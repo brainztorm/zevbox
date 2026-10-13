@@ -10,7 +10,8 @@ ARG APT_PACKAGES=""
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates git curl jq unzip python3 procps less ${APT_PACKAGES} \
  && rm -rf /var/lib/apt/lists/*
-RUN (getent group ${ZEVBOX_GID} || groupadd -g ${ZEVBOX_GID} agent) \
+RUN (getent group nobody || groupadd -r nobody) \
+ && (getent group ${ZEVBOX_GID} || groupadd -g ${ZEVBOX_GID} agent) \
  && useradd -u ${ZEVBOX_UID} -g ${ZEVBOX_GID} -M -d /home/agent -s /bin/bash agent \
  && mkdir -p /home/agent && chown ${ZEVBOX_UID}:${ZEVBOX_GID} /home/agent
 # /home/agent is hidden by the state mount at runtime: install nothing there.
