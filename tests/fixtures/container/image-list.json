@@ -1,0 +1,15 @@
+[
+  {
+    "configuration": {
+      "creationDate": "2026-07-30T15:14:27Z",
+      "descriptor": {"digest": "sha256:ef7b79af0be4e181454305737546e81aa9605b48d866331173ac89533d06df35", "mediaType": "application/vnd.oci.image.index.v1+json", "size": 523},
+      "name": "code.forgejo.org/forgejo/forgejo:16.0.2-rootless"
+    },
+    "id": "ef7b79af0be4e181454305737546e81aa9605b48d866331173ac89533d06df35",
+    "variants": []
+  },
+  {
+    "configuration": {"name": "zevbox/claude:claude-20261013-101500"},
+    "id": "0123"
+  }
+]

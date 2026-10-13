@@ -1,0 +1,32 @@
+# zevbox images (§8.8). Embedded in the binary with include_str!.
+# Build: container build --target <claude|antigravity> --build-arg BASE_IMAGE=... (see §8.7).
+# Everything here is validated at step 11; adjust and record changes in docs/DECISIONS.md.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS base
+ARG ZEVBOX_UID
+ARG ZEVBOX_GID
+# Each name is validated by zevbox (config::validate_apt_package) before being passed.
+ARG APT_PACKAGES=""
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates git curl jq unzip python3 procps less ${APT_PACKAGES} \
+ && rm -rf /var/lib/apt/lists/*
+RUN (getent group ${ZEVBOX_GID} || groupadd -g ${ZEVBOX_GID} agent) \
+ && useradd -u ${ZEVBOX_UID} -g ${ZEVBOX_GID} -M -d /home/agent -s /bin/bash agent \
+ && mkdir -p /home/agent && chown ${ZEVBOX_UID}:${ZEVBOX_GID} /home/agent
+# /home/agent is hidden by the state mount at runtime: install nothing there.
+COPY zevbox-release.json /etc/zevbox-release.json
+
+FROM base AS claude
+COPY package.json package-lock.json /opt/zevbox/claude/
+# No --omit=optional: the native Claude binary is an optional dependency (F6).
+RUN cd /opt/zevbox/claude && npm ci \
+ && test -x node_modules/.bin/claude-agent-acp
+
+FROM base AS antigravity
+ARG AGY_SHA256
+COPY agy.zip /tmp/agy.zip
+RUN echo "${AGY_SHA256}  /tmp/agy.zip" | sha256sum -c - \
+ && mkdir -p /opt/zevbox/antigravity \
+ && unzip -q /tmp/agy.zip -d /opt/zevbox/antigravity \
+ && rm /tmp/agy.zip \
+ && chmod +x /opt/zevbox/antigravity/agy_acp_server.par

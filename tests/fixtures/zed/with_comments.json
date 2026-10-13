@@ -1,0 +1,25 @@
+// Zed settings
+//
+// For information on how to configure Zed, see the Zed
+// documentation: https://zed.dev/docs/configuring-zed
+{
+  /* Theme block
+     kept exactly as is */
+  "theme": "One Dark",
+  "ui_font_size": 16, // trailing comment
+  "agent_servers": {
+    // Registry agent managed by Zed itself: zevbox must never touch it.
+    "claude-acp": {
+      "default_config_options": {
+        "fast": true,
+      },
+    },
+    "zevbox · Claude · old": {
+      "type": "custom",
+      "command": "/old/path/zevbox",
+      "args": ["launch", "claude", "--project", "/old/project"],
+      "env": {}
+    },
+  },
+  "vim_mode": false, /* inline block */
+}

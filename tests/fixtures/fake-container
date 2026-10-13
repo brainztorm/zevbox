@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# Test double of Apple's `container` CLI (1.5.0 JSON shapes). TEST-ONLY: the
+# no-shell rule (I7) applies to src/, not to this fixture. PROTECTED FILE.
+#
+# State: one directory per container in $FAKE_CONTAINER_DIR/<name>/ with files
+#   pid, labels.json, image, command, rm (present if --rm).
+# Every invocation is appended to $FAKE_CONTAINER_LOG (arguments joined by spaces).
+# `run` execs `python3 $FAKE_AGENT`, so the container pid is the agent pid.
+set -u
+DIR="${FAKE_CONTAINER_DIR:?FAKE_CONTAINER_DIR not set}"
+LOG="${FAKE_CONTAINER_LOG:?FAKE_CONTAINER_LOG not set}"
+mkdir -p "$DIR"
+printf '%s\n' "$*" >> "$LOG"
+
+alive() { [ -n "$1" ] && [ "$1" != 0 ] && kill -0 "$1" 2>/dev/null; }
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  --version)
+    echo "container CLI version 1.5.0 (build: release, commit: fake)"
+    ;;
+  system)
+    case "${1:-}" in
+      status) echo '{"status":"running","client":{"version":"1.5.0"},"host":{"architecture":"arm64"}}' ;;
+      start) : ;;
+      *) echo "fake-container: unsupported: system $*" >&2; exit 64 ;;
+    esac
+    ;;
+  image)
+    case "${1:-}" in
+      list)
+        printf '['
+        first=1
+        images="${FAKE_IMAGES-zevbox/claude:claude-test}"
+        # macOS bash 3.2: no arrays under `set -u`; image names contain no spaces.
+        for i in ${images//,/ }; do
+          [ $first = 1 ] || printf ','
+          first=0
+          printf '{"configuration":{"name":"%s"},"id":"fake"}' "$i"
+        done
+        printf ']\n'
+        ;;
+      delete) : ;;
+      *) echo "fake-container: unsupported: image $*" >&2; exit 64 ;;
+    esac
+    ;;
+  list)
+    printf '['
+    first=1
+    for d in "$DIR"/*/; do
+      [ -d "$d" ] || continue
+      name="$(basename "$d")"
+      pid="$(cat "$d/pid" 2>/dev/null || echo 0)"
+      if alive "$pid"; then
+        state=running
+      else
+        if [ -f "$d/rm" ]; then rm -rf "$d"; continue; fi
+        state=stopped
+      fi
+      labels="$(cat "$d/labels.json" 2>/dev/null || echo '{}')"
+      [ $first = 1 ] || printf ','
+      first=0
+      printf '{"configuration":{"id":"%s","labels":%s},"id":"%s","status":{"state":"%s"}}' "$name" "$labels" "$name" "$state"
+    done
+    printf ']\n'
+    ;;
+  run)
+    name=""; rm=0; labels=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --name) name="$2"; shift 2 ;;
+        --label) k="${2%%=*}"; v="${2#*=}"; labels="${labels}${labels:+,}\"$k\":\"$v\""; shift 2 ;;
+        --rm|--remove) rm=1; shift ;;
+        -i|-it|-t|--init|--interactive|--tty) shift ;;
+        --cpus|-c|--memory|-m|--uid|--gid|--cap-drop|-e|--env|--mount|-w|--workdir|--cwd|--progress) shift 2 ;;
+        -*) echo "fake-container: unknown run option $1" >&2; exit 64 ;;
+        *) break ;;
+      esac
+    done
+    [ $# -ge 1 ] || { echo "fake-container: missing image" >&2; exit 64; }
+    image="$1"; shift
+    [ -n "$name" ] || { echo "fake-container: --name required by zevbox" >&2; exit 65; }
+    if [ -e "$DIR/$name" ]; then echo "fake-container: $name already exists" >&2; exit 66; fi
+    mkdir "$DIR/$name"
+    printf '{%s}\n' "$labels" > "$DIR/$name/labels.json"
+    [ $rm = 1 ] && touch "$DIR/$name/rm"
+    printf '%s\n' "$image" > "$DIR/$name/image"
+    printf '%s\n' "$@" > "$DIR/$name/command"
+    echo $$ > "$DIR/$name/pid"
+    exec python3 "${FAKE_AGENT:?FAKE_AGENT not set}"
+    ;;
+  stop)
+    name=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -t|--time|-s|--signal) shift 2 ;;
+        -a|--all) echo "fake-container: --all is forbidden for zevbox" >&2; exit 99 ;;
+        -*) echo "fake-container: unknown stop option $1" >&2; exit 64 ;;
+        *) name="$1"; shift ;;
+      esac
+    done
+    d="$DIR/$name"
+    [ -n "$name" ] && [ -d "$d" ] || { echo "fake-container: $name not found" >&2; exit 1; }
+    pid="$(cat "$d/pid" 2>/dev/null || echo 0)"
+    alive "$pid" && kill -TERM "$pid" 2>/dev/null
+    for _ in $(seq 1 20); do alive "$pid" || break; sleep 0.1; done
+    alive "$pid" && kill -KILL "$pid" 2>/dev/null
+    [ -f "$d/rm" ] && rm -rf "$d"
+    exit 0
+    ;;
+  delete|rm)
+    name=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -f|--force) shift ;;
+        -a|--all) echo "fake-container: --all is forbidden for zevbox" >&2; exit 99 ;;
+        -*) echo "fake-container: unknown delete option $1" >&2; exit 64 ;;
+        *) name="$1"; shift ;;
+      esac
+    done
+    d="$DIR/$name"
+    [ -n "$name" ] && [ -d "$d" ] || { echo "fake-container: $name not found" >&2; exit 1; }
+    pid="$(cat "$d/pid" 2>/dev/null || echo 0)"
+    alive "$pid" && kill -KILL "$pid" 2>/dev/null
+    rm -rf "$d"
+    ;;
+  *)
+    echo "fake-container: unsupported command '$cmd'" >&2
+    exit 64
+    ;;
+esac

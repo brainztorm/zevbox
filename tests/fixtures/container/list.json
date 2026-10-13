@@ -1,0 +1,29 @@
+[
+  {
+    "configuration": {
+      "id": "buildkit",
+      "image": {"reference": "ghcr.io/apple/container-builder-shim/builder:0.13.1"},
+      "labels": {"com.apple.container.plugin": "builder", "com.apple.container.resource.role": "builder"},
+      "resources": {"cpus": 2, "memoryInBytes": 2147483648}
+    },
+    "id": "buildkit",
+    "status": {"startedDate": "2026-10-12T14:23:07Z", "state": "running"}
+  },
+  {
+    "configuration": {
+      "id": "zevbox-claude-0a1b2c3d",
+      "labels": {"zevbox.managed": "1", "zevbox.instance": "0a1b2c3d", "zevbox.agent": "claude"}
+    },
+    "id": "zevbox-claude-0a1b2c3d",
+    "status": {"state": "running"}
+  },
+  {
+    "configuration": {"id": "zevbox-fake-noLabel"},
+    "id": "zevbox-fake-noLabel",
+    "status": {"state": "stopped"}
+  },
+  {
+    "configuration": {"id": "zevbox-impostor", "labels": {"zevbox.managed": "1"}},
+    "id": "zevbox-impostor"
+  }
+]
