@@ -3,7 +3,6 @@
 use crate::paths::Paths;
 use std::path::Path;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 /// Exit codes of the whole CLI (§8.1).
 pub const EXIT_OK: u8 = 0;
@@ -138,37 +137,33 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
         Ok(p) => p,
         Err(err_msg) => {
             let full_msg = format!("zevbox: {err_msg}");
-            let mut stdin_reader = tokio::io::BufReader::new(tokio::io::stdin());
+            use std::io::{BufRead, Write};
+            let stdin = std::io::stdin();
+            let mut handle = stdin.lock();
             let mut line = String::new();
-            loop {
-                line.clear();
-                match stdin_reader.read_line(&mut line).await {
-                    Ok(0) => break,
-                    Ok(_) => {
-                        let trimmed = line.trim();
-                        if trimmed.is_empty() {
-                            continue;
-                        }
-                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                            if let Some(id) = v.get("id") {
-                                let resp = serde_json::json!({
-                                    "jsonrpc": "2.0",
-                                    "id": id,
-                                    "error": {
-                                        "code": -32000,
-                                        "message": full_msg
-                                    }
-                                });
-                                let _ = tokio::io::stdout()
-                                    .write_all(format!("{resp}\n").as_bytes())
-                                    .await;
-                                let _ = tokio::io::stdout().flush().await;
-                                break;
-                            }
-                        }
-                    }
-                    Err(_) => break,
+            while handle.read_line(&mut line).is_ok() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    line.clear();
+                    continue;
                 }
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                    if let Some(id) = v.get("id") {
+                        let resp = serde_json::json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "error": {
+                                "code": -32000,
+                                "message": full_msg
+                            }
+                        });
+                        let mut out = std::io::stdout();
+                        let _ = out.write_all(format!("{resp}\n").as_bytes());
+                        let _ = out.flush();
+                        break;
+                    }
+                }
+                break;
             }
             crate::ui::err(&full_msg);
             return EXIT_PRECONDITION;
