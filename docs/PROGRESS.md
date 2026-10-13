@@ -10,7 +10,7 @@ précédentes ne sont pas ✅ ici.
 | Étape | Titre | Statut | Preuve / notes |
 |---|---|---|---|
 | 0 | Chaîne d'outils + git | ✅ | Rust 1.99.0 installé via Homebrew `rustup` (2026-10-13), binaires dans `/opt/homebrew/opt/rustup/bin`. `make verify STEP=0` OK, `git init` et commit initial « harness » effectués (2026-10-13). |
-| 1 | Inventaire (👤 chemin du projet) | ⬜ | |
+| 1 | Inventaire (👤 chemin du projet) | ✅ | Revérifié (2026-10-13) : `container` 1.5.0, système `running`, 3 conteneurs existants intacts (`buildkit`, `kiac-*`). Zed 1.23.3, premier projet autorisé : `~/code/zevbox`. `make verify STEP=1` OK. |
 | 2 | Squelette compilable | ✅ | Fourni avec le plan : `cargo clippy --all-targets -- -D warnings` OK, `zevbox --help` liste les 15 commandes (2026-10-13). |
 | 3 | config, fsutil, tools | ✅ | **Exemple fourni** (2026-10-13) : `cargo test --test config_test` 22/22, clippy -D warnings OK, invariants OK. Fichiers marqués `WORKED EXAMPLE` : s'en inspirer pour le style. |
 | 4 | Politique du relais | ✅ | **Exemple fourni** (2026-10-13) : `relay_policy_test` 44/44, clippy OK, invariants OK. |
@@ -34,3 +34,4 @@ précédentes ne sont pas ✅ ici.
   `container`, faux agent, gates. Tous les tests ont été validés contre une
   implémentation de référence jetable (non fournie) : ils sont réalisables.
 - 2026-10-13 — Étape 0 validée : `make verify STEP=0` OK, git initialisé et commit « harness ».
+- 2026-10-13 — Étape 1 validée : inventaire vérifié, Zed 1.23.3, projet confirmé (`~/code/zevbox`), `make verify STEP=1` OK.

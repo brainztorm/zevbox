@@ -23,6 +23,7 @@ Format : date — fait ou décision — comment c'est vérifié.
 - 2026-10-13 — Langue : code, identifiants, messages CLI en anglais ; README en français.
 - 2026-10-13 — `status` est en lecture seule (affiche `orphan`) ; `launch`, `stop` et `clean` nettoient.
 - 2026-10-13 — `init` écrit `/opt/homebrew/bin/container` si le CLI est introuvable (et `doctor` le signale) plutôt que d'échouer.
+- 2026-10-13 — Étape 1 : Zed version 1.23.3 (`/Applications/Zed.app`) ; premier projet autorisé : `~/code/zevbox`.
 
 ## À vérifier (remplir pendant les étapes indiquées)
 
