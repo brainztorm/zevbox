@@ -4,7 +4,7 @@ Ce document présente une vue d'ensemble détaillée du projet **`zevbox`**, de 
 
 ---
 
-## 1. Contexte et Objectif
+## 1. Contexte et Problématique
 
 ### Le problème avec les agents IA dans l'éditeur (Zed)
 Lorsqu'un éditeur comme **Zed** intègre un agent IA via le protocole ACP (*Agent Client Protocol*, p. ex. Claude Code ou Google Antigravity), cet agent s'exécute habituellement directement sur votre Mac avec l'ensemble de vos privilèges utilisateurs.
@@ -41,7 +41,56 @@ flowchart LR
 
 ---
 
-## 2. Architecture Globale
+## 2. Pourquoi des Micro-VM Apple Container ? (L'intérêt Technologique)
+
+Le choix des **micro-VM Apple Container** est au cœur de la stratégie de confinement de `zevbox`. Il est crucial de comprendre la différence fondamentale entre les conteneurs traditionnels, les machines virtuelles classiques et les micro-VMs natives d'Apple.
+
+### 2.1 Comparatif des technologies d'isolation
+
+```mermaid
+flowchart TD
+    subgraph HostExec ["1. Exécution Directe sur l'Hôte"]
+        H1["Agent IA"] --> H2["Noyau macOS (XNU)"]
+        H2 --> H3["Accès direct à TOUS vos fichiers personnels (~/.ssh, etc.)"]
+    end
+
+    subgraph ClassicDocker ["2. Conteneurs Linux Classiques (Docker sous Linux)"]
+        D1["Agent en Conteneur"] --> D2["Noyau Linux Partagé (Namespaces / cgroups)"]
+        D2 -.->|"Évasion de conteneur possible si faille noyau (CVE)"| D3["Hôte Compromis"]
+    end
+
+    subgraph AppleVM ["3. Micro-VM Apple Container (Architecture zevbox)"]
+        A1["Agent en Micro-VM"] --> A2["Noyau Linux Dédié Guest en RAM"]
+        A2 --> A3["Barrière Matérielle Hyperviseur (Apple Virtualization.framework / ARM EL2)"]
+        A3 --> A4["Noyau macOS Protégé (Aucun accès aux fichiers hors des 2 montages)"]
+    end
+```
+
+### 2.2 Les 5 atouts décisifs d'Apple Container
+
+#### 1. Barrière matérielle (Hardware-enforced Hypervisor boundary)
+- **Conteneur classique (Linux)** : L'isolation repose sur des fonctionnalités logicielles du système d'exploitation (`namespaces`, `cgroups`, `chroot`). L'agent et l'hôte partagent le *même* noyau. Si une vulnérabilité noyau est exploitée, l'attaquant s'échappe directement sur l'hôte.
+- **Apple Container (macOS)** : Chaque conteneur est en réalité une **vraie micro-machine virtuelle** distincte pilotée par le framework natif `Virtualization.framework` d'Apple. La séparation est garantie au niveau du silicium par les extensions de virtualisation matérielle Apple Silicon (ARM EL2). Même un attaquant qui obtiendrait les droits `root` absolus et corromprait le noyau Linux de la micro-VM se heurte à la barrière physique de l'hyperviseur macOS.
+
+#### 2. Démarrage instantané (Sub-seconde vs VM lourdes)
+- Une machine virtuelle traditionnelle (UTM, Parallels, VirtualBox) émule une carte mère complète, charge un BIOS/UEFI, boote un OS lourd et met 15 à 30 secondes à démarrer tout en consommant plusieurs gigaoctets de RAM fixe.
+- Les micro-VM Apple Container démarrent en **moins de 300 millisecondes**. Elles démarrent directement un noyau Linux minimal en mémoire sans émulation matérielle superflue. Du point de vue de l'utilisateur dans Zed, le lancement de l'agent paraît instantané.
+
+#### 3. Partage de fichiers natif haute performance via `virtiofs`
+- Docker Desktop sur Mac souffre historiquement d'une latence d'I/O très lourde lors de l'accès aux fichiers du Mac (passerelles osxfs/gRPC FUSE ralenties).
+- Apple Container utilise **`virtiofs`**, directement intégré au noyau macOS et au noyau Linux invité via un canal mémoire partagé. L'agent lit et modifie les fichiers de votre projet à la vitesse native du SSD NVMe de votre Mac.
+
+#### 4. Préservation stricte des permissions (`host_uid` / `host_gid`)
+- Dans un environnement Docker classique, les fichiers écrits par un conteneur appartiennent souvent à `root`, bloquant l'utilisateur sur son Mac pour modifier ou commiter ses propres fichiers.
+- `zevbox` mappe exactement votre UID/GID macOS (`id -u` / `id -g`, p. ex. 501:20) dans la VM. Les fichiers créés ou modifiés par Claude ou tout autre agent appartiennent immédiatement à votre utilisateur macOS sans root-squash ni conflit de permissions.
+
+#### 5. Éphémérité totale (`--rm`) et délestage des capacités (`--cap-drop ALL`)
+- La micro-VM est créée avec une couche overlay temporaire en mémoire RAM. Dès que Zed ferme la session, la VM est anéantie : tous les fichiers temporaires, scripts de compilation ou artefacts générés hors du projet s'évaporent sans polluer votre Mac.
+- De surcroît, le conteneur démarre avec l'option `--cap-drop ALL` : même le compte `root` interne à la VM ne dispose d'aucun privilège système Linux spécial (`CAP_SYS_ADMIN`, `CAP_NET_ADMIN`, etc.).
+
+---
+
+## 3. Architecture Globale du Projet
 
 L'architecture repose sur quatre composants clés :
 
@@ -89,7 +138,7 @@ flowchart TD
 
 ---
 
-## 3. Le Cœur de Sécurité : La Politique du Relais
+## 4. Le Cœur de Sécurité : La Politique du Relais
 
 Le protocole ACP permet théoriquement à l'agent de demander à l'éditeur d'exécuter des actions sur la machine (par exemple `fs/readTextFile`, `terminal/create`).
 
@@ -139,7 +188,7 @@ sequenceDiagram
 
 ---
 
-## 4. Cycle de Vie d'une Session
+## 5. Cycle de Vie d'une Session
 
 Le superviseur garantit qu'aucun conteneur orphelin ne reste actif, même si Zed plante ou est forcé à quitter.
 
@@ -171,7 +220,7 @@ flowchart TD
 
 ---
 
-## 5. Gestion des Versions : Releases, Build et Rollback
+## 6. Gestion des Versions : Releases, Build et Rollback
 
 `zevbox` utilise un pipeline de release immuable : chaque version d'un agent génère un identifiant horodaté unique (`<agent>-AAAAMMJJ-HHMMSS`) et un fichier de verrouillage (`lock.json`).
 
@@ -189,7 +238,7 @@ Si une régression apparaît, la commande `zevbox rollback --agent <agent>` inte
 
 ---
 
-## 6. Analyse Détaillée : Claude vs Antigravity
+## 7. Analyse Détaillée : Claude vs Antigravity
 
 Pourquoi Claude fonctionne-t-il immédiatement dans `zevbox` alors qu'Antigravity nécessite une étape spécifique ?
 
@@ -226,7 +275,7 @@ flowchart TD
 
 ---
 
-## 7. Les 12 Invariants de Sécurité
+## 8. Les 12 Invariants de Sécurité
 
 Ces règles sont testées automatiquement à chaque compilation (`scripts/check-invariants.sh`) et ne peuvent jamais être relâchées :
 
