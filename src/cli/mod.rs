@@ -183,7 +183,7 @@ pub fn run() -> u8 {
             return EXIT_ERROR;
         }
     };
-    runtime.block_on(async move {
+    let code = runtime.block_on(async move {
         match dispatch(cli.command).await {
             Ok(code) => code,
             Err(e) => {
@@ -191,10 +191,24 @@ pub fn run() -> u8 {
                 EXIT_ERROR
             }
         }
-    })
+    });
+    runtime.shutdown_background();
+    code
 }
 
 async fn dispatch(command: Command) -> anyhow::Result<u8> {
+    let paths = crate::paths::Paths::from_env()?;
+    if !matches!(
+        command,
+        Command::Init | Command::Setup { .. } | Command::Launch { .. }
+    ) && !paths.config_file().exists()
+    {
+        crate::ui::err(
+            "zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init' in a macOS terminal.",
+        );
+        return Ok(crate::supervisor::EXIT_PRECONDITION);
+    }
+
     match command {
         Command::Setup { project } => setup::run(project).await,
         Command::Init => init::run().await,

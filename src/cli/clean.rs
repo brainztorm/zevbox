@@ -1,6 +1,41 @@
 //! `zevbox clean` (§8.1).
 
-pub async fn run(images: bool) -> anyhow::Result<u8> {
-    let _ = (images,);
-    anyhow::bail!("not implemented yet: zevbox clean")
+use crate::paths::Paths;
+use crate::supervisor::{EXIT_OK, EXIT_PRECONDITION};
+
+pub async fn run(_images: bool) -> anyhow::Result<u8> {
+    let paths = Paths::from_env()?;
+    if !paths.config_file().exists() {
+        crate::ui::err(
+            "zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init' in a macOS terminal.",
+        );
+        return Ok(EXIT_PRECONDITION);
+    }
+    let config = crate::config::load(&paths.config_file())?;
+    let cli = crate::container::ContainerCli::new(config.container_binary);
+
+    // 1. Clean orphan instance records and their containers
+    let cleaned = crate::supervisor::clean_orphans(&paths).await;
+    for id in cleaned {
+        crate::ui::out(&format!("cleaned orphan instance {id}"));
+    }
+
+    // 2. Clean unregistered zevbox containers
+    let records = crate::instances::list(&paths).unwrap_or_default();
+    if let Ok(containers) = cli.list_all().await {
+        for c in containers {
+            if crate::container::may_target(&c)
+                && !records.iter().any(|r| r.container_name == c.name)
+            {
+                crate::ui::out(&format!("removing unregistered container {}", c.name));
+                let _ = cli.stop_and_delete_verified(&c.name).await;
+            }
+        }
+    }
+
+    // 3. Prune old logs and backups
+    let _ = crate::fsutil::prune_oldest(&paths.logs_dir(), ".log", 30);
+    let _ = crate::fsutil::prune_oldest(&paths.backups_dir(), ".json", 30);
+
+    Ok(EXIT_OK)
 }
