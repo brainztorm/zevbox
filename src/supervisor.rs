@@ -139,23 +139,35 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
         Err(err_msg) => {
             let full_msg = format!("zevbox: {err_msg}");
             let mut stdin_reader = tokio::io::BufReader::new(tokio::io::stdin());
-            let mut first_line = String::new();
-            if stdin_reader.read_line(&mut first_line).await.is_ok() {
-                if let Ok(v) = serde_json::from_str::<serde_json::Value>(first_line.trim()) {
-                    if let Some(id) = v.get("id") {
-                        let resp = serde_json::json!({
-                            "jsonrpc": "2.0",
-                            "id": id,
-                            "error": {
-                                "code": -32000,
-                                "message": full_msg
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match stdin_reader.read_line(&mut line).await {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        let trimmed = line.trim();
+                        if trimmed.is_empty() {
+                            continue;
+                        }
+                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                            if let Some(id) = v.get("id") {
+                                let resp = serde_json::json!({
+                                    "jsonrpc": "2.0",
+                                    "id": id,
+                                    "error": {
+                                        "code": -32000,
+                                        "message": full_msg
+                                    }
+                                });
+                                let _ = tokio::io::stdout()
+                                    .write_all(format!("{resp}\n").as_bytes())
+                                    .await;
+                                let _ = tokio::io::stdout().flush().await;
+                                break;
                             }
-                        });
-                        let _ = tokio::io::stdout()
-                            .write_all(format!("{resp}\n").as_bytes())
-                            .await;
-                        let _ = tokio::io::stdout().flush().await;
+                        }
                     }
+                    Err(_) => break,
                 }
             }
             crate::ui::err(&full_msg);

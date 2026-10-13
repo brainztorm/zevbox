@@ -21,7 +21,7 @@ précédentes ne sont pas ✅ ici.
 | 9 | launch, status, stop, clean, init, project, zed | ✅ | Implémenté : `instances.rs`, `supervisor.rs`, CLI `init`, `project`, `zed`, `status`, `stop`, `clean`, `launch`. `make verify STEP=9` OK : `lifecycle_test` 22/22, `cli_test` 8/8, 12 binaires de test OK (2026-10-13). |
 | 10 | Tests réels Apple Container | ✅ | Validé sur la vraie VM Apple Container : 8/8 tests réussis dans `tests/integration_test.rs` (isolation virtiofs, uid hôte, bounded shutdown, SIGKILL, non-propagation symlink). `make verify STEP=10` OK (2026-10-13). |
 | 11 | update / build / smoke test / rollback | ✅ | Pipeline update / build / smoke test / rollback implémenté dans `src/release.rs` et `src/cli/update.rs`. Digest baseImage `node:22` consigné dans `DECISIONS.md`. Preuves réelles : `zevbox update --check` liste Claude (0.89.1) et Antigravity (1.3.0) ; `zevbox update --agent claude` construit l'image `zevbox/claude:claude-20261013-073156`, passe le smoke test (`/etc/zevbox-release.json`, `uname -s` Linux, dpkg) et promeut ; rollback testé avec 2 releases successives (permute current/previous). `make verify STEP=11` OK (2026-10-13). |
-| 12 | tools | ⬜ | |
+| 12 | tools | ✅ | CLI `zevbox tools list/add/remove` implémenté dans `src/cli/tools.rs`. Preuves réelles : `zevbox tools add ripgrep` ajoute `ripgrep` à `tools.json`, reconstruit l'image `zevbox/claude:claude-20261013-073710` et la promeut ; test réel `container run --rm zevbox/claude:claude-20261013-073710 rg --version` affiche `ripgrep 13.0.0` ; aucun nouveau montage hôte. `make verify STEP=12` OK (2026-10-13). |
 | 13 | 👤 Authentification Claude | ⬜ | |
 | 14 | 👤 Antigravity | ⬜ | |
 | 15 | doctor, setup, shell, logs, auth --status | ⬜ | |
@@ -40,3 +40,4 @@ précédentes ne sont pas ✅ ici.
 - 2026-10-13 — Étape 9 validée : gestion des instances, superviseur et commandes CLI essentielles, `make verify STEP=9` OK.
 - 2026-10-13 — Étape 10 validée : 8 tests réels Apple Container validés sur la machine hôte (`make verify STEP=10` OK).
 - 2026-10-13 — Étape 11 validée : pipeline de release complet, build réel sous Apple Container, smoke test et rollback validés sur l'hôte, `make verify STEP=11` OK.
+- 2026-10-13 — Étape 12 validée : `zevbox tools` implémenté, build avec apt package ripgrep validé sous Apple Container, `make verify STEP=12` OK.
