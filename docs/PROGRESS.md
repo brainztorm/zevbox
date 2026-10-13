@@ -14,12 +14,12 @@ précédentes ne sont pas ✅ ici.
 | 2 | Squelette compilable | ✅ | Fourni avec le plan : `cargo clippy --all-targets -- -D warnings` OK, `zevbox --help` liste les 15 commandes (2026-10-13). |
 | 3 | config, fsutil, tools | ✅ | **Exemple fourni** (2026-10-13) : `cargo test --test config_test` 22/22, clippy -D warnings OK, invariants OK. Fichiers marqués `WORKED EXAMPLE` : s'en inspirer pour le style. |
 | 4 | Politique du relais | ✅ | **Exemple fourni** (2026-10-13) : `relay_policy_test` 44/44, clippy OK, invariants OK. |
-| 5 | Transport du relais | ✅ | `run_relay` implémenté dans `src/relay/mod.rs` (boucle `tokio::select!`, FramedRead LinesCodec, sécurité I9/I11). `make verify STEP=5` OK : `relay_transport_test` 18/18, clippy OK, invariants OK (2026-10-13). |
+| 5 | Transport du relais | ✅✅ | `run_relay` implémenté dans `src/relay/mod.rs` (boucle `tokio::select!`, FramedRead LinesCodec, sécurité I9/I11). `make verify STEP=5` OK : `relay_transport_test` 18/18, clippy OK, invariants OK (2026-10-13). |
 | 6 | container.rs | ✅ | **Exemple fourni** (2026-10-13) : `container_test` 12/12, clippy OK, invariants OK. |
 | 7 | Releases (parsing, active.json) | ✅ | Parsing manifeste ACP (Claude / Antigravity), active.json, promote, rollback implémentés dans `src/release.rs`. `make verify STEP=7` OK : `release_test` 10/10, clippy OK, invariants OK (2026-10-13). |
 | 8 | Réglages Zed (JSONC) | ✅ | **Exemple fourni** (2026-10-13) : `zed_settings_test` 23/23 ; essai sur une copie du vrai `~/.config/zed/settings.json` : 0 ligne supprimée, désinstallation = original à l'octet. |
 | 9 | launch, status, stop, clean, init, project, zed | ✅ | Implémenté : `instances.rs`, `supervisor.rs`, CLI `init`, `project`, `zed`, `status`, `stop`, `clean`, `launch`. `make verify STEP=9` OK : `lifecycle_test` 22/22, `cli_test` 8/8, 12 binaires de test OK (2026-10-13). |
-| 10 | Tests réels Apple Container | ⬜ | |
+| 10 | Tests réels Apple Container | ✅ | Validé sur la vraie VM Apple Container : 8/8 tests réussis dans `tests/integration_test.rs` (isolation virtiofs, uid hôte, bounded shutdown, SIGKILL, non-propagation symlink). `make verify STEP=10` OK (2026-10-13). |
 | 11 | update / build / smoke test / rollback | ⬜ | |
 | 12 | tools | ⬜ | |
 | 13 | 👤 Authentification Claude | ⬜ | |
@@ -38,3 +38,4 @@ précédentes ne sont pas ✅ ici.
 - 2026-10-13 — Étape 5 validée : `relay::run_relay` implémenté et testé (18/18 tests transport), `make verify STEP=5` OK.
 - 2026-10-13 — Étape 7 validée : parsing des manifestes de registre, gestion des locks et rollback dans `src/release.rs` (10/10 tests release), `make verify STEP=7` OK.
 - 2026-10-13 — Étape 9 validée : gestion des instances, superviseur et commandes CLI essentielles, `make verify STEP=9` OK.
+- 2026-10-13 — Étape 10 validée : 8 tests réels Apple Container validés sur la machine hôte (`make verify STEP=10` OK).
