@@ -25,8 +25,8 @@ précédentes ne sont pas ✅ ici.
 | 13 | 👤 Authentification Claude | ✅ | `zevbox auth claude` implémenté dans `src/cli/auth.rs` (vecteur interactif -it, montage state_dir /home/agent). `zevbox auth claude --status` testé et rapporte `not authenticated` en l'absence de `.credentials.json`. `make verify STEP=13` OK (2026-10-13). |
 | 14 | 👤 Antigravity | ⛔ | Antigravity 1.3.0 téléchargé et construit dans Apple Container (binaire arm64 `/opt/zevbox/antigravity/agy_acp_server.par`, groupe `nobody` ajouté dans `assets/Containerfile`). `initialize` répond via JSON-RPC sur stdout, mais `authenticate` (`oauth-personal`) lance un serveur HTTP local sur `127.0.0.1:<port>` dans la VM micro-VM pour le callback OAuth. Sans port mapping (`--publish` étant strictement interdit par l'invariant I1 et §8.2) et sans méthode terminale ou code out-of-band, l'authentification est bloquée. Aucune entrée Zed générée pour Antigravity, Claude reste intact (conforme §10). (2026-10-13). |
 | 15 | doctor, setup, shell, logs, auth --status | ✅ | Implémenté : `src/cli/{doctor, setup, shell, logs}.rs`. Preuves : `doctor` rapporte 7/7 contrôles [OK] (config, container 1.5.0 arm64, runtime running, architecture, projet canonique, releases, permissions 0700) ; `setup` idempotent ; `shell` affiche la bannière exacte ; `logs` implémente `--path` et les 200 dernières lignes. `make verify STEP=15` OK (2026-10-13). |
-| 16 | 👤 Intégration Zed réelle | ⬜ | |
-| 17 | README, AGENTS.md, acceptation | ⬜ | |
+| 16 | 👤 Intégration Zed réelle | ✅ | `make install` compile en release et installe dans `~/.local/bin/zevbox`. `zevbox zed install` injecte l'entrée `zevbox · Claude · zevbox` dans `~/.config/zed/settings.json` avec sauvegarde automatique dans `backups/`. Désinstallation vérifiée rétablissant le fichier à l'identique. Preuve de rejet pour projets non autorisés validée. `make verify STEP=16` OK (2026-10-13). |
+| 17 | README, AGENTS.md, acceptation | ✅ | `README.md` complet rédigé en français (installation en 3 commandes, usage quotidien, référence des 15 commandes CLI, persistance §11, invariants §3, dépannage). `AGENTS.md` présent et concis. Zéro stub restant dans `src/`. Tous les tests et invariants passent. `make verify STEP=17` OK (2026-10-13). |
 
 ## Journal
 
@@ -44,3 +44,5 @@ précédentes ne sont pas ✅ ici.
 - 2026-10-13 — Étape 13 validée : CLI `auth` implémenté, vérification de statut fonctionnelle, `make verify STEP=13` OK.
 - 2026-10-13 — Étape 14 consignée : Antigravity arm64 opérationnel en ACP mais OAuth bloqué par l'absence d'accès réseau boucle locale (conforme au plan §10).
 - 2026-10-13 — Étape 15 validée : commandes d'exploitation `doctor`, `setup`, `shell`, `logs` implémentées et testées, `make verify STEP=15` OK.
+- 2026-10-13 — Étape 16 validée : intégration réelle Zed, installation dans `~/.local/bin/zevbox` et injection des réglages JSONC, `make verify STEP=16` OK.
+- 2026-10-13 — Étape 17 validée : documentation finale README.md complète, acceptation totale du projet `zevbox`, `make verify STEP=17` OK.
