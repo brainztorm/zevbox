@@ -17,6 +17,7 @@ Format : date — fait ou décision — comment c'est vérifié.
 - `SIGKILL` du processus `zevbox launch` : le stdin du conteneur se ferme, l'agent sort, le conteneur disparaît (< 15 s). Vérifié avec l'implémentation de référence (`tests/integration_test.rs`).
 - Réglages Zed : `~/.config/zed/settings.json` (0600) contient déjà `agent_servers.claude-acp` (ne pas toucher).
 - `jsonc-parser` 0.34 (features `cst`, `serde`) : l'édition CST préserve commentaires et virgules finales (API utilisée : `CstRootNode::parse`, `root.value()`, `root.object_value()`, `root.object_value_or_set()`, `obj.get(name)`, `prop.object_value()`, `obj.object_value_or_set(name)`, `obj.properties()`, `prop.decoded_name()`, `prop.value()?.to_serde_value()`, `prop.set_value(CstInputValue)`, `prop.remove()`, `obj.append(name, CstInputValue)`, `root.to_string()`). Rendu vérifié : nouvelles entrées indentées comme le fichier, idempotence octet pour octet.
+- Digest de `node:22-bookworm-slim` vérifié : `sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392` (via `container image list --format json`). Image de base figée : `node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392`.
 
 ## Décisions
 
@@ -24,10 +25,10 @@ Format : date — fait ou décision — comment c'est vérifié.
 - 2026-10-13 — `status` est en lecture seule (affiche `orphan`) ; `launch`, `stop` et `clean` nettoient.
 - 2026-10-13 — `init` écrit `/opt/homebrew/bin/container` si le CLI est introuvable (et `doctor` le signale) plutôt que d'échouer.
 - 2026-10-13 — Étape 1 : Zed version 1.23.3 (`/Applications/Zed.app`) ; premier projet autorisé : `~/code/zevbox`.
+- 2026-10-13 — Étape 11 : Digest vérifié `node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392`.
 
 ## À vérifier (remplir pendant les étapes indiquées)
 
-- Étape 11 : digest de `node:22-bookworm-slim` (commande exacte).
 - Étape 13 : chemin réel du fichier d'identifiants Claude sous Linux (`authMarker`).
 - Étape 14 : structure du zip Antigravity, sens de `--uid=`, méthode d'authentification.
 - Étape 16 : affichage dans Zed des erreurs préalables (§8.5) et comportement à l'archivage/fermeture.

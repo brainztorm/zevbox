@@ -1,11 +1,18 @@
 //! Releases: registry resolution, lock files, build, smoke test, promotion,
 //! rollback (§8.7).
 
-use crate::fsutil::{ensure_private_dir, write_atomic};
+use crate::fsutil::{ensure_private_dir, sha256_hex, write_atomic};
 use crate::paths::Paths;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::path::Path;
+use std::process::Stdio;
+
+pub const BASE_IMAGE: &str =
+    "node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392";
+
+pub const CONTAINERFILE_TEMPLATE: &str = include_str!("../assets/Containerfile");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -74,8 +81,10 @@ pub enum ReleaseError {
     NoActiveRelease(String),
     #[error("release store error: {0}")]
     Store(String),
-    #[error("not implemented yet: {0}")]
-    NotImplemented(&'static str),
+    #[error("build error: {0}")]
+    Build(String),
+    #[error("smoke test failed: {0}")]
+    SmokeTestFailed(String),
 }
 
 /// Requires `id == "claude-acp"`, `version`, `distribution.npx.package`
@@ -229,6 +238,16 @@ pub fn load_lock(paths: &Paths, release_id: &str) -> Result<ReleaseLock, Release
     }
 }
 
+pub fn save_lock(paths: &Paths, release_id: &str, lock: &ReleaseLock) -> Result<(), ReleaseError> {
+    let dir = paths.release_dir(release_id);
+    ensure_private_dir(&dir)
+        .map_err(|e| ReleaseError::Store(format!("failed to create release dir: {e}")))?;
+    let bytes = serde_json::to_vec_pretty(lock)
+        .map_err(|e| ReleaseError::Store(format!("failed to serialize lock file: {e}")))?;
+    write_atomic(&paths.release_lock_file(release_id), &bytes)
+        .map_err(|e| ReleaseError::Store(format!("failed to write lock file: {e}")))
+}
+
 /// Lock of the `current` release of `agent`, or `NoActiveRelease`.
 pub fn active_lock(paths: &Paths, agent: &str) -> Result<ReleaseLock, ReleaseError> {
     let active = load_active(paths)?;
@@ -266,4 +285,238 @@ pub fn rollback(active: &mut ActiveReleases, agent: &str) -> Result<(), ReleaseE
 /// `<agent>-<YYYYMMDD-HHMMSS>` in UTC.
 pub fn new_release_id(agent: &str, now: chrono::DateTime<chrono::Utc>) -> String {
     format!("{agent}-{}", now.format("%Y%m%d-%H%M%S"))
+}
+
+/// Downloads manifest from the registry via curl.
+pub fn fetch_manifest(registry_id: &str) -> Result<(String, String, String), ReleaseError> {
+    let url = format!(
+        "https://raw.githubusercontent.com/agentclientprotocol/registry/main/{registry_id}/agent.json"
+    );
+    let out = std::process::Command::new("curl")
+        .args([
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--max-time",
+            "60",
+            &url,
+        ])
+        .output()
+        .map_err(|e| ReleaseError::Store(format!("curl error: {e}")))?;
+
+    if !out.status.success() {
+        return Err(ReleaseError::Store(format!(
+            "failed to download manifest from {url}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )));
+    }
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    let sha = sha256_hex(text.as_bytes());
+    Ok((url, sha, text))
+}
+
+/// Prepares the build context for an update (§8.7 step 3).
+pub fn prepare_context(
+    context_dir: &Path,
+    lock: &ReleaseLock,
+    container_bin: &Path,
+) -> Result<(), ReleaseError> {
+    ensure_private_dir(context_dir)
+        .map_err(|e| ReleaseError::Store(format!("failed to create context dir: {e}")))?;
+
+    let containerfile_path = context_dir.join("Containerfile");
+    write_atomic(&containerfile_path, CONTAINERFILE_TEMPLATE.as_bytes())
+        .map_err(|e| ReleaseError::Store(format!("failed to write Containerfile: {e}")))?;
+
+    let release_json = serde_json::to_vec_pretty(lock)
+        .map_err(|e| ReleaseError::Store(format!("failed to serialize release.json: {e}")))?;
+    write_atomic(&context_dir.join("zevbox-release.json"), &release_json)
+        .map_err(|e| ReleaseError::Store(format!("failed to write zevbox-release.json: {e}")))?;
+
+    if lock.agent == "claude" {
+        let npm_pkg = lock
+            .npm_package
+            .as_deref()
+            .ok_or_else(|| ReleaseError::Store("missing npmPackage in lock".to_string()))?;
+        let package_json = serde_json::json!({
+            "private": true,
+            "dependencies": {
+                "@agentclientprotocol/claude-agent-acp": lock.agent_version
+            }
+        });
+        let pkg_bytes = serde_json::to_vec_pretty(&package_json)
+            .map_err(|e| ReleaseError::Store(format!("failed to serialize package.json: {e}")))?;
+        write_atomic(&context_dir.join("package.json"), &pkg_bytes)
+            .map_err(|e| ReleaseError::Store(format!("failed to write package.json: {e}")))?;
+
+        let out = std::process::Command::new(container_bin)
+            .args([
+                "run",
+                "--rm",
+                "--mount",
+                &format!("type=bind,source={},target=/w", context_dir.display()),
+                "-w",
+                "/w",
+                &lock.base_image,
+                "npm",
+                "install",
+                "--package-lock-only",
+                "--ignore-scripts",
+                npm_pkg,
+            ])
+            .output()
+            .map_err(|e| {
+                ReleaseError::Build(format!("failed to generate package-lock.json: {e}"))
+            })?;
+
+        if !out.status.success() {
+            return Err(ReleaseError::Build(format!(
+                "npm install --package-lock-only failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            )));
+        }
+    } else if lock.agent == "antigravity" {
+        let archive_url = lock
+            .archive_url
+            .as_deref()
+            .ok_or_else(|| ReleaseError::Store("missing archiveUrl in lock".to_string()))?;
+        let zip_path = context_dir.join("agy.zip");
+        let out = std::process::Command::new("curl")
+            .args([
+                "--fail",
+                "--silent",
+                "--show-error",
+                "--location",
+                "--max-time",
+                "120",
+                "-o",
+                &zip_path.to_string_lossy(),
+                archive_url,
+            ])
+            .output()
+            .map_err(|e| ReleaseError::Store(format!("failed to download antigravity zip: {e}")))?;
+
+        if !out.status.success() {
+            return Err(ReleaseError::Build(format!(
+                "curl failed for antigravity zip: {}",
+                String::from_utf8_lossy(&out.stderr)
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+/// Builds the container image via `container build` (§8.7 step 4).
+pub fn build_image(
+    context_dir: &Path,
+    lock: &ReleaseLock,
+    container_bin: &Path,
+    build_log_path: &Path,
+    uid: u32,
+    gid: u32,
+) -> Result<(), ReleaseError> {
+    let mut cmd = std::process::Command::new(container_bin);
+    cmd.args([
+        "build",
+        "-f",
+        &context_dir.join("Containerfile").to_string_lossy(),
+        "--target",
+        &lock.agent,
+        "--tag",
+        &lock.image,
+        "--build-arg",
+        &format!("BASE_IMAGE={}", lock.base_image),
+        "--build-arg",
+        &format!("ZEVBOX_UID={uid}"),
+        "--build-arg",
+        &format!("ZEVBOX_GID={gid}"),
+        "--build-arg",
+        &format!("APT_PACKAGES={}", lock.apt_packages.join(" ")),
+    ]);
+
+    if let Some(sha) = &lock.archive_sha256 {
+        cmd.args(["--build-arg", &format!("AGY_SHA256={sha}")]);
+    }
+    cmd.arg(context_dir);
+
+    let log_file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(build_log_path)
+        .map_err(|e| ReleaseError::Store(format!("cannot open build.log: {e}")))?;
+
+    cmd.stdout(Stdio::from(log_file.try_clone().map_err(|e| {
+        ReleaseError::Store(format!("cannot clone log file handle: {e}"))
+    })?));
+    cmd.stderr(Stdio::from(log_file));
+
+    let status = cmd
+        .status()
+        .map_err(|e| ReleaseError::Build(format!("container build failed to spawn: {e}")))?;
+
+    if !status.success() {
+        return Err(ReleaseError::Build(format!(
+            "container build failed with exit code {:?}; see {}",
+            status.code(),
+            build_log_path.display()
+        )));
+    }
+
+    Ok(())
+}
+
+/// Smoke tests the newly built image (§8.7 step 5).
+pub fn run_smoke_test(lock: &ReleaseLock, container_bin: &Path) -> Result<SmokeTest, ReleaseError> {
+    // 1. uname -s == Linux
+    let out = std::process::Command::new(container_bin)
+        .args(["run", "--rm", &lock.image, "uname", "-s"])
+        .output()
+        .map_err(|e| ReleaseError::SmokeTestFailed(format!("failed to run uname: {e}")))?;
+    if !out.status.success() || String::from_utf8_lossy(&out.stdout).trim() != "Linux" {
+        return Err(ReleaseError::SmokeTestFailed(
+            "uname -s was not 'Linux'".to_string(),
+        ));
+    }
+
+    // 2. dpkg -s for tools
+    for pkg in &lock.apt_packages {
+        let out = std::process::Command::new(container_bin)
+            .args(["run", "--rm", &lock.image, "dpkg", "-s", pkg])
+            .output()
+            .map_err(|e| {
+                ReleaseError::SmokeTestFailed(format!("dpkg test failed for {pkg}: {e}"))
+            })?;
+        if !out.status.success() {
+            return Err(ReleaseError::SmokeTestFailed(format!(
+                "package {pkg} is not installed"
+            )));
+        }
+    }
+
+    // 3. /etc/zevbox-release.json
+    let out = std::process::Command::new(container_bin)
+        .args([
+            "run",
+            "--rm",
+            &lock.image,
+            "cat",
+            "/etc/zevbox-release.json",
+        ])
+        .output()
+        .map_err(|e| ReleaseError::SmokeTestFailed(format!("failed to read release json: {e}")))?;
+    let content = String::from_utf8_lossy(&out.stdout);
+    if !content.contains(&lock.release_id) {
+        return Err(ReleaseError::SmokeTestFailed(
+            "/etc/zevbox-release.json missing releaseId".to_string(),
+        ));
+    }
+
+    Ok(SmokeTest {
+        passed: true,
+        at: chrono::Utc::now().to_rfc3339(),
+        details: "uname, packages and release-id verified".to_string(),
+    })
 }
