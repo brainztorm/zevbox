@@ -14,7 +14,7 @@ précédentes ne sont pas ✅ ici.
 | 2 | Squelette compilable | ✅ | Fourni avec le plan : `cargo clippy --all-targets -- -D warnings` OK, `zevbox --help` liste les 15 commandes (2026-10-13). |
 | 3 | config, fsutil, tools | ✅ | **Exemple fourni** (2026-10-13) : `cargo test --test config_test` 22/22, clippy -D warnings OK, invariants OK. Fichiers marqués `WORKED EXAMPLE` : s'en inspirer pour le style. |
 | 4 | Politique du relais | ✅ | **Exemple fourni** (2026-10-13) : `relay_policy_test` 44/44, clippy OK, invariants OK. |
-| 5 | Transport du relais | ⬜ | |
+| 5 | Transport du relais | ✅ | `run_relay` implémenté dans `src/relay/mod.rs` (boucle `tokio::select!`, FramedRead LinesCodec, sécurité I9/I11). `make verify STEP=5` OK : `relay_transport_test` 18/18, clippy OK, invariants OK (2026-10-13). |
 | 6 | container.rs | ✅ | **Exemple fourni** (2026-10-13) : `container_test` 12/12, clippy OK, invariants OK. |
 | 7 | Releases (parsing, active.json) | ⬜ | |
 | 8 | Réglages Zed (JSONC) | ✅ | **Exemple fourni** (2026-10-13) : `zed_settings_test` 23/23 ; essai sur une copie du vrai `~/.config/zed/settings.json` : 0 ligne supprimée, désinstallation = original à l'octet. |
@@ -35,3 +35,4 @@ précédentes ne sont pas ✅ ici.
   implémentation de référence jetable (non fournie) : ils sont réalisables.
 - 2026-10-13 — Étape 0 validée : `make verify STEP=0` OK, git initialisé et commit « harness ».
 - 2026-10-13 — Étape 1 validée : inventaire vérifié, Zed 1.23.3, projet confirmé (`~/code/zevbox`), `make verify STEP=1` OK.
+- 2026-10-13 — Étape 5 validée : `relay::run_relay` implémenté et testé (18/18 tests transport), `make verify STEP=5` OK.
