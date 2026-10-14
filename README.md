@@ -1,5 +1,7 @@
 # zevbox — run AI coding agents for Zed inside Apple Container micro-VMs
 
+**English** · [Français](docs/fr/README.md)
+
 **zevbox** lets you use ACP agents (**Claude Code**, **Google Antigravity**) from the
 [Zed](https://zed.dev) editor while keeping them off your Mac. Each agent runs inside a
 disposable **Apple Container** Linux micro-VM — a real hardware-isolated virtual machine, not a
@@ -29,6 +31,55 @@ directory** — and nothing else:
 | Files created outside the project | land on your Mac | **gone when the VM exits** |
 | File ownership of project edits | your user | **your user** (same UID/GID, no root-squash) |
 | Agent start-up | instant | **< 1 s** (micro-VM boot) |
+
+### What it looks like
+
+```mermaid
+flowchart LR
+    subgraph Host ["Your Mac (macOS, Apple Silicon)"]
+        Zed["Zed editor"]
+        Relay["zevbox relay\n(single Rust binary)"]
+        Project["Allowed project\ndirectory"]
+        State["Agent state\n(tokens)"]
+        Secrets["~/.ssh · ~/.aws · keychain\nother projects · $HOME"]
+    end
+    subgraph VM ["Disposable Apple Container micro-VM (Linux arm64)"]
+        Agent["ACP agent\nClaude Code / Antigravity"]
+    end
+
+    Zed <-->|"ACP · JSON-RPC\nstdin/stdout"| Relay
+    Relay <-->|"filtered ACP"| Agent
+    Project -.->|"bind mount · RW\nyour UID/GID"| Agent
+    State -.->|"bind mount · /home/agent"| Agent
+    Secrets x--x|"never mounted\nnever reachable"| VM
+
+    style Secrets fill:#fde8e8,stroke:#c0392b
+    style VM fill:#eef7ee,stroke:#2e7d32
+```
+
+The relay is the second half of the story. ACP lets an agent ask the *editor* to read files,
+write files or open a terminal **on the host**. zevbox answers those requests itself and Zed
+never sees them:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Zed as Zed
+    participant R as zevbox relay
+    participant A as agent (in the VM)
+
+    Zed->>R: initialize { fs: true, terminal: true }
+    Note over R: capabilities rewritten
+    R->>A: initialize { fs: false, terminal: false }
+    Zed->>R: session/new { cwd, mcpServers: [...] }
+    Note over R: cwd must be the allowed root · mcpServers emptied
+    R->>A: session/new { cwd, mcpServers: [] }
+    A-->>R: fs/readTextFile { path: "~/.ssh/id_rsa" }
+    Note over R: blocked (I3)
+    R-->>A: error -32601 "Method not allowed by zevbox policy"
+    A->>R: session/update (streamed answer)
+    R->>Zed: session/update
+```
 
 ### Why Apple Container rather than Docker
 
@@ -60,6 +111,14 @@ zevbox auth antigravity   # Google account (AI Pro / One AI Premium) — OAuth P
 zevbox project add /path/to/your/project
 ```
 
+```mermaid
+flowchart LR
+    A["make install"] --> B["zevbox auth claude\nzevbox auth antigravity"]
+    B --> C["zevbox project add /path"]
+    C --> D["Zed ▸ agent panel ▸\nzevbox · Claude"]
+    D --> E(["agent runs in a micro-VM"])
+```
+
 Zed now shows two agent servers, **`zevbox · Claude`** and **`zevbox · Antigravity`**. They work
 in every project you allowed with `zevbox project add`; in any other folder the agent answers
 `… is not an allowed project` (invariant I2 — only explicitly allowed directories are ever
@@ -70,6 +129,7 @@ mounted in a VM). `zevbox setup /path` does all of the above in one go; `init`, 
 
 Full walkthrough with checks: **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
 How it works and why: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+Documentation en français : **[docs/fr/](docs/fr/README.md)**.
 
 ---
 
@@ -112,6 +172,18 @@ How it works and why: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 | `zevbox tools list` / `add <pkgs…>` / `remove <pkgs…>` | Manages extra Debian packages (`tools.json`) and rebuilds the active agent images. |
 
 ---
+
+## Session lifecycle
+
+```mermaid
+flowchart LR
+    L(["Zed runs\nzevbox launch"]) --> P{"preflight\nconfig · project · image · auth"}
+    P -- "fails" --> E["JSON-RPC error to Zed\nexit code 3"]
+    P -- "ok" --> S["container run -i --rm\n--cap-drop ALL …"]
+    S --> R["relay loop"]
+    R -- "Zed closes stdin · agent exits · SIGTERM" --> T["bounded shutdown\ncontainer stop --time 5"]
+    T --> C(["VM destroyed\nrecord removed"])
+```
 
 ## What persists, what does not
 
@@ -176,7 +248,7 @@ not meant to be edited to make a change pass. [AGENTS.md](AGENTS.md) describes t
 invariants and workflow — it is written for AI coding agents but is the best short orientation
 for humans too. Design history lives in `docs/DECISIONS.md`, `docs/PROGRESS.md` and the plans
 `zevbox_plan_V2.md` (current contract) / `zevbox_plan_V1.md` (superseded); these working
-documents are in French.
+documents are in French. User documentation is bilingual: English here and in `docs/`, French under `docs/fr/`.
 
 ## License
 

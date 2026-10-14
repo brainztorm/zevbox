@@ -1,5 +1,7 @@
 # zevbox — Architecture, Operation and Security
 
+**English** · [Français](fr/ARCHITECTURE.md)
+
 This document gives a detailed overview of **zevbox**: its design choices, its security model,
 and how the ACP relay and the Apple Container micro-VMs work together.
 
