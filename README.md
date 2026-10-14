@@ -118,3 +118,14 @@ Zed affiche deux entrées, **`zevbox · Claude`** et **`zevbox · Antigravity`**
 - **`zevbox: this agent is bound to <A>; this session asked for <B>. Open <A> in Zed, or run 'zevbox project add <B>'`** : la session Zed demande un dossier différent de celui dans lequel l'agent a été lancé — typiquement un espace de travail Zed à plusieurs dossiers racines. Ouvrez un seul dossier racine par fenêtre Zed.
 - **`Auto mode unavailable: the selected model does not support Auto mode`** : le modèle par défaut de Claude dans la VM est Haiku 4.5. `zevbox doctor` signale `no default model` ; lancez `zevbox auth claude` (écrit `state/claude/.claude/settings.json`) ou écrivez-y `{"model": "fable"}`, puis ouvrez un nouveau thread Zed.
 - **`Apple Container system is not running. Fix: run 'container system start'`** : Le service de virtualisation Apple Container est arrêté. Démarrez-le avec `container system start`.
+
+---
+
+## Licence
+
+Copyright (C) 2026 brainztorm
+
+Zevbox est un logiciel libre, distribué sous la
+[Licence publique générale GNU v3.0 (GPLv3)](LICENSE).
+Sauf mention contraire explicite, toute contribution soumise intentionnellement pour inclusion
+dans ce dépôt est placée sous ces mêmes conditions.

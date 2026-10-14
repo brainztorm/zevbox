@@ -240,13 +240,13 @@ Exactement deux blocs, quel que soit le nombre de projets autorisés :
 ```json
     "zevbox · Claude": {
       "type": "custom",
-      "command": "~/.local/bin/zevbox",
+      "command": "/Users/<user>/.local/bin/zevbox",
       "args": ["launch", "claude"],
       "env": {}
     },
     "zevbox · Antigravity": {
       "type": "custom",
-      "command": "~/.local/bin/zevbox",
+      "command": "/Users/<user>/.local/bin/zevbox",
       "args": ["launch", "antigravity"],
       "env": {}
     }
