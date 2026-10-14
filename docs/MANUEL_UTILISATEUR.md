@@ -19,7 +19,7 @@ flowchart TD
     Step4 --> Step4b["Étape 5 : Autoriser vos projets\nzevbox project add <chemin>"]
     Step4b --> Step5{"Étape 6 : Batterie de tests\nzevbox doctor & shell"}
     
-    Step5 -- "Tests OK" --> Step6["Étape 7 : Lancer Zed\nSélectionner zevbox · Claude · <projet>\nou zevbox · Antigravity · <projet>"]
+    Step5 -- "Tests OK" --> Step6["Étape 7 : Lancer Zed\nSélectionner zevbox · Claude\nou zevbox · Antigravity"]
     Step5 -- "Erreur détectée" --> Fix["Consulter la section Dépannage"]
     Fix --> Step5
 
@@ -151,11 +151,11 @@ zevbox project add /chemin/absolu/du/projet
 **Ce que fait cette commande :**
 1. Valide que le chemin est sain (interdit `/`, `$HOME` et ses parents, les dossiers système, les dossiers de zevbox).
 2. L'ajoute à la liste blanche `config.json`.
-3. Crée dans Zed (`~/.config/zed/settings.json`, sauvegarde dans `backups/`) deux entrées liées à ce projet : **`zevbox · Claude · <nom>`** et **`zevbox · Antigravity · <nom>`**. Pas besoin de redémarrer Zed.
+3. S'assure que les deux entrées **`zevbox · Claude`** et **`zevbox · Antigravity`** sont présentes dans Zed (`~/.config/zed/settings.json`, sauvegarde dans `backups/` si quelque chose change). Pas besoin de redémarrer Zed.
 
-Répétez la commande pour chaque projet. `zevbox project list` affiche la liste ; `zevbox project remove <chemin>` retire un projet et ses entrées Zed.
+Répétez la commande pour chaque projet. `zevbox project list` affiche la liste ; `zevbox project remove <chemin>` retire un projet (les entrées Zed restent : elles ne dépendent pas des projets).
 
-> **Pourquoi une entrée par projet ?** Les serveurs d'agents de Zed sont un réglage global : toutes les entrées `zevbox · …` sont visibles depuis n'importe quel projet. Chaque entrée embarque le chemin de *son* projet et ne démarre que si le dossier ouvert dans Zed est bien celui-là. Choisir `zevbox · Claude · zevbox` depuis un autre projet donne le message `this agent is bound to …` (voir Dépannage, problème 2).
+> **Pourquoi seulement deux entrées ?** Les serveurs d'agents de Zed sont un réglage global, visible depuis tous les projets. Les entrées `zevbox · …` n'embarquent donc aucun chemin : au lancement, zevbox prend le dossier ouvert dans Zed (premier dossier racine) et vérifie qu'il est dans la liste blanche. Dans un dossier non autorisé, Zed affiche `… is not an allowed project. Fix: run 'zevbox project add …'` (voir Dépannage, problème 2).
 
 ---
 
@@ -232,18 +232,18 @@ grep -C 4 "zevbox · " ~/.config/zed/settings.json
 ```
 
 **Résultat attendu :**
-Pour chaque projet autorisé, deux blocs comme ceux-ci (ici pour le projet `demo-app`) :
+Exactement deux blocs, quel que soit le nombre de projets autorisés :
 ```json
-    "zevbox · Claude · demo-app": {
+    "zevbox · Claude": {
       "type": "custom",
       "command": "~/.local/bin/zevbox",
-      "args": ["launch", "claude", "--project", "~/code/demo-app"],
+      "args": ["launch", "claude"],
       "env": {}
     },
-    "zevbox · Antigravity · demo-app": {
+    "zevbox · Antigravity": {
       "type": "custom",
       "command": "~/.local/bin/zevbox",
-      "args": ["launch", "antigravity", "--project", "~/code/demo-app"],
+      "args": ["launch", "antigravity"],
       "env": {}
     }
 ```
@@ -264,9 +264,9 @@ sequenceDiagram
 
     User->>Zed: 1. Ouvre le projet dans Zed
     User->>Zed: 2. Ouvre le panneau Assistant (Cmd+Shift+A)
-    User->>Zed: 3. Sélectionne l'agent "zevbox · Claude · zevbox"
+    User->>Zed: 3. Sélectionne l'agent "zevbox · Claude"
     User->>Zed: 4. Pose une question dans le chat
-    Zed->>Zevbox: Appelle zevbox launch claude --project ...
+    Zed->>Zevbox: Appelle zevbox launch claude (cwd = projet ouvert)
     Zevbox->>VM: Démarre la micro-VM Linux isolée (< 300 ms)
     VM->>Zed: Répond via le relais ACP filtré
     Zed->>User: Affiche la réponse dans Zed
@@ -280,9 +280,9 @@ sequenceDiagram
    ```
 2. **Ouvrez le panneau Assistant / Agent** :
    - Raccourci clavier : `Cmd + Shift + A` (ou menu *View > Toggle Assistant Panel*).
-3. **Sélectionnez le serveur d'agent qui porte le nom du projet ouvert** :
+3. **Sélectionnez le serveur d'agent** :
    - En haut du panneau, menu « New Thread » / choix de l'agent.
-   - Choisissez **`zevbox · Claude · demo-app`** ou **`zevbox · Antigravity · demo-app`**. Les entrées des autres projets sont visibles aussi mais refuseront de démarrer ici.
+   - Choisissez **`zevbox · Claude`** ou **`zevbox · Antigravity`** : ce sont les deux seules entrées zevbox, elles s'appliquent au projet ouvert.
 4. **Faites un test dans le chat de Zed** :
    - Tapez ce prompt de validation :
      > *"Peux-tu me dire quel est ton système d'exploitation et lister les fichiers du dossier courant ?"*
@@ -309,21 +309,18 @@ sequenceDiagram
 
 ---
 
-### Problème 2 : Zed affiche `zevbox: this agent is bound to <A>; this session asked for <B>`
-- **Cause** : Depuis le projet `<B>`, vous avez choisi l'entrée Zed d'un autre projet (`<A>`). Chaque entrée `zevbox · <agent> · <nom>` ne sert qu'au projet de son nom.
-- **Solution** : Autorisez le projet ouvert, puis choisissez la nouvelle entrée qui porte son nom :
+### Problème 2 : Zed affiche `... is not an allowed project. Fix: run 'zevbox project add ...'`
+- **Cause** : Le dossier ouvert dans Zed n'est pas dans la liste blanche de `zevbox`.
+- **Solution** : Dans votre terminal, ajoutez le dossier (pas besoin de redémarrer Zed, relancez juste le thread) :
   ```bash
-  zevbox project add /chemin/vers/B
+  zevbox project add /chemin/vers/ce/dossier
   ```
 
 ---
 
-### Problème 3 : Zed affiche `... is not an allowed project`
-- **Cause** : Le dossier ouvert dans Zed n'est pas dans la liste blanche de `zevbox`.
-- **Solution** : Dans votre terminal, ajoutez le dossier :
-  ```bash
-  zevbox project add /chemin/vers/ce/dossier
-  ```
+### Problème 3 : Zed affiche `zevbox: this agent is bound to <A>; this session asked for <B>`
+- **Cause** : La session Zed demande un dossier (`<B>`) différent de celui où l'agent a été lancé (`<A>`) — en pratique un espace de travail Zed avec plusieurs dossiers racines.
+- **Solution** : Ouvrez un seul dossier racine par fenêtre Zed.
 
 ---
 

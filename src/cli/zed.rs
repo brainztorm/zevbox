@@ -11,7 +11,8 @@ pub async fn run(action: super::ZedAction) -> anyhow::Result<u8> {
         );
         return Ok(EXIT_PRECONDITION);
     }
-    let config = crate::config::load(&paths.config_file())?;
+    // Validates the configuration before touching Zed's settings.
+    let _config = crate::config::load(&paths.config_file())?;
 
     match action {
         super::ZedAction::Install { settings, dry_run } => {
@@ -26,11 +27,8 @@ pub async fn run(action: super::ZedAction) -> anyhow::Result<u8> {
                 }
             }
             let installed_bin = crate::paths::installed_binary()?;
-            let entries = crate::zed_settings::entries_for(
-                &config.projects,
-                &active_agents,
-                &installed_bin.to_string_lossy(),
-            );
+            let entries =
+                crate::zed_settings::entries_for(&active_agents, &installed_bin.to_string_lossy());
             if dry_run {
                 let original = match std::fs::read_to_string(&settings_path) {
                     Ok(t) => t,

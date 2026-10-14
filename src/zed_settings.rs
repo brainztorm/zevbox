@@ -16,11 +16,13 @@ pub const MANAGED_PREFIX: &str = "zevbox · ";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManagedEntry {
-    /// e.g. "zevbox · Claude · myproject".
+    /// e.g. "zevbox · Claude".
     pub name: String,
     /// Absolute path of the installed binary.
     pub command: String,
-    /// ["launch", <agent>, "--project", <path>].
+    /// ["launch", <agent>]: the project is the working directory Zed starts
+    /// the agent in (its first worktree), checked against `config.projects`
+    /// by `launch` (I2).
     pub args: Vec<String>,
 }
 
@@ -44,42 +46,19 @@ pub enum ZedSettingsError {
     Io { path: PathBuf, reason: String },
 }
 
-/// One entry per (project, agent), projects in the given order, agents in the
-/// given order. Name: `zevbox · <display> · <basename>`; if two projects share
-/// a basename, both use `<parent-basename>/<basename>`.
-pub fn entries_for(projects: &[PathBuf], agents: &[AgentSpec], command: &str) -> Vec<ManagedEntry> {
-    let mut entries = Vec::new();
-    for project in projects {
-        let label = project_label(project, projects);
-        for agent in agents {
-            entries.push(ManagedEntry {
-                name: format!("{MANAGED_PREFIX}{} · {label}", agent.display),
-                command: command.to_string(),
-                args: vec![
-                    "launch".to_string(),
-                    agent.id.to_string(),
-                    "--project".to_string(),
-                    project.to_string_lossy().into_owned(),
-                ],
-            });
-        }
-    }
-    entries
-}
-
-fn file_name(path: &Path) -> String {
-    path.file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default()
-}
-
-fn project_label(project: &Path, all: &[PathBuf]) -> String {
-    let base = file_name(project);
-    let collides = all.iter().filter(|p| file_name(p) == base).count() > 1;
-    match project.parent() {
-        Some(parent) if collides => format!("{}/{base}", file_name(parent)),
-        _ => base,
-    }
+/// One entry per agent, agents in the given order, independent of the
+/// allowed projects (Zed's `agent_servers` is a global setting with no
+/// per-project filtering, so one entry per project would show them all in
+/// every project). Name: `zevbox · <display>`.
+pub fn entries_for(agents: &[AgentSpec], command: &str) -> Vec<ManagedEntry> {
+    agents
+        .iter()
+        .map(|agent| ManagedEntry {
+            name: format!("{MANAGED_PREFIX}{}", agent.display),
+            command: command.to_string(),
+            args: vec!["launch".to_string(), agent.id.to_string()],
+        })
+        .collect()
 }
 
 /// The exact value written for an entry (also used to detect "already up to date").

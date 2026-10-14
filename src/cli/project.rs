@@ -60,7 +60,10 @@ pub async fn run(action: super::ProjectAction) -> anyhow::Result<u8> {
     }
 }
 
-pub fn update_zed(paths: &Paths, config: &crate::config::Config) -> anyhow::Result<()> {
+/// Keeps the managed Zed entries in sync (one per agent with an active
+/// release). They do not depend on `config.projects`, so this is a no-op
+/// write-wise unless an entry is missing or stale.
+pub fn update_zed(paths: &Paths, _config: &crate::config::Config) -> anyhow::Result<()> {
     let zed_settings = match crate::paths::zed_settings_file() {
         Ok(p) => p,
         Err(_) => return Ok(()),
@@ -75,11 +78,8 @@ pub fn update_zed(paths: &Paths, config: &crate::config::Config) -> anyhow::Resu
         }
     }
     let installed_bin = crate::paths::installed_binary()?;
-    let entries = crate::zed_settings::entries_for(
-        &config.projects,
-        &active_agents,
-        &installed_bin.to_string_lossy(),
-    );
+    let entries =
+        crate::zed_settings::entries_for(&active_agents, &installed_bin.to_string_lossy());
     let _ = crate::zed_settings::install(&zed_settings, &paths.backups_dir(), &entries);
     Ok(())
 }

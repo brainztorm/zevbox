@@ -35,7 +35,7 @@ Un binaire unique `zevbox` (Rust, macOS arm64) qui permet de :
 ```bash
 cd ~/code/projects/me/zevbox && make install          # compile et installe ~/.local/bin/zevbox
 zevbox setup --project ~/code/projects/me/myproject   # configuration guidée, images, auth, Zed
-# → ouvrir le projet dans Zed, choisir « zevbox · Claude · myproject » dans le panneau Agent
+# → ouvrir le projet dans Zed, choisir « zevbox · Claude » dans le panneau Agent (amendement 2026-10-14, §8.9)
 zevbox status                                         # voir ce qui tourne
 zevbox stop                                           # tout arrêter (seulement les instances zevbox)
 ```
@@ -93,7 +93,7 @@ Limites assumées, à écrire telles quelles dans le README : l'agent peut modif
 
 ```text
 Zed (macOS)
-  │ lance : ~/.local/bin/zevbox launch claude --project /chemin/projet
+  │ lance : ~/.local/bin/zevbox launch claude   (cwd = projet ; `--project` optionnel — amendement 2026-10-14, §8.9)
   ▼
 zevbox launch  (processus hôte, Rust, tokio)
   ├─ 1. charge config + release active, vérifie projet (I2), runtime, image, auth
@@ -408,9 +408,9 @@ Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manq
 | `zevbox init` | Crée `stateRoot` (0700) et ses sous-dossiers, `config.json` et `tools.json` s'ils manquent. Ne remplace jamais un fichier existant. Si le CLI `container` est introuvable, écrit `/opt/homebrew/bin/container` (et `doctor` le signale). |
 | `zevbox doctor [--json]` | Liste de contrôles `OK/WARN/FAIL` + action corrective pour chacun (§8.6). Sortie 1 si au moins un `FAIL`. |
 | `zevbox project add PATH [--no-zed]` / `remove PATH` / `list` | Gère `config.projects` (validation I2), puis lance `zed install` sauf `--no-zed`. `remove` arrête d'abord les instances de ce projet. |
-| `zevbox zed install [--settings PATH] [--dry-run]` / `zed uninstall` | Synchronise les entrées `zevbox · …` des réglages Zed avec `config.projects` × agents ayant une release active (§8.9). `--dry-run` affiche le texte avant/après des entrées concernées. |
+| `zevbox zed install [--settings PATH] [--dry-run]` / `zed uninstall` | Synchronise les entrées `zevbox · …` des réglages Zed : ~~`config.projects` ×~~ une par agent ayant une release active (§8.9, amendement 2026-10-14). `--dry-run` affiche le texte avant/après des entrées concernées. |
 | `zevbox auth <agent> [--status]` | Session interactive d'authentification dans le conteneur (§8.2). `--status` : `authenticated`/`not authenticated`/`unknown`. |
-| `zevbox launch <agent> --project PATH` | Appelé par Zed. Ne jamais l'appeler à la main sauf pour tester. |
+| `zevbox launch <agent> [--project PATH]` | Appelé par Zed. Ne jamais l'appeler à la main sauf pour tester. Sans `--project` (amendement 2026-10-14) : projet = répertoire de travail, que Zed fixe au premier worktree du projet ; toujours contrôlé par I2. |
 | `zevbox status [--json]` | **Lecture seule.** Tableau : id, agent, projet, release, état (`running`/`orphan`/`unregistered`). Croise les enregistrements et `container list --all --format json`. `--json` : tableau d'objets `{id, agent, project, release, containerName, state}` (`id`, `project`, `release` à `null` pour `unregistered`) ; `[]` si rien. |
 | `zevbox stop [ID \| --project PATH]` | Sans argument : arrête **toutes les instances zevbox enregistrées**, une par une (jamais `--all`). Affiche ce qui a été arrêté. |
 | `zevbox clean [--images]` | Supprime les orphelins vérifiés (I8), les enregistrements obsolètes, les journaux au-delà de 30 et les sauvegardes au-delà de 20. `--images` : supprime les images `zevbox/*` qui ne sont ni `current` ni `previous`. Ne touche jamais `state/`, `config.json` ni les projets. |
@@ -496,7 +496,7 @@ VÉRIFIER à l'étape 16 (👤) comment Zed affiche ce message, et le consigner 
 5. Pour chaque agent : release active, image présente, témoin d'auth (`--status`).
 6. Droits `0700` sur `stateRoot` et `state/*`.
 7. `~/.local/bin/zevbox` existe ; c'est le binaire référencé par les entrées Zed.
-8. Les entrées Zed `zevbox · …` correspondent à `config.projects` (sinon `WARN` → `zevbox zed install`).
+8. Les entrées Zed `zevbox · …` correspondent ~~à `config.projects`~~ aux agents ayant une release active (amendement 2026-10-14 ; sinon `WARN` → `zevbox zed install`).
 9. Instances orphelines ou non enregistrées.
 10. Méthodes ACP refusées récemment (lues dans les journaux).
 11. Les conteneurs de `inventory-preexisting.json` existent toujours (sinon `WARN`, information seulement).
@@ -586,18 +586,20 @@ RUN echo "${AGY_SHA256}  /tmp/agy.zip" | sha256sum -c - \
 
 ### 8.9 Réglages Zed (`zed_settings.rs`)
 
-Entrée gérée, une par (projet, agent ayant une release active) :
+> **Amendement 2026-10-14 (DECISIONS R1).** `agent_servers` est un réglage global de Zed, sans filtrage par projet (`agent_server_store.rs` lit `settings.get(None)`) : une entrée par (projet, agent) affichait toutes les entrées dans tous les projets. Désormais **une entrée par agent ayant une release active**, indépendante de `config.projects`. Zed lance l'agent avec `current_dir` = premier worktree du projet (`acp/transport.rs::spawn_stdio`), `launch` en déduit le projet et applique I2/I5 comme avant. Ancien texte barré ci-dessous.
+
+Entrée gérée, une par ~~(projet,~~ agent ayant une release active~~)~~ :
 
 ```json
-"zevbox · Claude · myproject": {
+"zevbox · Claude": {
   "type": "custom",
   "command": "~/.local/bin/zevbox",
-  "args": ["launch", "claude", "--project", "~/code/myproject"],
+  "args": ["launch", "claude"],
   "env": {}
 }
 ```
 
-- Nom : `zevbox · <Display> · <basename>` ; si deux projets ont le même basename : `zevbox · <Display> · <parent>/<basename>`.
+- Nom : `zevbox · <Display>`. ~~`zevbox · <Display> · <basename>` ; si deux projets ont le même basename : `zevbox · <Display> · <parent>/<basename>`.~~ Les anciennes entrées `zevbox · <Display> · <projet>` sont gérées (préfixe) donc remplacées par `zed install`.
 - **Propriété** : une clé est gérée par zevbox si et seulement si elle commence par `zevbox · `. Les autres clés (ex. `claude-acp`) ne sont jamais lues, modifiées, réordonnées ni reformatées.
 - Algorithme `install` : lire le texte → sha256 → sauvegarde dans `backups/` → parser avec `jsonc_parser::cst::CstRootNode::parse` → obtenir ou créer l'objet racine puis `agent_servers` → supprimer les clés gérées obsolètes → mettre à jour ou ajouter les clés attendues → texte final → re-parser pour valider → **relire le fichier et comparer son sha256 à celui du début** (s'il a changé : abandonner, avec le message « settings changed during update, retry ») → écriture atomique **en conservant les droits d'origine** (`0600` ici).
 - Si le texte final est identique à l'original : ne rien écrire, ne pas créer de sauvegarde, afficher `already up to date`.

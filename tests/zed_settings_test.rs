@@ -1,4 +1,6 @@
 //! §9.3 — Zed JSONC settings editing. PROTECTED FILE: do not edit.
+//! 2026-10-14: entries are one per agent (`zevbox · <Display>`, args
+//! `["launch", <agent>]`), edited with the human's authorization (DECISIONS R1).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use jsonc_parser::ParseOptions;
@@ -26,31 +28,18 @@ fn parse(text: &str) -> Value {
     jsonc_parser::parse_to_serde_value(text, &ParseOptions::default()).unwrap()
 }
 
-fn entry(name: &str, agent: &str, project: &str) -> ManagedEntry {
+fn entry(name: &str, agent: &str) -> ManagedEntry {
     ManagedEntry {
         name: name.to_string(),
         command: BIN.to_string(),
-        args: vec![
-            "launch".into(),
-            agent.into(),
-            "--project".into(),
-            project.into(),
-        ],
+        args: vec!["launch".into(), agent.into()],
     }
 }
 
 fn my_entries() -> Vec<ManagedEntry> {
     vec![
-        entry(
-            "zevbox · Claude · myproject",
-            "claude",
-            "/Users/test/code/myproject",
-        ),
-        entry(
-            "zevbox · Antigravity · myproject",
-            "antigravity",
-            "/Users/test/code/myproject",
-        ),
+        entry("zevbox · Claude", "claude"),
+        entry("zevbox · Antigravity", "antigravity"),
     ]
 }
 
@@ -75,33 +64,24 @@ const CLAUDE_ACP_BLOCK: &str = r#""claude-acp": {
 
 #[test]
 fn entries_for_builds_names_and_args() {
-    let projects = vec![PathBuf::from("/Users/test/code/myproject")];
-    let got = entries_for(&projects, &AGENTS, BIN);
+    let got = entries_for(&AGENTS, BIN);
     assert_eq!(got, my_entries());
 }
 
 #[test]
-fn basename_collision_disambiguated() {
-    let projects = vec![
-        PathBuf::from("/a/work/app"),
-        PathBuf::from("/b/perso/app"),
-        PathBuf::from("/c/solo"),
-    ];
-    let got = entries_for(&projects, &AGENTS[..1], BIN);
+fn one_entry_per_agent_without_project_suffix() {
+    let got = entries_for(&AGENTS[..1], BIN);
     let names: Vec<&str> = got.iter().map(|e| e.name.as_str()).collect();
-    assert_eq!(
-        names,
-        vec![
-            "zevbox · Claude · work/app",
-            "zevbox · Claude · perso/app",
-            "zevbox · Claude · solo"
-        ]
+    assert_eq!(names, vec!["zevbox · Claude"]);
+    assert!(
+        got.iter().all(|e| !e.args.iter().any(|a| a == "--project")),
+        "the project comes from the working directory Zed starts the agent in"
     );
 }
 
 #[test]
 fn every_entry_name_has_managed_prefix() {
-    let got = entries_for(&[PathBuf::from("/x/y")], &AGENTS, BIN);
+    let got = entries_for(&AGENTS, BIN);
     assert_eq!(got.len(), 2);
     assert!(got.iter().all(|e| e.name.starts_with(MANAGED_PREFIX)));
 }
@@ -119,11 +99,7 @@ fn install_semantics_match_expected() {
     let keys: Vec<&String> = servers.keys().collect();
     assert_eq!(
         keys,
-        vec![
-            "claude-acp",
-            "zevbox · Claude · myproject",
-            "zevbox · Antigravity · myproject"
-        ],
+        vec!["claude-acp", "zevbox · Claude", "zevbox · Antigravity"],
         "stale managed entry removed, unmanaged kept first, new ones appended in order"
     );
     assert_eq!(
@@ -131,11 +107,11 @@ fn install_semantics_match_expected() {
         json!({"default_config_options": {"fast": true}})
     );
     assert_eq!(
-        servers["zevbox · Claude · myproject"],
+        servers["zevbox · Claude"],
         json!({
             "type": "custom",
             "command": BIN,
-            "args": ["launch", "claude", "--project", "/Users/test/code/myproject"],
+            "args": ["launch", "claude"],
             "env": {}
         })
     );
@@ -181,7 +157,7 @@ fn updates_changed_entry_in_place() {
     let out = apply_entries(&once, &changed).unwrap();
     let v = parse(&out);
     assert_eq!(
-        v["agent_servers"]["zevbox · Claude · myproject"]["command"],
+        v["agent_servers"]["zevbox · Claude"]["command"],
         "/new/zevbox"
     );
     assert_eq!(
@@ -193,9 +169,12 @@ fn updates_changed_entry_in_place() {
 
 #[test]
 fn removes_stale_managed_entries() {
+    // Also the migration path: the pre-2026-10-14 per-project entries
+    // (`zevbox · Claude · old`, `--project`) are managed, hence replaced.
     let out = apply_entries(&fixture("with_comments.json"), &my_entries()).unwrap();
     assert!(!out.contains("zevbox · Claude · old"));
     assert!(!out.contains("/old/project"));
+    assert!(!out.contains("--project"));
 }
 
 #[test]

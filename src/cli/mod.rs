@@ -79,8 +79,10 @@ pub enum Command {
     /// Called by Zed: start the agent VM and relay ACP on stdin/stdout
     Launch {
         agent: AgentArg,
+        /// Project root. Default: the current directory (Zed starts the agent
+        /// in the project's first worktree).
         #[arg(long)]
-        project: PathBuf,
+        project: Option<PathBuf>,
     },
     /// Show running zevbox instances
     Status {

@@ -1,5 +1,7 @@
 //! §8.1 — End-to-end tests of `init`, `project`, `zed`, `doctor` exit codes.
 //! PROTECTED FILE: do not edit.
+//! 2026-10-14: Zed entries are one per agent (DECISIONS R1), edited with the
+//! human's authorization.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod common;
@@ -139,10 +141,10 @@ async fn zed_install_dry_run_install_uninstall() {
     let v: Value = jsonc_parser::parse_to_serde_value(&text, &Default::default()).unwrap();
     let servers = v["agent_servers"].as_object().unwrap();
     // Only Claude has an active release in TestEnv::new().
-    let key = "zevbox · Claude · proj";
+    let key = "zevbox · Claude";
     assert!(servers.contains_key(key), "{text}");
     assert!(
-        !servers.contains_key("zevbox · Antigravity · proj"),
+        !servers.contains_key("zevbox · Antigravity"),
         "no entry without an active release"
     );
     assert!(servers.contains_key("claude-acp"));
@@ -153,7 +155,7 @@ async fn zed_install_dry_run_install_uninstall() {
     );
     assert_eq!(
         servers[key]["args"],
-        serde_json::json!(["launch", "claude", "--project", env.project])
+        serde_json::json!(["launch", "claude"])
     );
     assert_eq!(mode(&env.zed_settings), 0o600);
     assert_eq!(
@@ -188,8 +190,14 @@ async fn project_add_updates_zed_by_default() {
     let out = env.run(&["project", "add", p2.to_str().unwrap()]).await;
     assert_eq!(out.code, Some(0), "{}", out.stderr);
     let text = fs::read_to_string(&env.zed_settings).unwrap();
-    assert!(text.contains("zevbox · Claude · second"), "{text}");
-    assert!(text.contains("zevbox · Claude · proj"), "{text}");
+    // One entry per agent: adding a project never adds a Zed entry.
+    assert!(text.contains("\"zevbox · Claude\""), "{text}");
+    assert!(!text.contains("zevbox · Claude · second"), "{text}");
+    assert!(!text.contains("--project"), "{text}");
+    assert_eq!(
+        env.run(&["project", "list"]).await.stdout.lines().count(),
+        2
+    );
 }
 
 #[tokio::test]
