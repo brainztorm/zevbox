@@ -33,8 +33,8 @@ Un binaire unique `zevbox` (Rust, macOS arm64) qui permet de :
 ### Expérience utilisateur visée (doit être vraie à la fin)
 
 ```bash
-cd ~/code/projects/me/zevbox && make install          # compile et installe ~/.local/bin/zevbox
-zevbox setup --project ~/code/projects/me/myproject   # configuration guidée, images, auth, Zed
+cd ~/code/zevbox && make install          # compile et installe ~/.local/bin/zevbox
+zevbox setup --project ~/code/myproject   # configuration guidée, images, auth, Zed
 # → ouvrir le projet dans Zed, choisir « zevbox · Claude » dans le panneau Agent (amendement 2026-10-14, §8.9)
 zevbox status                                         # voir ce qui tourne
 zevbox stop                                           # tout arrêter (seulement les instances zevbox)
@@ -183,7 +183,7 @@ Créé par `zevbox init`. Champs inconnus → erreur (`#[serde(deny_unknown_fiel
 {
   "schemaVersion": 1,
   "containerBinary": "/opt/homebrew/bin/container",
-  "projects": ["~/code/myproject"],
+  "projects": ["/Users/<user>/code/myproject"],
   "resources": { "cpus": 4, "memory": "4G" },
   "relay": { "maxMessageBytes": 33554432 },
   "hostUid": 501,
@@ -593,7 +593,7 @@ Entrée gérée, une par ~~(projet,~~ agent ayant une release active~~)~~ :
 ```json
 "zevbox · Claude": {
   "type": "custom",
-  "command": "~/.local/bin/zevbox",
+  "command": "/Users/<user>/.local/bin/zevbox",
   "args": ["launch", "claude"],
   "env": {}
 }

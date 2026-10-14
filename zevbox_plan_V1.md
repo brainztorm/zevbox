@@ -216,9 +216,9 @@ Créer `config/zevbox.json` avec, au minimum, les paramètres suivants. Les chem
 ```json
 {
     "schemaVersion": 1,
-    "projectRoot": "~/code/myproject",
+    "projectRoot": "/Users/<user>/code/myproject",
     "containerBinary": "/opt/homebrew/bin/container",
-    "stateRoot": "~/Library/Application Support/zevbox",
+    "stateRoot": "/Users/<user>/Library/Application Support/zevbox",
     "resources": {
         "cpus": 4,
         "memory": "4G"
@@ -349,8 +349,8 @@ La suite de tests dans `tests/` est exécutable sans dépendance à un modèle d
 ### Commandes à développer
 
 ```bash
-~/code/agentbox/target/release/zevbox auth claude
-~/code/agentbox/target/release/zevbox auth antigravity
+~/code/zevbox/target/release/zevbox auth claude
+~/code/zevbox/target/release/zevbox auth antigravity
 ```
 
 Ces commandes lancent un environnement interactif Linux avec l’état dédié à l’agent concerné. Un TTY (`-it`) est permis pour ce flux manuel, contrairement au transport ACP. L’utilisateur réalise lui-même l’authentification via le mécanisme officiel disponible. [Source](https://github.com/apple/container/blob/1.5.0/docs/command-reference.md) [Source](https://code.claude.com/docs/en/authentication)
@@ -390,9 +390,9 @@ container run -i --rm \
   --name zevbox-claude-IDENTIFIANT \
   --cpus 4 \
   --memory 4G \
-  --mount "type=bind,source=~/code/myproject,target=~/code/myproject" \
-  --mount "type=bind,source=~/Library/Application Support/zevbox/state/claude,target=/home/agent" \
-  -w ~/code/myproject \
+  --mount "type=bind,source=/Users/<user>/code/myproject,target=/Users/<user>/code/myproject" \
+  --mount "type=bind,source=/Users/<user>/Library/Application Support/zevbox/state/claude,target=/home/agent" \
+  -w /Users/<user>/code/myproject \
   IMAGE_CLAUDE_VERROUILLEE \
   BINAIRE_CLAUDE_VERIFIE
 ```
@@ -434,22 +434,22 @@ Exemple du bloc attendu pour le projet `myproject` : [Source](https://zed.dev/do
     "agent_servers": {
         "zevbox · Claude · myproject": {
             "type": "custom",
-            "command": "~/code/zevbox/target/release/zevbox",
+            "command": "/Users/<user>/code/zevbox/target/release/zevbox",
             "args": [
                 "launch",
                 "claude",
                 "--project",
-                "~/code/myproject"
+                "/Users/<user>/code/myproject"
             ]
         },
         "zevbox · Antigravity · myproject": {
             "type": "custom",
-            "command": "~/code/zevbox/target/release/zevbox",
+            "command": "/Users/<user>/code/zevbox/target/release/zevbox",
             "args": [
                 "launch",
                 "antigravity",
                 "--project",
-                "~/code/myproject"
+                "/Users/<user>/code/myproject"
             ]
         }
     }
@@ -524,10 +524,10 @@ zevbox tools rebuild
 Après compilation et installation validées :
 
 ```bash
-~/code/agentbox/target/release/zevbox doctor
-~/code/agentbox/target/release/zevbox auth claude
-~/code/agentbox/target/release/zevbox auth antigravity
-~/code/agentbox/target/release/zevbox zed install
+~/code/zevbox/target/release/zevbox doctor
+~/code/zevbox/target/release/zevbox auth claude
+~/code/zevbox/target/release/zevbox auth antigravity
+~/code/zevbox/target/release/zevbox zed install
 ```
 
 Ouvrir `~/code/myproject` dans Zed, puis sélectionner **`zevbox · Claude · myproject`** ou **`zevbox · Antigravity · myproject`** dans le panneau Agent. Zed lance `zevbox`, et `zevbox` démarre le conteneur en relayant ACP de façon sécurisée. [Source](https://zed.dev/docs/ai/external-agents)
@@ -537,14 +537,14 @@ Ouvrir `~/code/myproject` dans Zed, puis sélectionner **`zevbox · Claude · my
 Pour vérifier l’exécution, utiliser `zevbox status` depuis un terminal macOS :
 
 ```bash
-~/code/agentbox/target/release/zevbox status
-~/code/agentbox/target/release/zevbox doctor
+~/code/zevbox/target/release/zevbox status
+~/code/zevbox/target/release/zevbox doctor
 ```
 
 Pour un shell humain isolé dans la micro-VM :
 
 ```bash
-~/code/agentbox/target/release/zevbox shell claude \
+~/code/zevbox/target/release/zevbox shell claude \
   --project ~/code/myproject
 ```
 
@@ -553,10 +553,10 @@ Pour un shell humain isolé dans la micro-VM :
 Pour libérer les ressources et arrêter formellement les micro-VMs associées au projet :
 
 ```bash
-~/code/agentbox/target/release/zevbox stop \
+~/code/zevbox/target/release/zevbox stop \
   --project ~/code/myproject
 
-~/code/agentbox/target/release/zevbox status
+~/code/zevbox/target/release/zevbox status
 ```
 
 ### Ce qui disparaît et ce qui persiste

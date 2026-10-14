@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Run ACP agents (Claude, Antigravity) for Zed inside Apple Container micro-VMs"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/brainztorm/zevbox"
+readme = "README.md"
+keywords = ["zed", "acp", "sandbox", "apple-container", "agent"]
+categories = ["development-tools", "command-line-utilities"]
 publish = false
 
 [lib]
