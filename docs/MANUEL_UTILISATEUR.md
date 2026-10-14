@@ -128,7 +128,7 @@ zevbox auth antigravity
 ```
 
 **Déroulement :**
-1. zevbox ouvre un petit serveur HTTP **sur votre Mac** (`127.0.0.1`, port aléatoire — aucun port n'est publié sur la micro-VM) et affiche l'URL de connexion Google. Si le navigateur ne s'ouvre pas, copiez-la.
+1. zevbox ouvre un petit serveur HTTP **sur votre Mac** (`127.0.0.1`, port aléatoire — aucun port n'est publié sur la micro-VM) et affiche l'URL de connexion Google. Si le navigateur ne s'ouvre pas, copiez-la. Zevbox attend le retour de Google pendant 5 minutes.
 2. Choisissez votre compte **Google AI Pro / One AI Premium** et cliquez sur **Autoriser**.
 3. Le navigateur affiche « Authentification Google réussie ! » ; le terminal affiche `Exchanging authorization code with Google...` puis `Google Antigravity authenticated successfully.`
 4. Les fichiers `settings.json` et `acp_token.json` sont écrits dans `state/antigravity/.gemini/antigravity-acp/` (`0600`). Le trousseau macOS n'est jamais sollicité.

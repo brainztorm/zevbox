@@ -56,13 +56,14 @@ Format : date — fait ou décision — comment c'est vérifié.
 - **R3 — Montages `auth`/`shell`, `setup` conforme — ✅ 2026-10-14** : `auth` monte un dossier vide jetable ; `shell` refuse un cwd non autorisé ; `setup` fait `update` + `auth` (terminal) + résumé.
 - **R2 — Quick start via `zevbox auth` — ✅ code 2026-10-14** : `auth` fait `init`/runtime/`update` si besoin. Preuve manuelle réseau à faire par 👤 (voir PROGRESS).
 - **R4 — ouverture du navigateur — partiel 2026-10-14** : Antigravity corrigé (`/usr/bin/open`, erreur affichée), à confirmer par 👤. Claude : test manuel `BROWSER` encore à faire (restant ci-dessous).
+- **R5 — durcissement `auth antigravity` — ✅ code 2026-10-14** (test de bout en bout à confirmer par 👤).
 
 ## Reste à faire — mode d'emploi pour l'agent implémenteur
 
 Ce qui suit est écrit pour être exécuté sans autre contexte que `AGENTS.md`, `zevbox_plan_V2.md` et ce fichier. Lire aussi les « Faits vérifiés » plus haut.
 
 **Règles communes (obligatoires)**
-1. **Ordre d'exécution : (R8, R3, R2 faits, R4 partiel) R4 → R5 → R6 → R7.** Un R à la fois. Ne pas commencer le suivant avant que le précédent soit commité.
+1. **Ordre d'exécution : (R8, R3, R2, R5 faits, R4 partiel) R4 → R6 → R7.** Un R à la fois. Ne pas commencer le suivant avant que le précédent soit commité.
 2. Avant de coder un R : lire les fichiers listés dans sa rubrique « Fichiers ». Copier le style des fichiers `WORKED EXAMPLE` (en-tête de fichier). Messages CLI en anglais, format `<problème>. Fix: <commande exacte>`.
 3. Interdits inchangés : `unwrap/expect/panic` dans `src/` (clippy les refuse), shell hôte (`sh -c`), montage de `$HOME`, `--all`, écriture dans un projet utilisateur, `-t` sur le conteneur ACP. Invariants I1–I12 du plan §3.
 4. **Fichiers protégés** (`tests/**` listés dans `tests/PROTECTED.sha256`, `scripts/**`, `clippy.toml`) : **ne pas les modifier**. Les nouveaux tests vont dans de **nouveaux fichiers** `tests/r<N>_<sujet>_test.rs` (ils peuvent faire `mod common;` et utiliser `common::TestEnv`, voir `tests/launch_cwd_test.rs` comme modèle) ou dans `#[cfg(test)]` du module. Si un R ne peut pas être fait sans toucher un test protégé : s'arrêter, écrire pourquoi dans `docs/PROGRESS.md`, demander au 👤.
@@ -77,19 +78,6 @@ Ce qui suit est écrit pour être exécuté sans autre contexte que `AGENTS.md`,
 - **Antigravity — FAIT (à confirmer 👤)** (`src/cli/auth.rs`, `auth_antigravity`) : était `std::process::Command::new("open").arg(&auth_url).spawn()` est appelé avec `let _ =`. Étapes : utiliser `/usr/bin/open` en chemin absolu (le `PATH` peut être minimal), attendre le statut (`.status()`), et si échec afficher `could not open the browser (<erreur>): open the URL above manually`. Tester à la main : si ça marche désormais, fini. Sinon, essayer `/usr/bin/open -u <url>` et consigner le résultat.
 - **Claude** : la commande tourne dans le conteneur ; elle ne peut pas ouvrir un navigateur hôte. Piste à **vérifier d'abord à la main** (10 min) : Claude Code respecte la variable `BROWSER` (il exécute `$BROWSER <url>`). Test : `zevbox shell claude` puis `BROWSER=/bin/echo /opt/zevbox/claude/node_modules/.bin/claude-agent-acp --cli auth login --claudeai` ; si l'URL est bien passée à `echo`, implémenter : dans `assets/Containerfile` (étape `claude`), ajouter un script `/opt/zevbox/open-url` (`#!/bin/sh` ; `printf '%s\n' "$1" > "$HOME/.zevbox-open-url"`) ; dans `auth.rs`, ajouter `-e BROWSER=/opt/zevbox/open-url` aux arguments (via un champ `extra_env: Vec<(String,String)>` dans `RunSpec`, vide par défaut, écrit par `run_args`), et pendant que le conteneur tourne, une tâche tokio relit `state/claude/.zevbox-open-url` toutes les 200 ms, lance `/usr/bin/open <url>` et supprime le fichier. Si `BROWSER` n'est pas honoré : consigner « non faisable, URL à copier » dans ce fichier et fermer R4 côté Claude.
 - Tests : `#[cfg(test)]` sur la fonction qui lit le fichier d'URL (n'ouvre rien si le fichier est absent ou si l'URL ne commence pas par `https://claude.com/` ou `https://claude.ai/`). Docs : MANUEL étape 4 (retirer « le navigateur ne s'ouvre pas » si corrigé).
-
-### R5 — Durcissement de `zevbox auth antigravity` (`src/cli/auth.rs`)
-
-Étapes, toutes dans `auth_antigravity` et ses helpers :
-1. Vérifier le paramètre `state` reçu dans la requête de rappel (`extract_query_param(&req, "state")`) contre celui généré ; différent ou absent → réponse HTTP 400 `Invalid state`, message `Google authentication failed: state mismatch`, code 1. Ne jamais poursuivre l'échange.
-2. Ne traiter que `GET /?…` : si le chemin de la première ligne ne commence pas par `/?`, répondre `404` et **continuer à attendre** la bonne requête (boucle `accept`), au lieu d'échouer (les navigateurs demandent parfois `/favicon.ico`).
-3. Timeout d'attente 120 s → 300 s.
-4. `--status` (branche commune, `marker_path.exists()`) : pour Antigravity, exiger que le fichier soit du JSON contenant une chaîne non vide `refresh_token` ; sinon `not authenticated`.
-5. Persister aussi `token` (= `access_token`) et `expiry` (ISO 8601, `now + expires_in`) dans `acp_token.json` ; ne rien casser si absents de la réponse.
-6. Tests `#[cfg(test)]` dans `auth.rs` : `base64_url_encode` (vecteurs RFC 4648 §10 : `""`→`""`, `"f"`→`"Zg"`, `"fo"`→`"Zm8"`, `"foo"`→`"Zm9v"`, `"foob"`→`"Zm9vYg"`), `url_encode` (`"a b/c"`→`"a%20b%2Fc"`), `extract_query_param` (`GET /?code=x%2By&state=s HTTP/1.1` → `code` = `x+y`), `percent_decode`, et la vérification de `state` (fonction pure `callback_is_valid(req, expected_state) -> Result<String, String>`).
-7. Docs : rien (comportement visible inchangé), sauf MANUEL 4b : délai 5 min.
-
-**Acceptation** : tests verts ; à la main : `zevbox auth antigravity` complet réussit encore ; `zevbox auth antigravity --status` → `authenticated`.
 
 ### R6 — Mises à jour disponibles
 

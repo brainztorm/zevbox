@@ -37,7 +37,12 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
     let marker_path = paths.state_dir(agent.id()).join(&lock.auth_marker);
 
     if status {
-        if marker_path.exists() {
+        let authenticated = if agent.id() == "antigravity" {
+            has_refresh_token(&marker_path)
+        } else {
+            marker_path.exists()
+        };
+        if authenticated {
             crate::ui::out("authenticated");
         } else {
             crate::ui::out("not authenticated");
@@ -260,11 +265,26 @@ async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {
 
     listener.set_nonblocking(true)?;
     let start = std::time::Instant::now();
-    let timeout = std::time::Duration::from_secs(120);
+    let timeout = std::time::Duration::from_secs(300);
 
-    let mut stream = loop {
+    use std::io::{Read, Write};
+    // Browsers also ask for /favicon.ico and the like: answer 404 and keep
+    // waiting for the real callback (`GET /?…`).
+    let (mut stream, req) = loop {
         match listener.accept() {
-            Ok((s, _)) => break s,
+            Ok((mut stream, _)) => {
+                stream.set_nonblocking(false)?;
+                stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
+                let mut buf = [0u8; 4096];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).into_owned();
+                if is_callback_request(&req) {
+                    break (stream, req);
+                }
+                let _ = stream.write_all(
+                    b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                );
+            }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 if start.elapsed() > timeout {
                     crate::ui::err("Authentication timed out waiting for browser callback.");
@@ -276,20 +296,16 @@ async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {
         }
     };
 
-    use std::io::{Read, Write};
-    let mut buf = [0u8; 4096];
-    let n = stream.read(&mut buf)?;
-    let req = String::from_utf8_lossy(&buf[..n]);
-
-    let code = match extract_query_param(&req, "code") {
-        Some(c) => c,
-        None => {
-            let error_msg = extract_query_param(&req, "error")
-                .unwrap_or_else(|| "missing code parameter".to_string());
-            let _ = stream.write_all(
-                b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<h1>Authentication Failed</h1>",
-            );
-            crate::ui::err(&format!("Google authentication failed: {error_msg}"));
+    let code = match callback_is_valid(&req, &state) {
+        Ok(c) => c,
+        Err(reason) => {
+            let body: &[u8] = if reason == STATE_MISMATCH {
+                b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nConnection: close\r\n\r\nInvalid state"
+            } else {
+                b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<h1>Authentication Failed</h1>"
+            };
+            let _ = stream.write_all(body);
+            crate::ui::err(&format!("Google authentication failed: {reason}"));
             return Ok(EXIT_ERROR);
         }
     };
@@ -357,7 +373,7 @@ async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {
         serde_json::to_string_pretty(&settings_json)?.as_bytes(),
     )?;
 
-    let acp_token_json = serde_json::json!({
+    let mut acp_token_json = serde_json::json!({
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
         "refresh_token": refresh_token,
@@ -369,6 +385,22 @@ async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {
         ],
         "project_id": ""
     });
+    // Also keep the access token and its expiry when Google sent them.
+    if let (Some(obj), Some(access)) = (
+        acp_token_json.as_object_mut(),
+        token_resp.get("access_token").and_then(|v| v.as_str()),
+    ) {
+        obj.insert("token".into(), access.into());
+        if let Some(secs) = token_resp.get("expires_in").and_then(|v| v.as_i64()) {
+            let expiry = chrono::Utc::now() + chrono::Duration::seconds(secs);
+            obj.insert(
+                "expiry".into(),
+                expiry
+                    .to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+                    .into(),
+            );
+        }
+    }
     crate::fsutil::write_atomic(
         &acp_dir.join("acp_token.json"),
         serde_json::to_string_pretty(&acp_token_json)?.as_bytes(),
@@ -376,6 +408,38 @@ async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {
 
     crate::ui::out("Google Antigravity authenticated successfully.");
     Ok(EXIT_OK)
+}
+
+const STATE_MISMATCH: &str = "state mismatch";
+
+/// True for `GET /?…`, the only request that can carry the OAuth redirect.
+fn is_callback_request(req: &str) -> bool {
+    let mut parts = req.lines().next().unwrap_or("").split_whitespace();
+    parts.next() == Some("GET") && parts.next().is_some_and(|p| p.starts_with("/?"))
+}
+
+/// The authorization code of the callback request, if its `state` is the one
+/// we generated. `Err` carries the reason shown to the user.
+fn callback_is_valid(req: &str, expected_state: &str) -> Result<String, String> {
+    if extract_query_param(req, "state").as_deref() != Some(expected_state) {
+        return Err(STATE_MISMATCH.to_string());
+    }
+    extract_query_param(req, "code").ok_or_else(|| {
+        extract_query_param(req, "error").unwrap_or_else(|| "missing code parameter".to_string())
+    })
+}
+
+/// `acp_token.json` counts as authenticated only with a non-empty `refresh_token`.
+fn has_refresh_token(path: &std::path::Path) -> bool {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|v| {
+            v.get("refresh_token")
+                .and_then(|t| t.as_str())
+                .map(|t| !t.is_empty())
+        })
+        .unwrap_or(false)
 }
 
 fn base64_url_encode(data: &[u8]) -> String {
@@ -443,4 +507,64 @@ fn percent_decode(input: &str) -> String {
         }
     }
     String::from_utf8_lossy(&bytes).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base64_url_vectors() {
+        for (input, want) in [
+            ("", ""),
+            ("f", "Zg"),
+            ("fo", "Zm8"),
+            ("foo", "Zm9v"),
+            ("foob", "Zm9vYg"),
+        ] {
+            assert_eq!(base64_url_encode(input.as_bytes()), want);
+        }
+    }
+
+    #[test]
+    fn url_encode_reserved() {
+        assert_eq!(url_encode("a b/c"), "a%20b%2Fc");
+    }
+
+    #[test]
+    fn query_params_are_decoded() {
+        let req = "GET /?code=x%2By&state=s HTTP/1.1\r\n";
+        assert_eq!(extract_query_param(req, "code").as_deref(), Some("x+y"));
+        assert_eq!(extract_query_param(req, "state").as_deref(), Some("s"));
+        assert_eq!(extract_query_param(req, "other"), None);
+        assert_eq!(percent_decode("a%20b%2Fc"), "a b/c");
+    }
+
+    #[test]
+    fn callback_state_is_checked() {
+        let ok = "GET /?code=x%2By&state=s HTTP/1.1\r\n";
+        assert_eq!(callback_is_valid(ok, "s"), Ok("x+y".to_string()));
+        assert_eq!(
+            callback_is_valid(ok, "other"),
+            Err(STATE_MISMATCH.to_string())
+        );
+        let no_state = "GET /?code=c HTTP/1.1\r\n";
+        assert_eq!(
+            callback_is_valid(no_state, "s"),
+            Err(STATE_MISMATCH.to_string())
+        );
+        let denied = "GET /?error=access_denied&state=s HTTP/1.1\r\n";
+        assert_eq!(
+            callback_is_valid(denied, "s"),
+            Err("access_denied".to_string())
+        );
+    }
+
+    #[test]
+    fn only_get_root_query_is_a_callback() {
+        assert!(is_callback_request("GET /?code=c&state=s HTTP/1.1\r\n"));
+        assert!(!is_callback_request("GET /favicon.ico HTTP/1.1\r\n"));
+        assert!(!is_callback_request("POST /?code=c HTTP/1.1\r\n"));
+        assert!(!is_callback_request(""));
+    }
 }
