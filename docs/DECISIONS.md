@@ -34,6 +34,7 @@ Format : date — fait ou décision — comment c'est vérifié.
 ## Décisions
 
 - 2026-10-13 — Langue : code, identifiants, messages CLI en anglais ; README en français.
+- 2026-10-14 — Publication GitHub : README, `docs/USER_GUIDE.md` (ex-`MANUEL_UTILISATEUR.md`) et `docs/ARCHITECTURE.md` (ex-`EXPLICATION_ET_ARCHITECTURE.md`) réécrits en anglais pour attirer des contributeurs ; les journaux de travail (plans, DECISIONS, PROGRESS, exploration) restent en français.
 - 2026-10-13 — `status` est en lecture seule (affiche `orphan`) ; `launch`, `stop` et `clean` nettoient.
 - 2026-10-13 — `init` écrit `/opt/homebrew/bin/container` si le CLI est introuvable (et `doctor` le signale) plutôt que d'échouer.
 - 2026-10-13 — Étape 1 : Zed version 1.23.3 (`/Applications/Zed.app`) ; premier projet autorisé : `~/code/zevbox`.
