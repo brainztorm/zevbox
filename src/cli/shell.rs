@@ -49,15 +49,17 @@ pub async fn run(agent: super::AgentArg, project: Option<PathBuf>) -> anyhow::Re
             let cur = std::env::current_dir()
                 .ok()
                 .and_then(|c| std::fs::canonicalize(c).ok());
-            if let Some(c) = cur.filter(|c| config.projects.contains(c)) {
-                c
-            } else if let Some(first) = config.projects.first() {
-                first.clone()
-            } else {
-                crate::ui::err(
-                    "no allowed projects configured. Fix: run 'zevbox project add <path>'",
-                );
-                return Ok(EXIT_PRECONDITION);
+            match cur.filter(|c| config.projects.contains(c)) {
+                Some(c) => c,
+                None => {
+                    let shown = std::env::current_dir()
+                        .map(|c| c.display().to_string())
+                        .unwrap_or_else(|_| "the current directory".to_string());
+                    crate::ui::err(&format!(
+                        "{shown} is not an allowed project. Fix: run 'zevbox project add {shown}' or pass --project <path>"
+                    ));
+                    return Ok(EXIT_PRECONDITION);
+                }
             }
         }
     };

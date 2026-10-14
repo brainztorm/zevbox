@@ -61,7 +61,7 @@ Zed affiche deux entrées, **`zevbox · Claude`** et **`zevbox · Antigravity`**
 
 | Commande | Description |
 |---|---|
-| `zevbox setup [PROJET]` | Initialisation complète guidée et idempotente : installe la configuration, enregistre le projet, configure Zed et lance `doctor`. |
+| `zevbox setup [PROJET]` | Initialisation complète guidée et idempotente : installe la configuration, enregistre le projet, construit les releases manquantes (`update`), propose `auth` pour chaque agent non authentifié (seulement dans un terminal), configure Zed, lance `doctor` et affiche un résumé par agent. |
 | `zevbox init` | Crée les répertoires d'état (`~/.local/share/zevbox` ou Application Support) en droits `0700`, ainsi que `config.json` et `tools.json`. |
 | `zevbox doctor [--json]` | Contrôle complet du système : binaire `container` ≥ 1.5.0, runtime en cours, architecture arm64, validité des projets, état des releases, droits `0700`. |
 | `zevbox project add <chemin>` | Valide canoniquement le chemin (interdit la racine, le home direct ou les dossiers système) et l'ajoute à la liste des projets autorisés (Invariant I2), puis synchronise Zed. |
@@ -74,7 +74,7 @@ Zed affiche deux entrées, **`zevbox · Claude`** et **`zevbox · Antigravity`**
 | `zevbox status [--json]` | Affiche les instances actives, orphelines ou non enregistrées. |
 | `zevbox stop [ID \| --project <chemin>]` | Arrête proprement les instances spécifiées ou toutes les instances actives de zevbox (jamais avec l'option globale `--all`). |
 | `zevbox clean [--images]` | Nettoie les conteneurs orphelins vérifiés, les enregistrements obsolètes, et purge les journaux anciens (>30) et sauvegardes (>20). Avec `--images`, supprime les anciennes images inutilisées. |
-| `zevbox shell <agent> [--project <chemin>]` | Ouvre un shell Bash interactif dans un conteneur micro-VM jetable identique à celui de l'agent. |
+| `zevbox shell <agent> [--project <chemin>]` | Ouvre un shell Bash interactif dans un conteneur micro-VM jetable identique à celui de l'agent. Sans `--project`, le dossier courant doit être un projet autorisé (sinon erreur, code 3). `auth claude` ne monte, lui, aucun projet (dossier vide jetable + état de l'agent). |
 | `zevbox logs [ID] [--path]` | Affiche les 200 dernières lignes du journal de la session la plus récente ou de l'ID spécifié. Avec `--path`, retourne le chemin du fichier journal. |
 | `zevbox update [--check] [--agent <agent>]` | Vérifie ou construit une nouvelle version de l'agent depuis le registre ACP officiel, exécute le smoke test et assure la promotion. |
 | `zevbox rollback [--agent <agent>]` | Permute la version active (`current`) avec la version précédente (`previous`). |

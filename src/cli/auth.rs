@@ -56,31 +56,15 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
         Err(e) => crate::ui::err(&format!("cannot write the default Claude model: {e}")),
     }
 
-    let project = match config.projects.first() {
-        Some(p) => p.clone(),
-        None => match std::env::current_dir() {
-            Ok(p) => p,
-            Err(_) => std::path::PathBuf::from("/"),
-        },
-    };
-
-    let id8 = crate::container::new_instance_id();
-    let name = format!("zevbox-{}-sh-{id8}", agent.id());
-
-    let spec = crate::container::RunSpec {
-        name,
-        instance_id: format!("auth-{id8}"),
-        agent: agent.id().to_string(),
-        cpus: config.resources.cpus,
-        memory: config.resources.memory.clone(),
-        uid: config.host_uid,
-        gid: config.host_gid,
-        project,
-        state_dir: paths.state_dir(agent.id()),
-        image: lock.image,
-        command: lock.auth_command,
-        interactive: true,
-    };
+    // I1: the auth container needs no project; it gets an empty throwaway dir
+    // (removed on drop) instead of an allowed project or the cwd.
+    let tmp_root = paths.state_root.join("tmp");
+    crate::fsutil::ensure_private_dir(&tmp_root)?;
+    let tmp = tempfile::Builder::new()
+        .prefix("auth-")
+        .tempdir_in(&tmp_root)?;
+    let tmp_path = std::fs::canonicalize(tmp.path())?;
+    let spec = auth_run_spec(&config, &paths, &lock, &tmp_path);
 
     let args = crate::container::run_args(&spec);
     let mut cmd = std::process::Command::new(&config.container_binary);
@@ -94,6 +78,31 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
         Ok(EXIT_OK)
     } else {
         Ok(EXIT_ERROR)
+    }
+}
+
+/// Run spec of the Claude login container: only `tmp` (an empty directory) and
+/// `state/claude` are mounted.
+pub fn auth_run_spec(
+    config: &crate::config::Config,
+    paths: &Paths,
+    lock: &crate::release::ReleaseLock,
+    tmp: &std::path::Path,
+) -> crate::container::RunSpec {
+    let id8 = crate::container::new_instance_id();
+    crate::container::RunSpec {
+        name: format!("zevbox-claude-sh-{id8}"),
+        instance_id: format!("auth-{id8}"),
+        agent: "claude".to_string(),
+        cpus: config.resources.cpus,
+        memory: config.resources.memory.clone(),
+        uid: config.host_uid,
+        gid: config.host_gid,
+        project: tmp.to_path_buf(),
+        state_dir: paths.state_dir("claude"),
+        image: lock.image.clone(),
+        command: lock.auth_command.clone(),
+        interactive: true,
     }
 }
 

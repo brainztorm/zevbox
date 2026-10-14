@@ -38,6 +38,22 @@ pub async fn run(project: Option<PathBuf>) -> anyhow::Result<u8> {
         }
     }
 
+    // Releases first: Zed gets one entry per agent that has an active release.
+    let missing_release = crate::agents::AGENTS
+        .iter()
+        .any(|a| crate::release::active_lock(&paths, a.id).is_err());
+    if missing_release {
+        crate::ui::out("building agent releases (network, 1-3 min per agent)...");
+        let code = crate::cli::update::run_update(false, None).await?;
+        if code != EXIT_OK {
+            return Ok(code);
+        }
+    } else {
+        crate::ui::out("releases: up to date");
+    }
+
+    authenticate_missing(&paths).await?;
+
     crate::ui::out("synchronizing Zed settings...");
     let _ = crate::cli::zed::run(super::ZedAction::Install {
         settings: None,
@@ -61,5 +77,60 @@ pub async fn run(project: Option<PathBuf>) -> anyhow::Result<u8> {
     }
 
     crate::ui::out("zevbox setup complete");
+    for spec in crate::agents::AGENTS {
+        let (release, authenticated) = agent_state(&paths, spec.id);
+        crate::ui::out(&format!(
+            "  {}: release {release}, {}",
+            spec.display,
+            if authenticated {
+                "authenticated"
+            } else {
+                "not authenticated"
+            }
+        ));
+    }
+    if config.projects.is_empty() {
+        crate::ui::out("next: zevbox project add <path>");
+    }
     Ok(EXIT_OK)
+}
+
+/// (active release id or "none", auth marker present).
+fn agent_state(paths: &Paths, agent: &str) -> (String, bool) {
+    match crate::release::active_lock(paths, agent) {
+        Ok(lock) => {
+            let authenticated = paths.state_dir(agent).join(&lock.auth_marker).exists();
+            (lock.release_id, authenticated)
+        }
+        Err(_) => ("none".to_string(), false),
+    }
+}
+
+/// Offers `zevbox auth` for every agent that has a release but no auth marker.
+/// Only asks on a terminal; otherwise prints the command to run.
+async fn authenticate_missing(paths: &Paths) -> anyhow::Result<()> {
+    use std::io::IsTerminal;
+    for (spec, arg) in crate::agents::AGENTS
+        .iter()
+        .zip([super::AgentArg::Claude, super::AgentArg::Antigravity])
+    {
+        let (release, authenticated) = agent_state(paths, spec.id);
+        if release == "none" || authenticated {
+            continue;
+        }
+        if !std::io::stdin().is_terminal() {
+            crate::ui::out(&format!(
+                "skipping authentication (not a terminal). Fix: run 'zevbox auth {}'",
+                spec.id
+            ));
+            continue;
+        }
+        crate::ui::out(&format!("authenticate {} now? [y/N] ", spec.display));
+        let mut answer = String::new();
+        std::io::stdin().read_line(&mut answer)?;
+        if answer.trim().eq_ignore_ascii_case("y") {
+            crate::cli::auth::run(arg, false).await?;
+        }
+    }
+    Ok(())
 }

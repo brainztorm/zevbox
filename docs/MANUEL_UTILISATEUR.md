@@ -95,10 +95,10 @@ flowchart LR
 ```
 
 **Ce que font ces commandes :**
-1. `setup` crée les répertoires d'état sécurisés (`0700`) et `config.json`, démarre le runtime Apple Container s'il est arrêté, et exécute un premier `doctor`. Idempotente : relancée, elle ne change rien.
+1. `setup` crée les répertoires d'état sécurisés (`0700`) et `config.json`, construit les releases manquantes (comme `update`), propose l'authentification de chaque agent non connecté (uniquement dans un terminal ; sinon elle affiche la commande `zevbox auth <agent>`), démarre le runtime Apple Container s'il est arrêté, exécute `doctor` et affiche un résumé par agent. Idempotente : relancée, elle ne reconstruit rien.
 2. `update` construit une image par agent (≈ 1 à 3 minutes chacune, réseau requis) et la promeut en release active. À relancer quand `zevbox update --check` signale une nouvelle version.
 
-> **Remarque** : `zevbox setup` n'enregistre aucun projet si vous ne lui passez pas de chemin. C'est l'étape 5 qui le fait. Vous pouvez aussi tout faire d'un coup avec `zevbox setup /chemin/du/projet` (mais il faut quand même `zevbox update` ensuite).
+> **Remarque** : `zevbox setup` n'enregistre aucun projet si vous ne lui passez pas de chemin. C'est l'étape 5 qui le fait. Vous pouvez aussi tout faire d'un coup avec `zevbox setup /chemin/du/projet` (les images sont construites par `setup` si elles manquent).
 
 ---
 
@@ -112,7 +112,7 @@ zevbox auth claude
 ```
 
 **Déroulement :**
-1. Une micro-VM éphémère démarre en mode interactif dans votre terminal.
+1. Une micro-VM éphémère démarre en mode interactif dans votre terminal. Elle ne monte aucun de vos dossiers : un dossier vide jetable et l'état de l'agent seulement.
 2. Claude affiche `Opening browser to sign in…` puis une URL `https://claude.com/cai/oauth/authorize?…`. **Le navigateur ne s'ouvre pas tout seul** (le processus tourne dans la VM) : copiez l'URL dans votre navigateur.
 3. Connectez-vous avec votre compte Claude (Pro / Team / Max) et autorisez l'accès ; collez le code affiché dans le terminal à l'invite `Paste code here if prompted >`.
 4. `Login successful.` : le jeton est enregistré dans `state/claude/.claude/.credentials.json` (`0600`).
