@@ -27,6 +27,8 @@ Format : date — fait ou décision — comment c'est vérifié.
 - Test réel 👤 (2026-10-14) : `zevbox auth claude` → `Login successful` ; `zevbox auth antigravity` → `Google Antigravity authenticated successfully.` (les deux : le navigateur ne s'est pas ouvert tout seul, l'URL imprimée a été copiée à la main). Le `session/new` depuis un autre projet que `zevbox` est refusé — comportement voulu, voir « Décisions » 2026-10-14 : le dialogue réel avec Gemini n'est donc **pas encore prouvé**.
 - Zed (`crates/agent_servers/src/acp/transport.rs`, `spawn_stdio`, lu le 2026-10-14) : pour un projet local, le processus agent custom est lancé avec `current_dir` = premier chemin de `project.default_path_list()` (premier worktree). Le `cwd` de `session/new` vient de la même liste. → zevbox peut déduire le projet de son propre répertoire de travail au lieu de `--project`.
 - Zed (`crates/project/src/agent_server_store.rs`, lu le 2026-10-14) : les entrées `agent_servers` sont lues avec `settings.get::<AllAgentServersSettings>(None)`, c'est-à-dire **depuis les réglages globaux uniquement** ; un `.zed/settings.json` local au projet n'est pas consulté et Zed n'offre aucun filtrage par projet. Conséquence : avec une entrée par (agent, projet), **toutes** les entrées `zevbox · …` sont visibles dans tous les projets (constaté le 2026-10-14 dans `demo-app`). Seule une entrée par agent, indépendante du projet, évite cet affichage.
+- « Auto mode unavailable: the selected model does not support Auto mode; using Accept edits instead. » (2026-10-14, après R1) : message émis par **claude-agent-acp dans le conteneur** (`dist/session-mode.js`, `AUTO_MODE_FALLBACK_NOTICE`), pas par zevbox ni par le relais. Il apparaît quand la session démarre avec `mode = "auto"` et un modèle dont `supportsAutoMode !== true`. Cause sur cette machine : Zed a enregistré dans `~/.config/zed/settings.json` → `agent_servers."zevbox · Claude".default_config_options = {"model": "haiku", "mode": "auto"}` (Zed persiste les choix faits dans le sélecteur du thread ; `haiku` est aussi le `model` de `~/.claude/settings.json` de l'hôte). Haiku ne supporte pas Auto ; l'entrée `claude-acp` de l'hôte n'a pas le message car elle a `model: "fable"`. Le relais ne modifie pas ces options (`session/set_mode`, `session/set_model`, `session/set_config_option` sont relayés tels quels).
+- Même test : `zevbox zed install` / `project add` / `update` / `rollback` (tous appellent `update_zed`) **écrasent** les `default_config_options` ajoutées par Zed aux entrées gérées : `zed_settings::apply_entries` compare l'objet existant à `{type, command, args, env}` et, s'il diffère, remplace l'objet entier (`prop.set_value`). → R8.
 - Test réel 👤 (2026-10-14, soir) : depuis `demo-app`, `zevbox · Antigravity · demo-app` et `zevbox · Claude · demo-app` répondent à un prompt. Étapes 14 et 16 prouvées de bout en bout.
 
 ## Décisions
@@ -114,6 +116,16 @@ Ordre de priorité. Chaque point est un correctif ou une déviation du contrat (
 ### R6 — Mises à jour disponibles
 
 - `zevbox update --check` (2026-10-14) : Claude 0.89.1 → 0.90.0, Antigravity 1.3.0 → 1.4.0. À appliquer avec `zevbox update` une fois le premier dialogue Zed prouvé (re-tester l'auth Antigravity : le format d'`acp_token.json` peut changer entre versions).
+
+### R8 — Auto mode / `default_config_options` des entrées Zed (constaté le 2026-10-14)
+
+**Côté utilisateur (sans code)** : dans le thread `zevbox · Claude`, choisir un modèle qui supporte Auto (comme `fable`, celui de l'entrée `claude-acp`) ou un mode autre que Auto ; Zed réécrit `default_config_options` tout seul. Ou éditer `~/.config/zed/settings.json` → `"zevbox · Claude".default_config_options` : `{"model": "fable", "mode": "auto", "effort": "high", "fast": true}` comme `claude-acp`.
+
+**Côté zevbox (plan, non implémenté)** :
+1. `zed_settings::apply_entries` : ne gérer que les clés `type`, `command`, `args`, `env` de l'objet d'une entrée gérée ; **conserver toute autre clé** (`default_config_options`, …) telle quelle, octet pour octet via la CST (`obj.get(name)` / `prop.set_value` par clé, pas sur l'objet entier). Idempotence inchangée (ne rien écrire si les quatre clés sont déjà bonnes).
+2. Optionnel : `zevbox zed install` pose des `default_config_options` **initiales** seulement si l'entrée est créée (jamais sur une entrée existante), copiées de l'entrée registre correspondante si elle existe dans le fichier (`claude-acp` → `zevbox · Claude`, `antigravity-acp` → `zevbox · Antigravity`), sinon rien. Ainsi le modèle/mode par défaut dans zevbox = celui de l'agent standard de l'utilisateur.
+3. Tests : fixture Zed avec `default_config_options` sur une entrée gérée → conservée après `apply_entries` (changement de `command` compris) ; entrée créée → options copiées de `claude-acp` ; `uninstall` supprime l'entrée entière. `tests/zed_settings_test.rs` (protégé) à compléter avec autorisation 👤, ou nouveau fichier de test.
+4. Docs : MANUEL (étape 7 : choix du modèle, message Auto mode), README dépannage, plan §8.9.
 
 ### R7 — Divers
 
