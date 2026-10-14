@@ -14,11 +14,12 @@ Voici les étapes que vous allez suivre :
 flowchart TD
     Start(["Démarrage"]) --> Step1["Étape 1 : Vérifier les pré-requis Mac"]
     Step1 --> Step2["Étape 2 : Installer le binaire de production\nmake install"]
-    Step2 --> Step3["Étape 3 : Enregistrer votre projet\nzevbox setup <chemin>"]
-    Step3 --> Step4["Étape 4 : Authentifier Claude\nzevbox auth claude"]
-    Step4 --> Step5{"Étape 5 : Batterie de tests\nzevbox doctor & shell"}
+    Step2 --> Step3["Étape 3 : Initialiser et construire les images\nzevbox setup · zevbox update"]
+    Step3 --> Step4["Étape 4 : Authentifier les agents\nzevbox auth claude · zevbox auth antigravity"]
+    Step4 --> Step4b["Étape 5 : Autoriser vos projets\nzevbox project add <chemin>"]
+    Step4b --> Step5{"Étape 6 : Batterie de tests\nzevbox doctor & shell"}
     
-    Step5 -- "Tests OK" --> Step6["Étape 6 : Lancer Zed\nSélectionner l'agent zevbox · Claude"]
+    Step5 -- "Tests OK" --> Step6["Étape 7 : Lancer Zed\nSélectionner zevbox · Claude · <projet>\nou zevbox · Antigravity · <projet>"]
     Step5 -- "Erreur détectée" --> Fix["Consulter la section Dépannage"]
     Fix --> Step5
 
@@ -66,7 +67,7 @@ make install
 ```
 
 **Ce que fait cette commande :**
-- Exécute les contrôles de formatage, les linters de sécurité et la suite complète de 167 tests.
+- Exécute les contrôles de formatage, les linters de sécurité et la suite complète de tests (`make check`).
 - Compile une version release optimisée en Rust.
 - Installe le binaire final dans `~/.local/bin/zevbox`.
 
@@ -74,60 +75,87 @@ make install
 ```bash
 zevbox --help
 ```
-*Vous devez voir s'afficher la liste des 15 commandes du projet.*
+*Vous devez voir s'afficher la liste des 16 commandes du projet.*
 
 ---
 
-### Étape 3 : Initialiser l'Environnement et Enregistrer Votre Projet
-Exécutez la commande d'onboarding `setup` en lui passant le chemin absolu de votre projet :
+### Étape 3 : Initialiser l'Environnement et Construire les Images des Agents
 
 ```bash
-zevbox setup ~/code/zevbox
+zevbox setup
+zevbox update
 ```
-
-*(Si vous souhaitez enregistrer un autre dossier de travail plus tard, remplacez simplement ce chemin).*
 
 ```mermaid
 flowchart LR
-    SetupCmd["zevbox setup <projet>"] --> DirInit["Crée les dossiers d'état\nen mode privé 0700"]
-    SetupCmd --> Conf["Ajoute le projet à la liste blanche\nconfig.json"]
-    SetupCmd --> Zed["Injecte l'agent dans Zed\n~/.config/zed/settings.json"]
+    SetupCmd["zevbox setup"] --> DirInit["Crée les dossiers d'état\nen mode privé 0700 + config.json"]
     SetupCmd --> Doc["Lance un diagnostic doctor"]
+    UpdateCmd["zevbox update"] --> Build["Télécharge Claude et Antigravity\ndepuis le registre ACP officiel"]
+    Build --> Img["Construit, teste (smoke test)\net active les images zevbox/claude et zevbox/antigravity"]
 ```
 
-**Ce que fait cette commande automatiquement :**
-1. Crée les répertoires d'état sécurisés avec des permissions strictes `0700`.
-2. Valide que le chemin du projet est sain (interdit le dossier racine ou `$HOME`).
-3. Enregistre le projet dans `config.json`.
-4. Injecte automatiquement le serveur d'agent `zevbox · Claude · <nom_projet>` dans votre fichier de réglages Zed (`~/.config/zed/settings.json`) tout en créant une sauvegarde de sécurité dans `backups/`.
-5. Exécute un premier passage de `doctor`.
+**Ce que font ces commandes :**
+1. `setup` crée les répertoires d'état sécurisés (`0700`) et `config.json`, démarre le runtime Apple Container s'il est arrêté, et exécute un premier `doctor`. Idempotente : relancée, elle ne change rien.
+2. `update` construit une image par agent (≈ 1 à 3 minutes chacune, réseau requis) et la promeut en release active. À relancer quand `zevbox update --check` signale une nouvelle version.
+
+> **Remarque** : `zevbox setup` n'enregistre aucun projet si vous ne lui passez pas de chemin. C'est l'étape 5 qui le fait. Vous pouvez aussi tout faire d'un coup avec `zevbox setup /chemin/du/projet` (mais il faut quand même `zevbox update` ensuite).
 
 ---
 
-### Étape 4 : Authentifier l'Agent Claude
-Les agents IA s'exécutent dans une micro-VM avec leur propre dossier d'état. Vous devez connecter votre compte Claude une seule fois :
+### Étape 4 : Authentifier les Agents (une seule fois)
+Les agents s'exécutent dans une micro-VM avec leur propre dossier d'état (`state/<agent>/`, monté sur `/home/agent` dans la VM). Vous connectez chaque compte une seule fois ; les jetons persistent d'une session à l'autre.
+
+#### 4a. Claude
 
 ```bash
 zevbox auth claude
 ```
 
-**Déroulement de l'action :**
+**Déroulement :**
 1. Une micro-VM éphémère démarre en mode interactif dans votre terminal.
-2. Claude affiche une invite ou un lien web de connexion Anthropic :
-   - Cliquez sur le lien ou copiez-le dans votre navigateur.
-   - Connectez-vous avec votre compte Claude (Claude Pro / Team / Max).
-   - Autorisez l'accès.
-3. Le jeton de session est enregistré de façon étanche dans `~/.local/share/zevbox/state/claude/` (ou `Application Support/zevbox/state/claude/`).
-4. La commande se termine et vous redonne la main sur votre terminal.
+2. Claude affiche `Opening browser to sign in…` puis une URL `https://claude.com/cai/oauth/authorize?…`. **Le navigateur ne s'ouvre pas tout seul** (le processus tourne dans la VM) : copiez l'URL dans votre navigateur.
+3. Connectez-vous avec votre compte Claude (Pro / Team / Max) et autorisez l'accès ; collez le code affiché dans le terminal à l'invite `Paste code here if prompted >`.
+4. `Login successful.` : le jeton est enregistré dans `state/claude/.claude/.credentials.json` (`0600`).
 
-**Vérification immédiate du statut :**
+#### 4b. Antigravity (Gemini, compte Google personnel)
+
+```bash
+zevbox auth antigravity
+```
+
+**Déroulement :**
+1. zevbox ouvre un petit serveur HTTP **sur votre Mac** (`127.0.0.1`, port aléatoire — aucun port n'est publié sur la micro-VM) et affiche l'URL de connexion Google. Si le navigateur ne s'ouvre pas, copiez-la.
+2. Choisissez votre compte **Google AI Pro / One AI Premium** et cliquez sur **Autoriser**.
+3. Le navigateur affiche « Authentification Google réussie ! » ; le terminal affiche `Exchanging authorization code with Google...` puis `Google Antigravity authenticated successfully.`
+4. Les fichiers `settings.json` et `acp_token.json` sont écrits dans `state/antigravity/.gemini/antigravity-acp/` (`0600`). Le trousseau macOS n'est jamais sollicité.
+
+**Vérification immédiate :**
 ```bash
 zevbox auth claude --status
+zevbox auth antigravity --status
 ```
-*Confirmation attendue : la commande doit renvoyer exactement :*
+*Chaque commande doit renvoyer exactement :*
 ```text
 authenticated
 ```
+
+---
+
+### Étape 5 : Autoriser Vos Projets
+zevbox ne monte jamais un dossier dans une micro-VM s'il n'a pas été explicitement autorisé (invariant I2). Pour chaque projet que vous voulez ouvrir avec un agent :
+
+```bash
+zevbox project add /chemin/absolu/du/projet
+```
+
+**Ce que fait cette commande :**
+1. Valide que le chemin est sain (interdit `/`, `$HOME` et ses parents, les dossiers système, les dossiers de zevbox).
+2. L'ajoute à la liste blanche `config.json`.
+3. Crée dans Zed (`~/.config/zed/settings.json`, sauvegarde dans `backups/`) deux entrées liées à ce projet : **`zevbox · Claude · <nom>`** et **`zevbox · Antigravity · <nom>`**. Pas besoin de redémarrer Zed.
+
+Répétez la commande pour chaque projet. `zevbox project list` affiche la liste ; `zevbox project remove <chemin>` retire un projet et ses entrées Zed.
+
+> **Pourquoi une entrée par projet ?** Les serveurs d'agents de Zed sont un réglage global : toutes les entrées `zevbox · …` sont visibles depuis n'importe quel projet. Chaque entrée embarque le chemin de *son* projet et ne démarre que si le dossier ouvert dans Zed est bien celui-là. Choisir `zevbox · Claude · zevbox` depuis un autre projet donne le message `this agent is bound to …` (voir Dépannage, problème 2).
 
 ---
 
@@ -150,6 +178,7 @@ Tous les voyants doivent être à `[OK  ]` :
 [OK  ] architecture         — host architecture is arm64
 [OK  ] project:...          — project directory exists
 [OK  ] agent:claude         — release claude-... (authenticated)
+[OK  ] agent:antigravity    — release antigravity-... (authenticated)
 [OK  ] permissions          — stateRoot is 0700
 ```
 > Si tous les indicateurs sont à `[OK  ]`, votre installation est saine.
@@ -196,19 +225,25 @@ Dès que vous tapez `exit`, la micro-VM est anéantie et tous les fichiers tempo
 ---
 
 ### Test 3 : Vérifier la Configuration de Zed
-Vérifiez que Zed a bien reçu la configuration de l'agent :
+Vérifiez que Zed a bien reçu les entrées de vos projets :
 
 ```bash
-grep -C 4 "zevbox · Claude" ~/.config/zed/settings.json
+grep -C 4 "zevbox · " ~/.config/zed/settings.json
 ```
 
 **Résultat attendu :**
-Vous devez voir le bloc JSON suivant :
+Pour chaque projet autorisé, deux blocs comme ceux-ci (ici pour le projet `demo-app`) :
 ```json
-    "zevbox · Claude · zevbox": {
+    "zevbox · Claude · demo-app": {
       "type": "custom",
       "command": "~/.local/bin/zevbox",
-      "args": ["launch", "claude", "--project", "~/code/zevbox"],
+      "args": ["launch", "claude", "--project", "~/code/demo-app"],
+      "env": {}
+    },
+    "zevbox · Antigravity · demo-app": {
+      "type": "custom",
+      "command": "~/.local/bin/zevbox",
+      "args": ["launch", "antigravity", "--project", "~/code/demo-app"],
       "env": {}
     }
 ```
@@ -217,7 +252,7 @@ Vous devez voir le bloc JSON suivant :
 
 ## 5. Utilisation Quotidienne dans Zed
 
-Tout est configuré ! Vous pouvez maintenant utiliser Claude dans Zed en toute sérénité :
+Tout est configuré ! Vous pouvez maintenant utiliser Claude ou Antigravity dans Zed en toute sérénité (le schéma montre Claude ; Antigravity est identique) :
 
 ```mermaid
 sequenceDiagram
@@ -239,19 +274,19 @@ sequenceDiagram
 
 ### La Marche à Suivre dans Zed :
 
-1. **Ouvrez votre projet dans Zed** :
+1. **Ouvrez un projet autorisé dans Zed** (un seul dossier racine par fenêtre) :
    ```bash
-   zed ~/code/zevbox
+   zed ~/code/demo-app
    ```
 2. **Ouvrez le panneau Assistant / Agent** :
    - Raccourci clavier : `Cmd + Shift + A` (ou menu *View > Toggle Assistant Panel*).
-3. **Sélectionnez le serveur d'agent** :
-   - En haut du panneau de discussion, cliquez sur le menu déroulant du choix du modèle / agent.
-   - Vous devez voir apparaître l'option **`zevbox · Claude · zevbox`**. Cliquez dessus.
+3. **Sélectionnez le serveur d'agent qui porte le nom du projet ouvert** :
+   - En haut du panneau, menu « New Thread » / choix de l'agent.
+   - Choisissez **`zevbox · Claude · demo-app`** ou **`zevbox · Antigravity · demo-app`**. Les entrées des autres projets sont visibles aussi mais refuseront de démarrer ici.
 4. **Faites un test dans le chat de Zed** :
    - Tapez ce prompt de validation :
      > *"Peux-tu me dire quel est ton système d'exploitation et lister les fichiers du dossier courant ?"*
-   - Claude doit vous confirmer qu'il tourne sous **Linux arm64**, et vous lister fidèlement les fichiers de votre projet sans jamais avoir accès au reste de votre Mac.
+   - L'agent doit confirmer qu'il tourne sous **Linux arm64**, et lister fidèlement les fichiers de votre projet sans jamais avoir accès au reste de votre Mac.
 
 ---
 
@@ -268,18 +303,23 @@ sequenceDiagram
 
 ## 7. Guide de Dépannage Rapide
 
-### Problème 1 : Zed affiche `Claude is not authenticated`
-- **Cause** : Le jeton de session Claude n'est pas encore initialisé dans son dossier d'état.
-- **Solution** : Ouvrez un terminal et lancez :
-  ```bash
-  zevbox auth claude
-  ```
-  Vérifiez ensuite avec `zevbox auth claude --status`.
+### Problème 1 : Zed affiche `Claude is not authenticated` (ou `Antigravity is not authenticated`)
+- **Cause** : Le jeton de l'agent n'est pas encore présent dans son dossier d'état.
+- **Solution** : Ouvrez un terminal et lancez `zevbox auth claude` (ou `zevbox auth antigravity`), puis vérifiez avec `zevbox auth <agent> --status`.
 
 ---
 
-### Problème 2 : Zed affiche `... is not an allowed project`
-- **Cause** : Vous avez ouvert dans Zed un dossier qui n'a pas été enregistré dans `zevbox`.
+### Problème 2 : Zed affiche `zevbox: this agent is bound to <A>; this session asked for <B>`
+- **Cause** : Depuis le projet `<B>`, vous avez choisi l'entrée Zed d'un autre projet (`<A>`). Chaque entrée `zevbox · <agent> · <nom>` ne sert qu'au projet de son nom.
+- **Solution** : Autorisez le projet ouvert, puis choisissez la nouvelle entrée qui porte son nom :
+  ```bash
+  zevbox project add /chemin/vers/B
+  ```
+
+---
+
+### Problème 3 : Zed affiche `... is not an allowed project`
+- **Cause** : Le dossier ouvert dans Zed n'est pas dans la liste blanche de `zevbox`.
 - **Solution** : Dans votre terminal, ajoutez le dossier :
   ```bash
   zevbox project add /chemin/vers/ce/dossier
@@ -287,7 +327,7 @@ sequenceDiagram
 
 ---
 
-### Problème 3 : Zed affiche `Apple Container system is not running`
+### Problème 4 : Zed affiche `Apple Container system is not running`
 - **Cause** : Le service de virtualisation Apple Container est arrêté sur votre Mac.
 - **Solution** : Démarrez-le avec la commande native :
   ```bash
@@ -296,7 +336,7 @@ sequenceDiagram
 
 ---
 
-### Problème 4 : Vous voulez revenir à une version précédente d'un agent
+### Problème 5 : Vous voulez revenir à une version précédente d'un agent
 - **Cause** : Une mise à jour récente de Claude dans le registre a introduit un comportement indésirable.
 - **Solution** : Utilisez le rollback instantané :
   ```bash
@@ -310,8 +350,9 @@ sequenceDiagram
 | Action | Commande exacte |
 |---|---|
 | Diagnostiquer l'état du système | `zevbox doctor` |
-| Se connecter à Claude | `zevbox auth claude` |
-| Vérifier le statut de connexion | `zevbox auth claude --status` |
+| Construire / mettre à jour les images des agents | `zevbox update` |
+| Se connecter à Claude / à Google (Antigravity) | `zevbox auth claude` / `zevbox auth antigravity` |
+| Vérifier le statut de connexion | `zevbox auth claude --status` / `zevbox auth antigravity --status` |
 | Ouvrir un shell Linux de test | `zevbox shell claude` |
 | Ajouter un nouveau projet | `zevbox project add /mon/projet` |
 | Ajouter un outil Linux dans la VM | `zevbox tools add ripgrep` |

@@ -6,7 +6,7 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
 
 ## Before anything
 
-1. Read `zevbox_plan.md` entirely (it is the contract), then `docs/PROGRESS.md`
+1. Read `zevbox_plan_V2.md` entirely (it is the contract; `zevbox_plan_V1.md` is history only), then `docs/PROGRESS.md`
    and `docs/DECISIONS.md`. Resume at the first step not marked ✅.
 2. Rust lives in `/opt/homebrew/opt/rustup/bin` (the Makefile adds it to PATH;
    in a shell: `export PATH=/opt/homebrew/opt/rustup/bin:$PATH`).

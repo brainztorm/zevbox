@@ -6,26 +6,33 @@ Binaire Rust autonome pour macOS Apple Silicon (arm64).
 
 ---
 
-## 1. Installation en 3 commandes
+## 1. Installation en 4 commandes
 
 ```bash
 # 1. Compiler et installer le binaire de production dans ~/.local/bin/zevbox
 make install
 
-# 2. Initialiser et associer votre projet
-zevbox setup /chemin/vers/votre/projet
+# 2. Initialiser zevbox (dossiers d'état 0700, config.json, images des agents)
+zevbox setup
+zevbox update            # construit les images Claude et Antigravity (une fois, puis à chaque mise à jour)
 
-# 3. Authentifier l'agent Claude dans son environnement isolé (interactif)
-zevbox auth claude
+# 3. Authentifier les agents, une seule fois (chaque commande imprime l'URL de connexion)
+zevbox auth claude        # compte Claude (Pro/Max) — s'exécute dans un conteneur -it
+zevbox auth antigravity   # compte Google (AI Pro / One AI Premium) — OAuth PKCE sur le Mac
+
+# 4. Autoriser un projet (à répéter pour chaque projet que vous voulez ouvrir avec un agent)
+zevbox project add /chemin/vers/votre/projet
 ```
 
-Une fois ces trois commandes exécutées, l'entrée `zevbox · Claude · <projet>` apparaît automatiquement dans la liste des serveurs d'agents de Zed.
+Chaque `zevbox project add` crée dans Zed deux entrées, `zevbox · Claude · <nom du projet>` et `zevbox · Antigravity · <nom du projet>`, liées à ce projet et à lui seul (invariant I2 : seuls les projets explicitement autorisés sont montés dans une micro-VM). L'ordre des étapes 3 et 4 est libre ; `zevbox setup /chemin` fait les étapes 2 (sans `update`) et 4 d'un coup.
+
+> Les deux commandes `auth` impriment l'URL de connexion : si le navigateur ne s'ouvre pas tout seul, copiez-la dans votre navigateur.
 
 ---
 
 ## 2. Usage quotidien
 
-- **Dans Zed** : Ouvrez votre projet enregistré. Dans le panneau de discussion / agent, sélectionnez **zevbox · Claude · `<projet>`**. L'agent s'exécute dans une VM Linux temporaire dédiée, avec votre code source monté avec les mêmes droits UID/GID que sur votre Mac.
+- **Dans Zed** : Ouvrez votre projet enregistré. Dans le panneau de discussion / agent, sélectionnez **zevbox · Claude · `<projet>`** ou **zevbox · Antigravity · `<projet>`**. Choisissez l'entrée qui porte le nom du projet ouvert : chaque entrée est liée à un seul projet (c'est voulu, voir I2). Pour un dossier pas encore autorisé, `zevbox project add /ce/dossier` suffit, sans redémarrer Zed. L'agent s'exécute dans une VM Linux temporaire dédiée, avec votre code source monté avec les mêmes droits UID/GID que sur votre Mac.
 - **Ajouter un projet supplémentaire** :
   ```bash
   zevbox project add /autre/projet
@@ -62,7 +69,7 @@ Une fois ces trois commandes exécutées, l'entrée `zevbox · Claude · <projet
 | `zevbox project list` | Affiche la liste des projets autorisés. |
 | `zevbox zed install [--dry-run]` | Injecte de façon non destructive les entrées gérées (`zevbox · ...`) dans `~/.config/zed/settings.json` en préservant commentaires et formatage CST. Sauvegarde automatique dans `backups/`. |
 | `zevbox zed uninstall` | Retire toutes les entrées gérées de Zed et restaure les réglages à l'octet près. |
-| `zevbox auth <agent> [--status]` | Lance la commande d'authentification interactive dans un conteneur `-it`. Avec `--status`, affiche `authenticated`, `not authenticated` ou `unknown`. |
+| `zevbox auth <agent> [--status]` | Claude : lance la commande d'authentification interactive dans un conteneur `-it`. Antigravity : exécute le flux Google OAuth 2.0 PKCE **sur le Mac** (serveur HTTP éphémère `127.0.0.1:<port aléatoire>`, aucun port publié sur la micro-VM, aucun accès au trousseau) et écrit `state/antigravity/.gemini/antigravity-acp/{settings.json,acp_token.json}` en `0600`. Avec `--status`, affiche `authenticated`, `not authenticated` ou `unknown`. |
 | `zevbox launch <agent> --project <chemin>` | Commande appelée par Zed pour démarrer la micro-VM et relayer le protocole ACP sur stdin/stdout (avec filtrage de sécurité strict). |
 | `zevbox status [--json]` | Affiche les instances actives, orphelines ou non enregistrées. |
 | `zevbox stop [ID \| --project <chemin>]` | Arrête proprement les instances spécifiées ou toutes les instances actives de zevbox (jamais avec l'option globale `--all`). |
@@ -110,4 +117,6 @@ Une fois ces trois commandes exécutées, l'entrée `zevbox · Claude · <projet
 - **`<chemin> is not an allowed project. Fix: run 'zevbox project add <chemin>'`** : Le dossier ouvert n'est pas dans la liste blanche. Ajoutez-le avec `zevbox project add`.
 - **`no active Claude release. Fix: run 'zevbox update --agent claude'`** : L'image de l'agent n'a pas encore été construite. Lancez `zevbox update --agent claude`.
 - **`Claude is not authenticated. Fix: run 'zevbox auth claude'`** : Lancez `zevbox auth claude` dans votre terminal pour vous connecter à votre compte Claude.
+- **`Antigravity is not authenticated. Fix: run 'zevbox auth antigravity'`** : Lancez `zevbox auth antigravity` et validez votre compte Google dans le navigateur.
+- **`zevbox: this agent is bound to <A>; this session asked for <B>. Open <A> in Zed, or run 'zevbox project add <B>'`** : Vous avez choisi, depuis le projet `<B>`, l'entrée Zed d'un autre projet (`<A>`). Les entrées `zevbox · <agent> · <nom>` sont toutes visibles dans tous les projets (réglage global de Zed), mais chacune ne sert qu'au projet de son nom. Lancez `zevbox project add <B>` : les entrées `zevbox · Claude · <nom de B>` et `zevbox · Antigravity · <nom de B>` apparaissent dans Zed, sélectionnez-les.
 - **`Apple Container system is not running. Fix: run 'container system start'`** : Le service de virtualisation Apple Container est arrêté. Démarrez-le avec `container system start`.

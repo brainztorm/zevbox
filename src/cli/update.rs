@@ -226,7 +226,11 @@ pub async fn run_rollback(agent_arg: Option<AgentArg>) -> anyhow::Result<u8> {
         return Ok(EXIT_ERROR);
     }
     save_active(&paths, &active)?;
-    crate::ui::out(&format!("{}: rolled back", agent_arg.id()));
+    let now_current = active
+        .get(agent_arg.id())
+        .map(|e| e.current.clone())
+        .unwrap_or_default();
+    crate::ui::out(&format!("{}: rolled back to {now_current}", agent_arg.id()));
 
     let config = crate::config::load(&paths.config_file())?;
     let _ = crate::cli::project::update_zed(&paths, &config);
