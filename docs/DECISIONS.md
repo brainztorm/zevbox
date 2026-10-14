@@ -49,101 +49,110 @@ Format : date — fait ou décision — comment c'est vérifié.
 - Étape 16 : affichage dans Zed des erreurs préalables (§8.5) — vérifié le 2026-10-14 : le message `zevbox: this agent is bound to …` est affiché tel quel dans le panneau agent. Comportement à l'archivage/fermeture : encore à consigner.
 - Étape 14/16 : premier échange réel avec Gemini et avec Claude depuis Zed (`session/new` + un prompt) — `demo-app` a été ajouté le 2026-10-14 ; reste à sélectionner `zevbox · <Agent> · demo-app` dans Zed et consigner le résultat.
 
-## Reste à faire (décidé le 2026-10-14, non implémenté)
+## Fait depuis l'acceptation (étape 17)
 
-Ordre de priorité. Chaque point est un correctif ou une déviation du contrat (plan §7/§8) ; aucun n'est commencé. R1 et R2 forment le « quick start » demandé le 2026-10-14.
+- **R1 — Une entrée Zed par agent, projet déduit du répertoire de travail — ✅ 2026-10-14** (commit `9128163`). Motif : `agent_servers` est un réglage global de Zed sans filtrage par projet ; une entrée par (agent, projet) affichait toutes les entrées partout. Résultat : menu Zed = `zevbox · Claude` et `zevbox · Antigravity` ; `zevbox launch <agent>` sans `--project` prend `std::env::current_dir()` (Zed lance l'agent dans le premier worktree), I2/I5 inchangés ; `project add/remove` ne touchent plus aux entrées ; tests protégés `cli_test.rs`/`zed_settings_test.rs` modifiés **avec l'autorisation 👤 du 2026-10-14** et rescellés ; `tests/launch_cwd_test.rs` ajouté. Décision associée : liste blanche I2 stricte conservée (option « racines autorisées » → Idées reportées). Non fait, volontairement : contrôle `doctor` n° 8 (n'existait pas) ; message « multi-root » (le relais garde `this agent is bound to …`).
 
-### R1 — Une entrée Zed par agent, projet déduit du répertoire de travail — ✅ FAIT le 2026-10-14
+## Reste à faire — mode d'emploi pour l'agent implémenteur
 
-> Implémenté (commit « r1: … ») : `launch --project` optionnel (`src/cli/launch.rs`), `zed_settings::entries_for(agents, command)`, `project add/remove` ne créent plus d'entrées, tests protégés `cli_test.rs`/`zed_settings_test.rs` modifiés avec l'autorisation 👤 et rescellés (`make protect-update`), nouveau `tests/launch_cwd_test.rs` (cwd autorisé / refusé), plan §1/§4/§8.1/§8.6/§8.9 amendés. Non fait : contrôle `doctor` n° 8 (il n'existait pas avant non plus) ; message « multi-root » (I5 garde `this agent is bound to …`). Point 9 (déploiement) : fait par l'agent, voir PROGRESS.
+Ce qui suit est écrit pour être exécuté sans autre contexte que `AGENTS.md`, `zevbox_plan_V2.md` et ce fichier. Lire aussi les « Faits vérifiés » plus haut.
 
-**Problème constaté** : les entrées Zed sont `zevbox · <Agent> · <projet>` avec `--project <chemin>` figé dans `args`. Comme `agent_servers` est un réglage global de Zed (sans filtrage par projet, fait vérifié), **toutes** les entrées apparaissent dans tous les projets (capture du 2026-10-14 : 4 entrées visibles dans `demo-app`, dont les 2 de `zevbox`) ; choisie depuis le mauvais projet, une entrée fait refuser `session/new` (`this agent is bound to …`). L'utilisateur veut ne voir que ce qui s'applique au projet ouvert : avec une entrée par agent, le menu montre exactement `zevbox · Claude` et `zevbox · Antigravity`, valables partout où le projet est autorisé.
+**Règles communes (obligatoires)**
+1. **Ordre d'exécution : R8 → R3 → R2 → R4 → R5 → R6 → R7.** Un R à la fois. Ne pas commencer le suivant avant que le précédent soit commité.
+2. Avant de coder un R : lire les fichiers listés dans sa rubrique « Fichiers ». Copier le style des fichiers `WORKED EXAMPLE` (en-tête de fichier). Messages CLI en anglais, format `<problème>. Fix: <commande exacte>`.
+3. Interdits inchangés : `unwrap/expect/panic` dans `src/` (clippy les refuse), shell hôte (`sh -c`), montage de `$HOME`, `--all`, écriture dans un projet utilisateur, `-t` sur le conteneur ACP. Invariants I1–I12 du plan §3.
+4. **Fichiers protégés** (`tests/**` listés dans `tests/PROTECTED.sha256`, `scripts/**`, `clippy.toml`) : **ne pas les modifier**. Les nouveaux tests vont dans de **nouveaux fichiers** `tests/r<N>_<sujet>_test.rs` (ils peuvent faire `mod common;` et utiliser `common::TestEnv`, voir `tests/launch_cwd_test.rs` comme modèle) ou dans `#[cfg(test)]` du module. Si un R ne peut pas être fait sans toucher un test protégé : s'arrêter, écrire pourquoi dans `docs/PROGRESS.md`, demander au 👤.
+5. Le faux `container` (`tests/fixtures/fake-container`) ne sait pas faire `build` ni accéder au réseau : tout ce qui construit une image ou appelle le registre se teste **à la main** (preuve à consigner dans `docs/PROGRESS.md`), pas en test automatique.
+6. Fin de chaque R : `make check` (fmt + clippy -D warnings + tests + invariants) puis `make verify STEP=17` doit afficher `STEP 17: OK` ; `make install` ; test manuel indiqué dans « Acceptation » ; ligne de journal dans `docs/PROGRESS.md` (`- <date> — R<N> : …`) ; déplacer le R dans « Fait depuis l'acceptation » ci-dessus (3 lignes max) ; `git commit -m "r<N>: <titre>"`.
+7. Les lignes de code citées (`fichier:ligne`) datent du 2026-10-14 : vérifier avec `grep` avant d'éditer.
 
-**Résultat attendu dans Zed** : menu « External Agents » = `zevbox · Claude`, `zevbox · Antigravity` (2 lignes, quel que soit le nombre de projets). Dans un projet non autorisé : message `<cwd> is not an allowed project. Fix: run 'zevbox project add <cwd>'`.
-
-**Plan** :
-1. `zevbox launch <agent>` : rendre `--project` optionnel ; sans lui, projet = `std::env::current_dir()` (Zed lance le processus avec `current_dir` = premier worktree, fait vérifié ci-dessus). Garder `--project` pour les tests et le débogage.
-2. Préflight inchangé : canonicalisation, puis contrôle I2 contre `config.projects`. Nouveau message si refusé : `zevbox: <cwd> is not an allowed project. Fix: run 'zevbox project add <cwd>' in a macOS terminal.` (déjà prévu §8.5).
-3. I5 inchangé : le `cwd` de `session/new` doit toujours être exactement le projet (même source côté Zed, donc identiques sauf workspace multi-racines → message explicite `multi-root workspaces are not supported`).
-4. `zed_settings::entries_for` : une entrée par agent, nommée `zevbox · Claude` / `zevbox · Antigravity`, `args: ["launch", "<agent>"]`, sans suffixe projet. `zed install` migre les anciennes entrées `zevbox · <Agent> · <projet>` (elles sont gérées, préfixe `zevbox · `, donc supprimables sans risque). `project add/remove` ne touche plus Zed sauf si les entrées manquent.
-5. `doctor` contrôle 8 (§8.6) : vérifier les deux entrées par agent au lieu d'une par projet.
-6. 👤 **Décision prise le 2026-10-14 : option (a)**, liste blanche stricte conservée (`zevbox project add` par projet ; confirmé par l'utilisateur). L'option (b) reste une idée reportée. Pour mémoire, les options étaient : (a) garder la liste blanche stricte (une commande `zevbox project add` par nouveau projet, pas de redémarrage de Zed) ; (b) ajouter des **racines autorisées** (`config.projectRoots`, ex. `~/code`) : tout sous-dossier direct ou indirect d'une racine est accepté, les interdits de `project add` (home, `/`, dossiers système, chemins contenant des fichiers zevbox — I12) restent appliqués au `cwd` reçu. Recommandation : (b), car c'est ce que demande l'usage ; à consigner comme amendement de l'invariant I2 dans le plan §3 et dans `tests/` via le 👤 (fichiers protégés : `cli_test.rs:142-192` et `zed_settings_test.rs:36-210` encodent le nommage `zevbox · <Agent> · <projet>` et `--project` ; ils devront être modifiés par l'humain puis rescellés avec `make protect-update`).
-7. Tests : nouveaux cas `launch` sans `--project` (cwd autorisé / refusé / multi-racines), migration des entrées Zed, `doctor`. **Fichiers protégés** : `tests/cli_test.rs` et `tests/zed_settings_test.rs` (et tout autre test qui encode le nommage) sont modifiés par l'agent **avec l'autorisation explicite du 👤 donnée le 2026-10-14**, le diff des tests est présenté avant rescellement, puis `make protect-update` régénère `tests/PROTECTED.sha256`.
-8. Docs : README §1-2 et §6, MANUEL (étapes 5 et 7, Test 3, dépannage), plan §7.3/§8.1/§8.5/§8.6 (amendement daté, l'ancien texte barré), PROGRESS (nouvelle ligne de journal « R1 »), DECISIONS (ce point passe en « fait »).
-9. Déploiement 👤 après `make install` : `zevbox zed install` migre `~/.config/zed/settings.json` (sauvegarde dans `backups/`), puis vérification dans Zed : menu = 2 lignes, thread depuis `demo-app` et depuis `zevbox`, message `not an allowed project` depuis un dossier non autorisé.
-10. Hors périmètre de R1 (inchangé) : `zevbox shell <agent>` (déjà repli sur le cwd), `stop --project`, `status`, le message `this agent is bound to …` du relais (I5, reste pour le cas multi-racines).
-
-### R2 — Quick start : `zevbox auth <agent>` fait `init` + `update` si nécessaire
-
-> 👤 2026-10-14 : **ne pas implémenter maintenant** (R2 et R3 attendront une demande explicite, après R1).
-
-**Objectif** : trois commandes suffisent après `make install` : `zevbox auth claude` et/ou `zevbox auth antigravity` (ordre libre), `zevbox project add <projet>`, puis Zed. `setup`, `update`, `init` restent disponibles séparément.
-
-**Plan** (`src/cli/auth.rs`, sans toucher aux fichiers protégés) :
-1. Si `config.json` est absent : exécuter `init` (déjà idempotent) au lieu de sortir en code 3. `--status` garde le comportement actuel (`unknown`).
-2. Si aucune release active pour l'agent demandé (ou image absente) : exécuter `update --agent <agent>` (réseau, 1-3 min, progression sur stderr) puis continuer. Si `update` échoue : message `Fix: run 'zevbox update --agent <agent>'`, code 3.
-3. Démarrer le runtime Apple Container s'il est arrêté (comme `setup`).
-4. Puis l'authentification proprement dite (inchangée). Idempotent : relancer `auth` quand tout est en place ne refait ni `init` ni `update`.
-5. Le second agent suit le même chemin : `init` déjà fait → seulement `update --agent <autre>`.
-6. `setup` est rendu conforme à §8.1 (voir R3) mais n'est plus requis dans le parcours.
-7. Tests : nouveaux cas dans `src/cli/auth.rs` (`#[cfg(test)]`) ou un nouveau fichier `tests/auth_quickstart_test.rs` (fake `container` de `tests/` réutilisable) : auth sans config → init ; auth sans release → update appelé ; auth avec tout en place → aucun build.
-8. Docs : README §1 et MANUEL (étapes 3-5 fusionnées en « Quick start », les commandes séparées gardées en référence).
-
-### R3 — `zevbox auth` et `zevbox setup` : écarts avec le plan (priorité haute)
-
-> 👤 2026-10-14 : **ne pas implémenter maintenant** (voir R2).
-
-- **`auth claude` monte un projet utilisateur sans raison** (`src/cli/auth.rs:51-57`) : le conteneur d'auth est construit avec `RunSpec.project = config.projects.first()`, sinon `current_dir()`, sinon `/`. Conséquences : (1) le premier projet de la liste est monté en lecture/écriture dans un conteneur qui n'en a pas besoin ; (2) **sans aucun projet enregistré, `auth claude` lancé depuis `$HOME` monterait `$HOME`, et depuis un dossier illisible monterait `/`** — contraire à « Never mount $HOME » (AGENTS.md) et à I1. Correctif : monter à la place un dossier temporaire vide privé (`tempfile::tempdir()` sous `stateRoot/tmp`, 0700), ou pas de montage projet du tout si `container::run_args` le permet ; même revue pour `zevbox shell` sans `--project` (`src/cli/shell.rs:49-56`, repli sur `current_dir()`, à valider avec `validate_project_path`).
-- **`setup` ne suit pas §8.1** : le plan prévoit `init → inventory-preexisting.json → doctor → update (les deux agents) → auth claude → auth antigravity (chacune passable avec `n`) → project add → résumé`. L'implémentation fait `init → [project add] → zed install → doctor`. Donc après `zevbox setup` seul, aucun agent n'est construit ni authentifié : `doctor` l'indique mais l'utilisateur doit lancer `update` et `auth` à la main (c'est ce que documentent README §1 et MANUEL étapes 3-5 en attendant). Correctif : ajouter `update` et les deux `auth` (interactives, avec question `[y/n]`) au flux `setup`, et le résumé final.
-
-
-
-### R4 — `zevbox auth` : le navigateur ne s'ouvre pas automatiquement
-
-- Claude : la commande tourne dans le conteneur ; `claude-agent-acp --cli auth login` ne peut pas ouvrir un navigateur hôte. Correctif : zevbox lit le stdout du conteneur, repère l'URL `https://claude.com/cai/oauth/authorize?…` et exécute `open <url>` sur le Mac (le reste du flux — coller le code — reste interactif).
-- Antigravity : `open <url>` est appelé (`src/cli/auth.rs`) mais n'a pas ouvert le navigateur ; vérifier le code de retour de `open` et l'afficher au lieu de l'ignorer (`let _ =`), et tester avec `open -u`/`/usr/bin/open` explicite.
-- Dans les deux cas l'URL est déjà imprimée : solution de repli fonctionnelle.
-
-### R5 — Durcissement de `zevbox auth antigravity` (`src/cli/auth.rs`)
-
-- Vérifier le paramètre `state` reçu au callback contre celui émis (anti-CSRF) ; refuser sinon.
-- Timeout du callback 120 s → 300 s (choix de compte, 2FA).
-- `--status` : exiger un JSON valide contenant `refresh_token`, pas seulement l'existence du fichier.
-- Si le premier `session/new` échoue côté Gemini : persister aussi `token` (access_token) et `expiry` dans `acp_token.json`.
-- Tests `#[cfg(test)]` pour `base64_url_encode` (vecteurs RFC 4648), `url_encode`, `extract_query_param`, `percent_decode`.
-- Ne répondre qu'à la requête `GET /?code=…` : ignorer `/favicon.ico` et autres chemins au lieu de renvoyer 400.
-
-### R6 — Mises à jour disponibles
-
-- `zevbox update --check` (2026-10-14) : Claude 0.89.1 → 0.90.0, Antigravity 1.3.0 → 1.4.0. À appliquer avec `zevbox update` une fois le premier dialogue Zed prouvé (re-tester l'auth Antigravity : le format d'`acp_token.json` peut changer entre versions).
-
-### R8 — « Auto mode unavailable » dans `zevbox · Claude` (constaté le 2026-10-14, cause trouvée)
+### R8 — « Auto mode unavailable » dans `zevbox · Claude` : modèle par défaut + `default_config_options` préservées
 
 **Faits vérifiés** (agent piloté à la main dans le conteneur avec le même montage d'état, 2026-10-14) :
-- Le message est émis par claude-agent-acp (`dist/session-mode.js`), **une fois par session**, dès qu'un passage en mode `auto` est demandé alors que le modèle courant a `supportsAutoMode !== true`. Il arrive dans Zed comme `agent_message_chunk` + `current_mode_update: acceptEdits`.
-- **Dans le conteneur, le modèle par défaut à `session/new` est « Default (recommended) = Haiku 4.5 »** (`claude-haiku-4-5-20251001`), car le dossier d'état ne contient aucun `~/.claude/settings.json` (seul `.credentials.json` y est écrit par `auth`). Sur l'hôte, `~/.claude/settings.json` fixe `model: haiku` et l'entrée `claude-acp` envoie `model: fable`.
-- Zed applique le **mode avant le modèle** à la création du thread : `set_mode auto` arrive quand le modèle est encore Haiku 4.5 → repli `acceptEdits` + message. Le `set model=fable` qui suit ne rétablit pas Auto (le repli est définitif pour la session). D'où : « le message reste même avec opus/sonnet/fable, même dans un nouveau thread ».
-- Séquence inverse testée : `set model=fable` **puis** `set_mode auto` → aucun message, Auto actif. Passer ensuite à `haiku` (5.5) ou `claude-haiku-4-5` → Auto retiré + message. Donc ici : Haiku (4.5 et 5.5) sans Auto ; Fable (et a priori Opus/Sonnet) avec.
-- Hors zevbox : ni le relais (il relaie `session/set_mode` / `set_config_option` tels quels, dans l'ordre), ni I1–I12 ne sont en cause ; la seule différence avec l'hôte est l'absence de `settings.json` (modèle par défaut) dans l'état de l'agent.
+- Le message `**Auto mode unavailable:** the selected model does not support Auto mode; using Accept edits instead.` est émis par claude-agent-acp (`dist/session-mode.js`), une fois par session, dès qu'un passage en mode `auto` est demandé alors que le modèle courant n'a pas `supportsAutoMode`. Il arrive dans Zed comme `agent_message_chunk` + `current_mode_update: acceptEdits`.
+- Dans le conteneur, le modèle par défaut à `session/new` est « Default (recommended) = Haiku 4.5 » (`claude-haiku-4-5-20251001`) parce que `state/claude/.claude/settings.json` n'existe pas (`auth` n'écrit que `.credentials.json`). Sur l'hôte, `~/.claude/settings.json` contient `{"model": "haiku", …}` et l'entrée `claude-acp` de Zed envoie `model: fable`.
+- Zed applique le **mode avant le modèle** à l'ouverture d'un thread : `set_mode auto` arrive quand le modèle est encore Haiku 4.5 → repli `acceptEdits` + message ; le `model=fable` qui suit ne rétablit pas Auto (repli définitif pour la session). D'où le message avec tous les modèles et à chaque nouveau thread.
+- Séquence inverse testée : `model=fable` **puis** `mode=auto` → pas de message, Auto actif. Passer ensuite à `haiku` (5.5) ou Haiku 4.5 → Auto retiré + message. Ici : Haiku (4.5 et 5.5) sans Auto ; Fable (et a priori Opus/Sonnet) avec.
+- Zed **écrit lui-même** `default_config_options` dans l'entrée gérée quand l'utilisateur choisit modèle/mode (vu : `"zevbox · Claude": {"default_config_options": {"model": "haiku", "mode": "auto"}, …}`). Or `zed_settings::apply_entries` (`src/zed_settings.rs:130-140`) compare l'objet existant à `entry_json` = `{type, command, args, env}` et, s'il diffère, remplace **l'objet entier** (`prop.set_value(entry_input(entry))`) → les choix de l'utilisateur sont effacés par `zevbox zed install`, `project add/remove`, `update`, `rollback` (tous appellent `cli::project::update_zed`).
+- Ni le relais ni I1–I12 ne sont en cause.
 
-**Correctif immédiat (👤, sans code, réversible)** : donner à l'agent du conteneur un modèle par défaut qui supporte Auto :
+**Correctif immédiat (👤, sans code, réversible)** — à appliquer tout de suite si ce n'est pas fait :
 ```bash
 printf '{"model": "fable"}\n' > "$HOME/Library/Application Support/zevbox/state/claude/.claude/settings.json"
 chmod 600 "$HOME/Library/Application Support/zevbox/state/claude/.claude/settings.json"
 ```
-(ou `opus` / `sonnet`). Nouveau thread Zed → plus de message, Auto actif. Vérification : `zevbox shell claude` → `cat ~/.claude/settings.json`.
+Nouveau thread Zed → plus de message, Auto actif. Vérification : `zevbox shell claude` → `cat ~/.claude/settings.json`.
 
-**Plan zevbox (non implémenté)** :
-1. `zevbox auth claude` (ou une commande dédiée `zevbox agent-config claude --model fable`) écrit `state/claude/.claude/settings.json` (0600) avec `{"model": …}` : valeur = `--model` si donné, sinon le `model` lu (lecture seule, jamais monté) dans `~/.claude/settings.json` de l'hôte s'il existe, sinon rien. Ne jamais écraser un fichier existant sans `--force`. `doctor` : `WARN agent:claude — no default model in state (Auto mode falls back to Accept edits); Fix: …`.
-2. `zed_settings::apply_entries` : ne gérer que `type`, `command`, `args`, `env` ; **conserver** les autres clés (`default_config_options`) octet pour octet (aujourd'hui tout `update_zed` — `zed install`, `project add/remove`, `update`, `rollback` — remplace l'objet entier dès qu'il diffère).
-3. À la **création** d'une entrée gérée seulement : copier `default_config_options` de l'entrée registre homonyme si présente (`claude-acp` → `zevbox · Claude`, `antigravity-acp` → `zevbox · Antigravity`), sinon rien.
-4. Tests : fixture avec `default_config_options` → conservées après `apply_entries` (y compris quand `command` change) ; création → copie depuis `claude-acp` ; `uninstall` → entrée entière supprimée ; `auth claude` → `settings.json` créé / non écrasé. `tests/zed_settings_test.rs` et `cli_test.rs` (protégés) à compléter avec autorisation 👤, ou nouveaux fichiers de test.
-5. Docs : MANUEL (étape 4a : modèle par défaut ; étape 7 : message Auto mode), README dépannage, plan §8.1/§8.9.
+**Fichiers** : `src/zed_settings.rs` (WORKED EXAMPLE), `src/cli/auth.rs`, `src/cli/doctor.rs`, `src/fsutil.rs` (`write_atomic`, `ensure_private_dir`), `src/paths.rs` (`home_dir()`, `state_dir(agent)`), `tests/zed_settings_test.rs` (lecture seule : montre l'usage de `apply_entries`/`install`), `tests/fixtures/zed/with_comments.json`.
 
-### R7 — Divers
+**Étapes**
+1. `zed_settings::apply_entries` : pour une clé gérée existante, ne plus remplacer l'objet. À la place, obtenir l'objet (`prop.object_value()`), et pour chacune des quatre clés `type`, `command`, `args`, `env` : si `obj.get(k)` existe et que `to_serde_value()` est déjà égal → rien ; sinon `set_value` ; si absente → `obj.append(k, …)`. Toute autre clé (`default_config_options`, etc.) est laissée telle quelle. Si la valeur gérée existante n'est pas un objet → la remplacer entièrement (comportement actuel). Idempotence : un fichier déjà conforme ressort octet pour octet (test `install_is_idempotent_bytes` protégé doit continuer à passer).
+2. À la **création** d'une entrée gérée (clé absente) : si `agent_servers` contient une entrée `claude-acp` (pour l'agent `claude`) ou `antigravity-acp` (pour `antigravity`) avec un objet `default_config_options`, copier cet objet (`to_serde_value()` → `CstInputValue`) dans la nouvelle entrée, en première position ; sinon ne rien ajouter. Table agent → clé registre : ajouter un champ `registry_key: &'static str` dans `agents::AgentSpec` (`"claude-acp"`, `"antigravity-acp"`) plutôt qu'une constante locale. Attention : `entry_json()` sert aussi à « déjà à jour » — il ne doit comparer que les quatre clés gérées.
+3. `src/cli/auth.rs`, branche Claude, **avant** de lancer le conteneur : si `state/claude/.claude/settings.json` n'existe pas, écrire `{"model": "<m>"}` en 0600 (`write_atomic`) où `<m>` = valeur de la clé `model` de `~/.claude/settings.json` de l'hôte si ce fichier existe, est du JSON valide et contient une chaîne `model` (lecture seule, jamais monté) ; sinon `"fable"`. Si le fichier existe déjà : ne rien faire (même si `model` manque). Afficher `claude: default model set to <m> (state/claude/.claude/settings.json)` seulement quand on l'écrit. Ne jamais copier d'autre clé que `model`.
+4. `src/cli/doctor.rs`, contrôle `agent:claude` : si `state/claude/.claude/settings.json` est absent ou sans clé `model` → statut `WARN`, message `no default model in state/claude/.claude/settings.json (Auto mode falls back to Accept edits in Zed). Fix: run 'zevbox auth claude' or write {"model": "fable"} in that file`. Ne pas changer le code de sortie (WARN ≠ FAIL).
+5. Tests, nouveau fichier `tests/r8_zed_options_test.rs` (fonctions pures, pas de binaire) : (a) `apply_entries` sur un JSONC contenant `"zevbox · Claude": {"default_config_options": {"model": "haiku", "mode": "auto"}, "type": "custom", "command": "/old", "args": ["launch","claude"], "env": {}}` avec une entrée dont `command` = `/new` → le résultat contient toujours `default_config_options` à l'identique et `command` = `/new` ; (b) même entrée déjà conforme → sortie identique à l'entrée octet pour octet ; (c) création de `zevbox · Claude` dans un fichier qui a `"claude-acp": {"default_config_options": {"mode": "auto", "model": "fable"}, "type": "registry"}` → la nouvelle entrée contient ces options ; sans `claude-acp` → pas de `default_config_options` ; (d) `apply_entries(…, &[])` supprime l'entrée entière, options comprises. Nouveau fichier `tests/r8_auth_default_model_test.rs` avec `common::TestEnv` : `env.run(&["auth","claude","--status"])` ne crée pas le fichier ; le lancement non interactif de `auth claude` n'est pas testable (conteneur `-it`) → la création du fichier est testée via une fonction publique `cli::auth::ensure_claude_default_model(paths, host_settings: &Path) -> io::Result<Option<String>>` appelée directement.
+6. Docs : MANUEL étape 4a (le modèle par défaut est écrit par `auth`, comment le changer), étape 7 (que faire si le message Auto apparaît), README §6 (entrée dépannage), plan §8.9 (clés gérées = `type, command, args, env` ; autres clés préservées).
 
-- `exploration_solutions_gemini.md` : déplacer sous `docs/` (ou résumer ici) ; il contient le client secret Google, déjà public dans le binaire, mais à garder à l'esprit si le dépôt devient public.
-- `lock.json` d'`antigravity-20261013-074439` a été édité à la main pour `authMarker` (release construite avant le correctif) : le prochain `zevbox update` régénérera un lock cohérent.
+**Acceptation** : (1) tests ci-dessus verts + `make verify STEP=17` ; (2) à la main : renommer `state/claude/.claude/settings.json` en `.bak`, `zevbox auth claude --status` ne le recrée pas, `zevbox doctor` affiche le WARN ; remettre le fichier ; (3) dans `~/.config/zed/settings.json`, laisser `default_config_options` sur `zevbox · Claude`, lancer `zevbox zed install` → `already up to date`-équivalent (aucune sauvegarde créée dans `backups/`, options intactes) ; (4) 👤 : nouveau thread `zevbox · Claude` en mode Auto → aucun message.
+
+### R3 — `zevbox auth` et `zevbox shell` : ne jamais monter un dossier non autorisé ; `setup` conforme à §8.1
+
+**Problème** (`src/cli/auth.rs:51-57`) : le conteneur d'authentification Claude est construit avec `RunSpec.project = config.projects.first()`, sinon `std::env::current_dir()`, sinon `/`. Donc (1) le premier projet est monté en lecture/écriture dans un conteneur qui n'en a pas besoin ; (2) sans projet enregistré, lancé depuis `$HOME` il monterait `$HOME`, et `/` si le cwd est illisible — contraire à I1 et à « never mount $HOME ». `zevbox shell` (`src/cli/shell.rs:48-60`) se rabat aussi sur `config.projects.first()`.
+
+**Fichiers** : `src/cli/auth.rs`, `src/cli/shell.rs`, `src/container.rs` (`RunSpec`, `run_args` — WORKED EXAMPLE, ne pas changer la signature), `src/paths.rs`, `src/cli/setup.rs`, `src/cli/update.rs` (`run_update(check, agent)`), `tests/lifecycle_test.rs` et `tests/cli_test.rs` (lecture seule).
+
+**Étapes**
+1. `auth.rs` (branche Claude) : remplacer le choix du projet par un dossier temporaire vide : `paths.state_root.join("tmp")` (créer 0700 avec `ensure_private_dir`), puis `tempfile::Builder::new().prefix("auth-").tempdir_in(...)` ; passer son chemin canonique dans `RunSpec.project` ; le `TempDir` est supprimé à la sortie (drop). Ainsi I1 est respecté (deux montages : ce dossier vide + `state/claude`). Ne plus lire `config.projects` ni `current_dir()` dans `auth`.
+2. `shell.rs` sans `--project` : si le cwd canonique est dans `config.projects` → l'utiliser ; sinon **erreur** code 3 : `<cwd> is not an allowed project. Fix: run 'zevbox project add <cwd>' or pass --project <path>`. Supprimer le repli sur `config.projects.first()`.
+3. `setup.rs` : après `init` et avant `zed install`, ajouter : `update` des deux agents via `crate::cli::update::run_update(false, None).await` **si** au moins un agent n'a pas de release active (`release::active_lock` → `Err(NoActiveRelease)`), sinon afficher `releases: up to date`. Puis, pour chaque agent sans témoin d'auth (`paths.state_dir(id).join(&lock.auth_marker)` absent) et seulement si stdin est un terminal (`std::io::IsTerminal`), poser `authenticate <Display> now? [y/N] ` ; `y` → `crate::cli::auth::run(agent, false).await`. Hors terminal : afficher `skipping authentication (not a terminal). Fix: run 'zevbox auth <id>'`. Terminer par le résumé : pour chaque agent `  <Display>: release <id|none>, <authenticated|not authenticated>` puis `next: zevbox project add <path>` si `config.projects` est vide.
+4. Tests, nouveau fichier `tests/r3_mounts_test.rs` avec `common::TestEnv` et le faux `container` (il journalise chaque invocation dans `env.container_calls()`, les montages sont dans les arguments `--mount type=bind,source=…`) : (a) `shell claude` lancé avec `current_dir` = `env.home` (pas un projet) → code 3, aucune ligne `run ` dans le journal ; (b) `auth claude` ne peut pas tourner en test (`-it`), donc extraire la construction du `RunSpec` dans une fonction `cli::auth::auth_run_spec(&config, &paths, &lock, tmp: &Path) -> RunSpec` et tester que `run_args(&spec)` ne contient aucun `source=` autre que `tmp` et `state/claude` ; (c) `setup` sans terminal (stdin null, c'est le cas de `env.run`) ne lance aucun conteneur `-it` et affiche `skipping authentication`.
+5. Docs : README §3 (`setup`, `auth`, `shell`), MANUEL étapes 3-4, plan §8.1 (ligne `setup` : marquer « conforme depuis R3 »).
+
+**Acceptation** : tests verts + `make verify STEP=17` ; à la main : `cd ~ && zevbox shell claude` → message d'erreur, code 3 ; `zevbox auth claude --status` inchangé ; `zevbox setup` (tout déjà en place) affiche le résumé sans rien reconstruire.
+
+### R2 — Quick start : `zevbox auth <agent>` fait `init` + `update` si nécessaire
+
+**Objectif** : après `make install`, trois commandes suffisent : `zevbox auth claude` et/ou `zevbox auth antigravity` (ordre libre), `zevbox project add <projet>`, Zed. `setup`, `update`, `init` restent disponibles séparément.
+
+**Fichiers** : `src/cli/mod.rs` (garde « not set up » ligne ~205 : `Command::Init | Command::Setup { .. } | Command::Launch { .. }`), `src/cli/auth.rs`, `src/cli/init.rs` (`run()`), `src/cli/update.rs` (`run_update(false, Some(agent))`), `src/release.rs` (`active_lock`), `src/container.rs` (`ContainerCli::{image_list, system_status, system_start}`, `image_matches`).
+
+**Étapes**
+1. `cli/mod.rs` : ajouter `Command::Auth { .. }` à la liste des commandes autorisées sans `config.json`.
+2. `auth.rs`, au début de `run` (sauf si `status == true`, qui garde le comportement actuel : `unknown` sans config) : (a) si `paths.config_file()` est absent → `crate::cli::init::run().await?` ; si code ≠ 0, le retourner. (b) `ContainerCli::system_status` ; si non `running` → `system_start` puis revérifier ; échec → `Apple Container system is not running. Fix: run 'container system start'`, code 3. (c) si `release::active_lock(&paths, agent.id())` est `Err(NoActiveRelease)` **ou** si l'image du lock n'est pas dans `image_list()` (`image_matches`) → afficher `<Display>: no release yet, building it now (network, 1-3 min)…` puis `crate::cli::update::run_update(false, Some(agent)).await?` ; si ensuite toujours pas de release → `no active <Display> release. Fix: run 'zevbox update --agent <id>'`, code 3. (d) continuer avec l'authentification existante. Idempotent : tout en place → ni `init` ni `update`.
+3. Tests, nouveau fichier `tests/r2_auth_quickstart_test.rs` : (a) `TestEnv::bare()` + `auth claude --status` → `unknown`, et `config.json` **n'est pas** créé ; (b) `TestEnv::new()` (release active, image présente dans le faux `container`) + `auth claude --status` → `authenticated` et le journal du faux `container` ne contient pas `build`. Le chemin « init puis update » **n'est pas testable** avec le faux `container` (pas de `build`, pas de réseau) : preuve manuelle obligatoire, voir Acceptation.
+4. Docs : README §1 (quick start = `make install`, `auth …`, `project add …`, Zed ; les commandes séparées restent dans le tableau §3), MANUEL (étapes 3 et 4 fusionnées : « Étape 3 : Authentifier (construit l'image au premier passage) »), plan §8.1 (ligne `auth` : amendement daté).
+
+**Acceptation** : tests verts + `make verify STEP=17` ; à la main, dans un état vierge (`ZEVBOX_STATE_ROOT=$(mktemp -d) zevbox auth antigravity`) : la commande initialise, construit l'image Antigravity, puis ouvre l'authentification ; relancée, elle ne reconstruit rien. Consigner la sortie dans PROGRESS.
+
+### R4 — `zevbox auth` : ouvrir le navigateur du Mac
+
+**Constat** (2026-10-14) : pour Claude comme pour Antigravity, l'URL s'affiche mais le navigateur ne s'ouvre pas. L'URL imprimée est un repli acceptable ; ne pas y passer plus d'une demi-journée.
+
+- **Antigravity** (`src/cli/auth.rs`, `auth_antigravity`) : `std::process::Command::new("open").arg(&auth_url).spawn()` est appelé avec `let _ =`. Étapes : utiliser `/usr/bin/open` en chemin absolu (le `PATH` peut être minimal), attendre le statut (`.status()`), et si échec afficher `could not open the browser (<erreur>): open the URL above manually`. Tester à la main : si ça marche désormais, fini. Sinon, essayer `/usr/bin/open -u <url>` et consigner le résultat.
+- **Claude** : la commande tourne dans le conteneur ; elle ne peut pas ouvrir un navigateur hôte. Piste à **vérifier d'abord à la main** (10 min) : Claude Code respecte la variable `BROWSER` (il exécute `$BROWSER <url>`). Test : `zevbox shell claude` puis `BROWSER=/bin/echo /opt/zevbox/claude/node_modules/.bin/claude-agent-acp --cli auth login --claudeai` ; si l'URL est bien passée à `echo`, implémenter : dans `assets/Containerfile` (étape `claude`), ajouter un script `/opt/zevbox/open-url` (`#!/bin/sh` ; `printf '%s\n' "$1" > "$HOME/.zevbox-open-url"`) ; dans `auth.rs`, ajouter `-e BROWSER=/opt/zevbox/open-url` aux arguments (via un champ `extra_env: Vec<(String,String)>` dans `RunSpec`, vide par défaut, écrit par `run_args`), et pendant que le conteneur tourne, une tâche tokio relit `state/claude/.zevbox-open-url` toutes les 200 ms, lance `/usr/bin/open <url>` et supprime le fichier. Si `BROWSER` n'est pas honoré : consigner « non faisable, URL à copier » dans ce fichier et fermer R4 côté Claude.
+- Tests : `#[cfg(test)]` sur la fonction qui lit le fichier d'URL (n'ouvre rien si le fichier est absent ou si l'URL ne commence pas par `https://claude.com/` ou `https://claude.ai/`). Docs : MANUEL étape 4 (retirer « le navigateur ne s'ouvre pas » si corrigé).
+
+### R5 — Durcissement de `zevbox auth antigravity` (`src/cli/auth.rs`)
+
+Étapes, toutes dans `auth_antigravity` et ses helpers :
+1. Vérifier le paramètre `state` reçu dans la requête de rappel (`extract_query_param(&req, "state")`) contre celui généré ; différent ou absent → réponse HTTP 400 `Invalid state`, message `Google authentication failed: state mismatch`, code 1. Ne jamais poursuivre l'échange.
+2. Ne traiter que `GET /?…` : si le chemin de la première ligne ne commence pas par `/?`, répondre `404` et **continuer à attendre** la bonne requête (boucle `accept`), au lieu d'échouer (les navigateurs demandent parfois `/favicon.ico`).
+3. Timeout d'attente 120 s → 300 s.
+4. `--status` (branche commune, `marker_path.exists()`) : pour Antigravity, exiger que le fichier soit du JSON contenant une chaîne non vide `refresh_token` ; sinon `not authenticated`.
+5. Persister aussi `token` (= `access_token`) et `expiry` (ISO 8601, `now + expires_in`) dans `acp_token.json` ; ne rien casser si absents de la réponse.
+6. Tests `#[cfg(test)]` dans `auth.rs` : `base64_url_encode` (vecteurs RFC 4648 §10 : `""`→`""`, `"f"`→`"Zg"`, `"fo"`→`"Zm8"`, `"foo"`→`"Zm9v"`, `"foob"`→`"Zm9vYg"`), `url_encode` (`"a b/c"`→`"a%20b%2Fc"`), `extract_query_param` (`GET /?code=x%2By&state=s HTTP/1.1` → `code` = `x+y`), `percent_decode`, et la vérification de `state` (fonction pure `callback_is_valid(req, expected_state) -> Result<String, String>`).
+7. Docs : rien (comportement visible inchangé), sauf MANUEL 4b : délai 5 min.
+
+**Acceptation** : tests verts ; à la main : `zevbox auth antigravity` complet réussit encore ; `zevbox auth antigravity --status` → `authenticated`.
+
+### R6 — Mises à jour disponibles
+
+`zevbox update --check` (2026-10-14) : Claude 0.89.1 → 0.90.0, Antigravity 1.3.0 → 1.4.0. Après R8/R3/R2 : `zevbox update` (les deux), puis re-tester à la main un thread Zed par agent (le format d'`acp_token.json` ou du modèle par défaut peut changer entre versions). Si Antigravity 1.4.0 échoue à l'auth : `zevbox rollback --agent antigravity` et consigner l'erreur ici. Pas de code.
+
+### R7 — Divers (sans code, 15 min)
+
+- Déplacer `exploration_solutions_gemini.md` sous `docs/` (`git mv`), mettre à jour les liens (README, PROGRESS, ce fichier). Il contient le client secret Google (public dans le binaire Antigravity, mais à savoir si le dépôt devient public).
+- `lock.json` d'`antigravity-20261013-074439` a été édité à la main pour `authMarker` ; le prochain `zevbox update` (R6) régénère un lock cohérent — rien à faire d'autre.
 
 ## Idées reportées
 
