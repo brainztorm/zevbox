@@ -71,26 +71,25 @@ fn entry_json(entry: &ManagedEntry) -> serde_json::Value {
     })
 }
 
-fn entry_input(entry: &ManagedEntry) -> CstInputValue {
-    CstInputValue::Object(vec![
+fn string_array(items: &[String]) -> CstInputValue {
+    CstInputValue::Array(items.iter().cloned().map(CstInputValue::String).collect())
+}
+
+/// The four managed keys, in the order they are written.
+fn managed_fields(entry: &ManagedEntry) -> Vec<(String, CstInputValue)> {
+    vec![
         ("type".into(), CstInputValue::String("custom".into())),
         (
             "command".into(),
             CstInputValue::String(entry.command.clone()),
         ),
-        (
-            "args".into(),
-            CstInputValue::Array(
-                entry
-                    .args
-                    .iter()
-                    .cloned()
-                    .map(CstInputValue::String)
-                    .collect(),
-            ),
-        ),
+        ("args".into(), string_array(&entry.args)),
         ("env".into(), CstInputValue::Object(Vec::new())),
-    ])
+    ]
+}
+
+fn entry_input(entry: &ManagedEntry) -> CstInputValue {
+    CstInputValue::Object(managed_fields(entry))
 }
 
 fn parse(text: &str) -> Result<CstRootNode, ZedSettingsError> {
@@ -99,7 +98,8 @@ fn parse(text: &str) -> Result<CstRootNode, ZedSettingsError> {
 }
 
 /// Pure text transform. Removes every managed key not in `entries`, updates or
-/// appends the others (`type`, `command`, `args`, `env: {}`), creates
+/// appends the others (`type`, `command`, `args`, `env: {}`; other keys of an
+/// existing managed entry, e.g. `default_config_options`, are preserved), creates
 /// `agent_servers` if missing, never touches unmanaged keys. Empty `original`
 /// (missing file) → a new document. Output must re-parse.
 pub fn apply_entries(original: &str, entries: &[ManagedEntry]) -> Result<String, ZedSettingsError> {
@@ -130,12 +130,34 @@ pub fn apply_entries(original: &str, entries: &[ManagedEntry]) -> Result<String,
             continue; // F10: never touch unmanaged entries such as `claude-acp`.
         }
         match entries.iter().find(|e| e.name == name) {
-            Some(entry) => {
-                let current = prop.value().and_then(|v| v.to_serde_value());
-                if current.as_ref() != Some(&entry_json(entry)) {
+            Some(entry) => match prop.object_value() {
+                // Only the four managed keys are compared and rewritten:
+                // Zed stores the user's model/mode choice next to them in
+                // `default_config_options`, which must survive.
+                Some(obj) => {
+                    let fields = managed_fields(entry);
+                    let wanted = entry_json(entry);
+                    for (key, input) in fields {
+                        let current = obj.get(&key);
+                        let same = current
+                            .as_ref()
+                            .and_then(|p| p.value())
+                            .and_then(|v| v.to_serde_value())
+                            .as_ref()
+                            == wanted.get(&key);
+                        match current {
+                            Some(_) if same => {}
+                            Some(p) => p.set_value(input),
+                            None => {
+                                obj.append(&key, input);
+                            }
+                        }
+                    }
+                }
+                None => {
                     prop.set_value(entry_input(entry));
                 }
-            }
+            },
             None => prop.remove(),
         }
     }

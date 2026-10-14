@@ -48,6 +48,14 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
         return auth_antigravity(&paths).await;
     }
 
+    match ensure_claude_default_model(&paths, &host_claude_settings()) {
+        Ok(Some(model)) => crate::ui::out(&format!(
+            "claude: default model set to {model} (state/claude/.claude/settings.json)"
+        )),
+        Ok(None) => {}
+        Err(e) => crate::ui::err(&format!("cannot write the default Claude model: {e}")),
+    }
+
     let project = match config.projects.first() {
         Some(p) => p.clone(),
         None => match std::env::current_dir() {
@@ -87,6 +95,47 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
     } else {
         Ok(EXIT_ERROR)
     }
+}
+
+/// The host's own Claude settings, read-only (never mounted).
+fn host_claude_settings() -> std::path::PathBuf {
+    crate::paths::home_dir()
+        .map(|home| home.join(".claude").join("settings.json"))
+        .unwrap_or_default()
+}
+
+/// Container-side `~/.claude/settings.json` of the Claude agent.
+fn claude_settings_path(paths: &Paths) -> std::path::PathBuf {
+    paths
+        .state_dir("claude")
+        .join(".claude")
+        .join("settings.json")
+}
+
+/// Without a default model the container's Claude starts on Haiku 4.5, which
+/// has no Auto mode (Zed then falls back to Accept edits, DECISIONS R8). Writes
+/// `{"model": "<m>"}` (0600) when the file is missing, where `<m>` is the
+/// `model` of `host_settings` if it holds one, else "fable". Only `model` is
+/// ever copied. Returns the model written, `None` if the file already exists.
+pub fn ensure_claude_default_model(
+    paths: &Paths,
+    host_settings: &std::path::Path,
+) -> std::io::Result<Option<String>> {
+    let target = claude_settings_path(paths);
+    if target.exists() {
+        return Ok(None);
+    }
+    let model = std::fs::read_to_string(host_settings)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|v| v.get("model").and_then(|m| m.as_str()).map(str::to_string))
+        .unwrap_or_else(|| "fable".to_string());
+    if let Some(dir) = target.parent() {
+        crate::fsutil::ensure_private_dir(dir)?;
+    }
+    let body = format!("{}\n", serde_json::json!({ "model": model }));
+    crate::fsutil::write_atomic(&target, body.as_bytes())?;
+    Ok(Some(model))
 }
 
 async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {

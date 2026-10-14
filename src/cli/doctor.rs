@@ -112,11 +112,20 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
                     } else {
                         "not authenticated"
                     };
-                    checks.push((
-                        format!("agent:{}", spec.id),
-                        "OK".to_string(),
-                        format!("release {} ({auth_status})", entry.current),
-                    ));
+                    let missing_model = spec.id == "claude" && !has_default_model(&paths);
+                    if missing_model {
+                        checks.push((
+                            format!("agent:{}", spec.id),
+                            "WARN".to_string(),
+                            "no default model in state/claude/.claude/settings.json (Auto mode falls back to Accept edits in Zed). Fix: run 'zevbox auth claude' or write {\"model\": \"fable\"} in that file".to_string(),
+                        ));
+                    } else {
+                        checks.push((
+                            format!("agent:{}", spec.id),
+                            "OK".to_string(),
+                            format!("release {} ({auth_status})", entry.current),
+                        ));
+                    }
                 }
                 Err(e) => {
                     checks.push((
@@ -164,6 +173,18 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
     }
 
     finish(json_output, &checks)
+}
+
+/// True iff the container's Claude settings hold a `model` string (DECISIONS R8).
+fn has_default_model(paths: &Paths) -> bool {
+    let path = paths
+        .state_dir("claude")
+        .join(".claude")
+        .join("settings.json");
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .is_some_and(|v| v.get("model").is_some_and(|m| m.is_string()))
 }
 
 fn finish(json_output: bool, checks: &[(String, String, String)]) -> anyhow::Result<u8> {

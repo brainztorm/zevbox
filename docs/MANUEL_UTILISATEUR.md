@@ -117,6 +117,8 @@ zevbox auth claude
 3. Connectez-vous avec votre compte Claude (Pro / Team / Max) et autorisez l'accès ; collez le code affiché dans le terminal à l'invite `Paste code here if prompted >`.
 4. `Login successful.` : le jeton est enregistré dans `state/claude/.claude/.credentials.json` (`0600`).
 
+**Modèle par défaut.** Avant de lancer la VM, `auth` écrit `state/claude/.claude/settings.json` (`{"model": "…"}`, `0600`) s'il n'existe pas : le `model` de votre `~/.claude/settings.json` (lu seul, jamais monté) ou `fable`. Sans cela, Claude démarre sur Haiku 4.5, qui n'a pas le mode Auto. Pour changer de modèle, éditez ce fichier ; `auth` ne le réécrit jamais s'il existe.
+
 #### 4b. Antigravity (Gemini, compte Google personnel)
 
 ```bash
@@ -321,6 +323,12 @@ sequenceDiagram
 ### Problème 3 : Zed affiche `zevbox: this agent is bound to <A>; this session asked for <B>`
 - **Cause** : La session Zed demande un dossier (`<B>`) différent de celui où l'agent a été lancé (`<A>`) — en pratique un espace de travail Zed avec plusieurs dossiers racines.
 - **Solution** : Ouvrez un seul dossier racine par fenêtre Zed.
+
+---
+
+### Problème 3b : Zed affiche `Auto mode unavailable: the selected model does not support Auto mode`
+- **Cause** : le modèle par défaut de Claude dans la VM est Haiku 4.5 (pas de mode Auto) ; Zed applique le mode avant le modèle.
+- **Solution** : `zevbox doctor` signale `no default model` ; lancez `zevbox auth claude` ou écrivez `{"model": "fable"}` dans `state/claude/.claude/settings.json` (voir étape 4a), puis ouvrez un nouveau thread.
 
 ---
 

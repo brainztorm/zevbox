@@ -1,7 +1,7 @@
 //! Command-line contract (§8.1). Parsing and dispatch only; each command lives
 //! in its own file and returns an exit code.
 
-mod auth;
+pub mod auth;
 mod clean;
 mod doctor;
 mod init;
