@@ -75,6 +75,14 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
     let tmp_path = std::fs::canonicalize(tmp.path())?;
     let spec = auth_run_spec(&config, &paths, &lock, &tmp_path);
 
+    // The login runs inside the VM, which cannot open the Mac's browser (I3).
+    crate::ui::out(
+        "claude: the browser will NOT open by itself (the login runs inside the VM).\n\
+         1. Copy the https://claude.com/... URL printed below into your browser.\n\
+         2. Sign in and authorize.\n\
+         3. Paste the code shown by the browser at the 'Paste code here' prompt.",
+    );
+
     let args = crate::container::run_args(&spec);
     let mut cmd = std::process::Command::new(&config.container_binary);
     cmd.args(&args);
