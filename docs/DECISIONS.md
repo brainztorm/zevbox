@@ -23,7 +23,7 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 - Zip `agy-acp-server-1.3.0-linux-arm64.zip` : le binaire `agy_acp_server.par` est à la racine de l'archive ; exécutable natif (flags absl `--[no]debug`, `--[no]notices`, `--helpfull`). Lancé sans argument : le `--uid=` du registre n'est pas un flag reconnu par `--helpfull` et n'est pas passé.
 - Fichiers lus par le serveur (chaînes présentes dans le binaire) : `$HOME/.gemini/antigravity-acp/settings.json` (`{"auth":{"type":"oauth-personal"}}`) et `$HOME/.gemini/antigravity-acp/acp_token.json` (format google-auth `authorized_user` : `client_id`, `client_secret`, `refresh_token`, `token_uri`, `scopes`).
-- Authentification retenue : OAuth 2.0 PKCE exécuté **sur l'hôte** par `zevbox auth antigravity` (client ID/secret d'application installée extraits du binaire public, listener `127.0.0.1:0`, échange du code via `curl`, écriture `0600`). Rejetés : clé API Gemini (facturation au jeton, pas le forfait AI Pro), réutilisation de `~/.gemini/oauth_creds.json` (client ID gemini-cli ≠ Antigravity → `unauthorized_client`), trousseau macOS (invite de mot de passe anxiogène), OAuth depuis la VM (navigateur hôte ne joint pas `127.0.0.1` de la VM sans `-p`, interdit par I1). Détails : `exploration_solutions_gemini.md`.
+- Authentification retenue : OAuth 2.0 PKCE exécuté **sur l'hôte** par `zevbox auth antigravity` (client ID/secret d'application installée extraits du binaire public, listener `127.0.0.1:0`, échange du code via `curl`, écriture `0600`). Rejetés : clé API Gemini (facturation au jeton, pas le forfait AI Pro), réutilisation de `~/.gemini/oauth_creds.json` (client ID gemini-cli ≠ Antigravity → `unauthorized_client`), trousseau macOS (invite de mot de passe anxiogène), OAuth depuis la VM (navigateur hôte ne joint pas `127.0.0.1` de la VM sans `-p`, interdit par I1). Détails : `docs/exploration_solutions_gemini.md`.
 - Test réel 👤 (2026-10-14) : `zevbox auth claude` → `Login successful` ; `zevbox auth antigravity` → `Google Antigravity authenticated successfully.` (les deux : le navigateur ne s'est pas ouvert tout seul, l'URL imprimée a été copiée à la main). Le `session/new` depuis un autre projet que `zevbox` est refusé — comportement voulu, voir « Décisions » 2026-10-14 : le dialogue réel avec Gemini n'est donc **pas encore prouvé**.
 - Zed (`crates/agent_servers/src/acp/transport.rs`, `spawn_stdio`, lu le 2026-10-14) : pour un projet local, le processus agent custom est lancé avec `current_dir` = premier chemin de `project.default_path_list()` (premier worktree). Le `cwd` de `session/new` vient de la même liste. → zevbox peut déduire le projet de son propre répertoire de travail au lieu de `--project`.
 - Zed (`crates/project/src/agent_server_store.rs`, lu le 2026-10-14) : les entrées `agent_servers` sont lues avec `settings.get::<AllAgentServersSettings>(None)`, c'est-à-dire **depuis les réglages globaux uniquement** ; un `.zed/settings.json` local au projet n'est pas consulté et Zed n'offre aucun filtrage par projet. Conséquence : avec une entrée par (agent, projet), **toutes** les entrées `zevbox · …` sont visibles dans tous les projets (constaté le 2026-10-14 dans `demo-app`). Seule une entrée par agent, indépendante du projet, évite cet affichage.
@@ -57,6 +57,7 @@ Format : date — fait ou décision — comment c'est vérifié.
 - **R2 — Quick start via `zevbox auth` — ✅ code 2026-10-14** : `auth` fait `init`/runtime/`update` si besoin. Preuve manuelle réseau à faire par 👤 (voir PROGRESS).
 - **R4 — ouverture du navigateur — partiel 2026-10-14** : Antigravity corrigé (`/usr/bin/open`, erreur affichée), à confirmer par 👤. Claude : test manuel `BROWSER` encore à faire (restant ci-dessous).
 - **R5 — durcissement `auth antigravity` — ✅ code 2026-10-14** (test de bout en bout à confirmer par 👤).
+- **R7 — divers — ✅ 2026-10-14** : `exploration_solutions_gemini.md` déplacé sous `docs/` (contient le client secret Google, public dans le binaire Antigravity ; à savoir si le dépôt devient public). Le `lock.json` d'`antigravity-20261013-074439` édité à la main sera régénéré par le prochain `zevbox update`.
 
 ## Reste à faire — mode d'emploi pour l'agent implémenteur
 
@@ -82,11 +83,6 @@ Ce qui suit est écrit pour être exécuté sans autre contexte que `AGENTS.md`,
 ### R6 — Mises à jour disponibles
 
 `zevbox update --check` (2026-10-14) : Claude 0.89.1 → 0.90.0, Antigravity 1.3.0 → 1.4.0. Après R8/R3/R2 : `zevbox update` (les deux), puis re-tester à la main un thread Zed par agent (le format d'`acp_token.json` ou du modèle par défaut peut changer entre versions). Si Antigravity 1.4.0 échoue à l'auth : `zevbox rollback --agent antigravity` et consigner l'erreur ici. Pas de code.
-
-### R7 — Divers (sans code, 15 min)
-
-- Déplacer `exploration_solutions_gemini.md` sous `docs/` (`git mv`), mettre à jour les liens (README, PROGRESS, ce fichier). Il contient le client secret Google (public dans le binaire Antigravity, mais à savoir si le dépôt devient public).
-- `lock.json` d'`antigravity-20261013-074439` a été édité à la main pour `authMarker` ; le prochain `zevbox update` (R6) régénère un lock cohérent — rien à faire d'autre.
 
 ## Idées reportées
 
