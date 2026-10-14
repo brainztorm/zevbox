@@ -1,5 +1,7 @@
 # zevbox — User Guide
 
+**English** · [Français](fr/GUIDE_UTILISATEUR.md)
+
 This guide walks you through installing, configuring, checking and using **zevbox** with the
 **Zed** editor on macOS. At the end you will have verified, not assumed, that the agent runs in
 an isolated Linux micro-VM and cannot see your Mac.
