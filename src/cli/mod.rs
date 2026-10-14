@@ -202,7 +202,7 @@ async fn dispatch(command: Command) -> anyhow::Result<u8> {
     let paths = crate::paths::Paths::from_env()?;
     if !matches!(
         command,
-        Command::Init | Command::Setup { .. } | Command::Launch { .. }
+        Command::Init | Command::Setup { .. } | Command::Launch { .. } | Command::Auth { .. }
     ) && !paths.config_file().exists()
     {
         crate::ui::err(

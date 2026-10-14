@@ -6,25 +6,22 @@ Binaire Rust autonome pour macOS Apple Silicon (arm64).
 
 ---
 
-## 1. Installation en 4 commandes
+## 1. Installation en 3 étapes
 
 ```bash
 # 1. Compiler et installer le binaire de production dans ~/.local/bin/zevbox
 make install
 
-# 2. Initialiser zevbox (dossiers d'état 0700, config.json, images des agents)
-zevbox setup
-zevbox update            # construit les images Claude et Antigravity (une fois, puis à chaque mise à jour)
-
-# 3. Authentifier les agents, une seule fois (chaque commande imprime l'URL de connexion)
+# 2. Authentifier les agents, une seule fois, ordre libre. Au premier passage, `auth`
+#    initialise zevbox et construit l'image de l'agent (réseau, 1-3 min) ; relancée, elle ne reconstruit rien.
 zevbox auth claude        # compte Claude (Pro/Max) — s'exécute dans un conteneur -it
 zevbox auth antigravity   # compte Google (AI Pro / One AI Premium) — OAuth PKCE sur le Mac
 
-# 4. Autoriser un projet (à répéter pour chaque projet que vous voulez ouvrir avec un agent)
+# 3. Autoriser un projet (à répéter pour chaque projet que vous voulez ouvrir avec un agent)
 zevbox project add /chemin/vers/votre/projet
 ```
 
-Zed affiche deux entrées, **`zevbox · Claude`** et **`zevbox · Antigravity`**, valables dans tout projet autorisé par `zevbox project add` (invariant I2 : seuls les projets explicitement autorisés sont montés dans une micro-VM ; dans un autre dossier, l'agent répond `… is not an allowed project`). L'ordre des étapes 3 et 4 est libre ; `zevbox setup /chemin` fait les étapes 2 (sans `update`) et 4 d'un coup.
+Zed affiche deux entrées, **`zevbox · Claude`** et **`zevbox · Antigravity`**, valables dans tout projet autorisé par `zevbox project add` (invariant I2 : seuls les projets explicitement autorisés sont montés dans une micro-VM ; dans un autre dossier, l'agent répond `… is not an allowed project`). `init`, `setup` et `update` restent disponibles séparément (tableau §3) ; `zevbox setup /chemin` fait en une fois l'initialisation, les images, l'authentification (dans un terminal) et l'autorisation du projet.
 
 > Les deux commandes `auth` impriment l'URL de connexion : si le navigateur ne s'ouvre pas tout seul, copiez-la dans votre navigateur.
 

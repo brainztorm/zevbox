@@ -54,33 +54,20 @@ Format : date — fait ou décision — comment c'est vérifié.
 - **R1 — Une entrée Zed par agent, projet déduit du répertoire de travail — ✅ 2026-10-14** (commit `9128163`). Motif : `agent_servers` est un réglage global de Zed sans filtrage par projet ; une entrée par (agent, projet) affichait toutes les entrées partout. Résultat : menu Zed = `zevbox · Claude` et `zevbox · Antigravity` ; `zevbox launch <agent>` sans `--project` prend `std::env::current_dir()` (Zed lance l'agent dans le premier worktree), I2/I5 inchangés ; `project add/remove` ne touchent plus aux entrées ; tests protégés `cli_test.rs`/`zed_settings_test.rs` modifiés **avec l'autorisation 👤 du 2026-10-14** et rescellés ; `tests/launch_cwd_test.rs` ajouté. Décision associée : liste blanche I2 stricte conservée (option « racines autorisées » → Idées reportées). Non fait, volontairement : contrôle `doctor` n° 8 (n'existait pas) ; message « multi-root » (le relais garde `this agent is bound to …`).
 - **R8 — Auto mode / `default_config_options` — ✅ 2026-10-14** : `apply_entries` préserve les clés non gérées d'une entrée ; `auth claude` écrit le modèle par défaut ; `doctor` WARN sans modèle. Étape 2 (copie des options du registre à la création) non faite : conflit avec le test protégé `install_semantics_match_expected` → décision 👤 (voir PROGRESS).
 - **R3 — Montages `auth`/`shell`, `setup` conforme — ✅ 2026-10-14** : `auth` monte un dossier vide jetable ; `shell` refuse un cwd non autorisé ; `setup` fait `update` + `auth` (terminal) + résumé.
+- **R2 — Quick start via `zevbox auth` — ✅ code 2026-10-14** : `auth` fait `init`/runtime/`update` si besoin. Preuve manuelle réseau à faire par 👤 (voir PROGRESS).
 
 ## Reste à faire — mode d'emploi pour l'agent implémenteur
 
 Ce qui suit est écrit pour être exécuté sans autre contexte que `AGENTS.md`, `zevbox_plan_V2.md` et ce fichier. Lire aussi les « Faits vérifiés » plus haut.
 
 **Règles communes (obligatoires)**
-1. **Ordre d'exécution : (R8, R3 faits) R2 → R4 → R5 → R6 → R7.** Un R à la fois. Ne pas commencer le suivant avant que le précédent soit commité.
+1. **Ordre d'exécution : (R8, R3, R2 faits) R4 → R5 → R6 → R7.** Un R à la fois. Ne pas commencer le suivant avant que le précédent soit commité.
 2. Avant de coder un R : lire les fichiers listés dans sa rubrique « Fichiers ». Copier le style des fichiers `WORKED EXAMPLE` (en-tête de fichier). Messages CLI en anglais, format `<problème>. Fix: <commande exacte>`.
 3. Interdits inchangés : `unwrap/expect/panic` dans `src/` (clippy les refuse), shell hôte (`sh -c`), montage de `$HOME`, `--all`, écriture dans un projet utilisateur, `-t` sur le conteneur ACP. Invariants I1–I12 du plan §3.
 4. **Fichiers protégés** (`tests/**` listés dans `tests/PROTECTED.sha256`, `scripts/**`, `clippy.toml`) : **ne pas les modifier**. Les nouveaux tests vont dans de **nouveaux fichiers** `tests/r<N>_<sujet>_test.rs` (ils peuvent faire `mod common;` et utiliser `common::TestEnv`, voir `tests/launch_cwd_test.rs` comme modèle) ou dans `#[cfg(test)]` du module. Si un R ne peut pas être fait sans toucher un test protégé : s'arrêter, écrire pourquoi dans `docs/PROGRESS.md`, demander au 👤.
 5. Le faux `container` (`tests/fixtures/fake-container`) ne sait pas faire `build` ni accéder au réseau : tout ce qui construit une image ou appelle le registre se teste **à la main** (preuve à consigner dans `docs/PROGRESS.md`), pas en test automatique.
 6. Fin de chaque R : `make check` (fmt + clippy -D warnings + tests + invariants) puis `make verify STEP=17` doit afficher `STEP 17: OK` ; `make install` ; test manuel indiqué dans « Acceptation » ; ligne de journal dans `docs/PROGRESS.md` (`- <date> — R<N> : …`) ; déplacer le R dans « Fait depuis l'acceptation » ci-dessus (3 lignes max) ; `git commit -m "r<N>: <titre>"`.
 7. Les lignes de code citées (`fichier:ligne`) datent du 2026-10-14 : vérifier avec `grep` avant d'éditer.
-
-### R2 — Quick start : `zevbox auth <agent>` fait `init` + `update` si nécessaire
-
-**Objectif** : après `make install`, trois commandes suffisent : `zevbox auth claude` et/ou `zevbox auth antigravity` (ordre libre), `zevbox project add <projet>`, Zed. `setup`, `update`, `init` restent disponibles séparément.
-
-**Fichiers** : `src/cli/mod.rs` (garde « not set up » ligne ~205 : `Command::Init | Command::Setup { .. } | Command::Launch { .. }`), `src/cli/auth.rs`, `src/cli/init.rs` (`run()`), `src/cli/update.rs` (`run_update(false, Some(agent))`), `src/release.rs` (`active_lock`), `src/container.rs` (`ContainerCli::{image_list, system_status, system_start}`, `image_matches`).
-
-**Étapes**
-1. `cli/mod.rs` : ajouter `Command::Auth { .. }` à la liste des commandes autorisées sans `config.json`.
-2. `auth.rs`, au début de `run` (sauf si `status == true`, qui garde le comportement actuel : `unknown` sans config) : (a) si `paths.config_file()` est absent → `crate::cli::init::run().await?` ; si code ≠ 0, le retourner. (b) `ContainerCli::system_status` ; si non `running` → `system_start` puis revérifier ; échec → `Apple Container system is not running. Fix: run 'container system start'`, code 3. (c) si `release::active_lock(&paths, agent.id())` est `Err(NoActiveRelease)` **ou** si l'image du lock n'est pas dans `image_list()` (`image_matches`) → afficher `<Display>: no release yet, building it now (network, 1-3 min)…` puis `crate::cli::update::run_update(false, Some(agent)).await?` ; si ensuite toujours pas de release → `no active <Display> release. Fix: run 'zevbox update --agent <id>'`, code 3. (d) continuer avec l'authentification existante. Idempotent : tout en place → ni `init` ni `update`.
-3. Tests, nouveau fichier `tests/r2_auth_quickstart_test.rs` : (a) `TestEnv::bare()` + `auth claude --status` → `unknown`, et `config.json` **n'est pas** créé ; (b) `TestEnv::new()` (release active, image présente dans le faux `container`) + `auth claude --status` → `authenticated` et le journal du faux `container` ne contient pas `build`. Le chemin « init puis update » **n'est pas testable** avec le faux `container` (pas de `build`, pas de réseau) : preuve manuelle obligatoire, voir Acceptation.
-4. Docs : README §1 (quick start = `make install`, `auth …`, `project add …`, Zed ; les commandes séparées restent dans le tableau §3), MANUEL (étapes 3 et 4 fusionnées : « Étape 3 : Authentifier (construit l'image au premier passage) »), plan §8.1 (ligne `auth` : amendement daté).
-
-**Acceptation** : tests verts + `make verify STEP=17` ; à la main, dans un état vierge (`ZEVBOX_STATE_ROOT=$(mktemp -d) zevbox auth antigravity`) : la commande initialise, construit l'image Antigravity, puis ouvre l'authentification ; relancée, elle ne reconstruit rien. Consigner la sortie dans PROGRESS.
 
 ### R4 — `zevbox auth` : ouvrir le navigateur du Mac
 

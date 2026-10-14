@@ -81,6 +81,8 @@ zevbox --help
 
 ### Étape 3 : Initialiser l'Environnement et Construire les Images des Agents
 
+> **Raccourci (R2)** : `zevbox auth <agent>` (étape 4) fait `init` puis `update` pour cet agent si nécessaire. Cette étape n'est utile que pour tout préparer d'un coup ou pour mettre à jour les images ; vous pouvez la sauter.
+
 ```bash
 zevbox setup
 zevbox update
@@ -102,7 +104,7 @@ flowchart LR
 
 ---
 
-### Étape 4 : Authentifier les Agents (une seule fois)
+### Étape 4 : Authentifier les Agents (une seule fois ; construit l'image au premier passage)
 Les agents s'exécutent dans une micro-VM avec leur propre dossier d'état (`state/<agent>/`, monté sur `/home/agent` dans la VM). Vous connectez chaque compte une seule fois ; les jetons persistent d'une session à l'autre.
 
 #### 4a. Claude

@@ -5,11 +5,15 @@ use crate::supervisor::{EXIT_ERROR, EXIT_OK, EXIT_PRECONDITION};
 
 pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
     let paths = Paths::from_env()?;
-    if !paths.config_file().exists() {
-        crate::ui::err(
-            "zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init' in a macOS terminal.",
-        );
-        return Ok(EXIT_PRECONDITION);
+    if status && !paths.config_file().exists() {
+        crate::ui::out("unknown");
+        return Ok(EXIT_OK);
+    }
+    if !status {
+        let code = prepare(&paths, agent).await?;
+        if code != EXIT_OK {
+            return Ok(code);
+        }
     }
     let config = crate::config::load(&paths.config_file())?;
 
@@ -21,8 +25,8 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
                 return Ok(EXIT_OK);
             } else {
                 crate::ui::err(&format!(
-                    "no active release for {}. Fix: run 'zevbox update --agent {}'",
-                    agent.id(),
+                    "no active {} release. Fix: run 'zevbox update --agent {}'",
+                    crate::agents::find(agent.id()).map_or(agent.id(), |a| a.display),
                     agent.id()
                 ));
                 return Ok(EXIT_PRECONDITION);
@@ -79,6 +83,62 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
     } else {
         Ok(EXIT_ERROR)
     }
+}
+
+/// Quick start (DECISIONS R2): makes `auth` work from a blank install.
+/// `init` if there is no config, starts the container runtime if stopped, and
+/// builds the agent's release when it is missing or its image is gone.
+/// Idempotent: everything in place → nothing done.
+async fn prepare(paths: &Paths, agent: super::AgentArg) -> anyhow::Result<u8> {
+    if !paths.config_file().exists() {
+        let code = super::init::run().await?;
+        if code != EXIT_OK {
+            return Ok(code);
+        }
+    }
+    let config = crate::config::load(&paths.config_file())?;
+    let cli = crate::container::ContainerCli::new(config.container_binary.clone());
+    let mut running = cli
+        .system_status()
+        .await
+        .map(|s| s.running)
+        .unwrap_or(false);
+    if !running {
+        let _ = cli.system_start().await;
+        running = cli
+            .system_status()
+            .await
+            .map(|s| s.running)
+            .unwrap_or(false);
+    }
+    if !running {
+        crate::ui::err("Apple Container system is not running. Fix: run 'container system start'");
+        return Ok(EXIT_PRECONDITION);
+    }
+
+    let display = crate::agents::find(agent.id()).map_or(agent.id(), |a| a.display);
+    let image_ready = match crate::release::active_lock(paths, agent.id()) {
+        Ok(lock) => cli
+            .image_list()
+            .await
+            .map(|images| {
+                images
+                    .iter()
+                    .any(|i| crate::container::image_matches(&i.reference, &lock.image))
+            })
+            .unwrap_or(false),
+        Err(_) => false,
+    };
+    if !image_ready {
+        crate::ui::out(&format!(
+            "{display}: no release yet, building it now (network, 1-3 min)…"
+        ));
+        let code = super::update::run_update(false, Some(agent)).await?;
+        if code != EXIT_OK {
+            return Ok(code);
+        }
+    }
+    Ok(EXIT_OK)
 }
 
 /// Run spec of the Claude login container: only `tmp` (an empty directory) and
