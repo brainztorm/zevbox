@@ -57,3 +57,4 @@ précédentes ne sont pas ✅ ici.
 - 2026-10-14 — **R5 (DECISIONS)** : `auth antigravity` durci : `state` vérifié (400 `Invalid state`, code 1), seules les requêtes `GET /?…` sont des rappels (404 sinon, l'attente continue), délai 300 s, `--status` exige un `refresh_token` non vide, `token` + `expiry` (ISO 8601) persistés si fournis. 5 tests `#[cfg(test)]` dans `auth.rs`. À tester par 👤 : `zevbox auth antigravity` complet puis `--status`.
 - 2026-10-14 — **R7 (DECISIONS)** : `exploration_solutions_gemini.md` → `docs/` (`git mv`), aucun lien à mettre à jour hors DECISIONS.
 - 2026-10-14 — **R4 clos** : piste `BROWSER` pour Claude abandonnée (décision 👤) ; `auth claude` affiche maintenant les instructions (copier l'URL, autoriser, coller le code).
+- 2026-10-14 — **R6** : `make install` puis `zevbox update` (Claude 0.90.0, Antigravity 1.4.0) ; `doctor` OK ; `launch <agent>` piloté à la main (initialize + session/new) OK pour les deux. Rollback disponible.

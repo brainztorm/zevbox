@@ -58,23 +58,20 @@ Format : date — fait ou décision — comment c'est vérifié.
 - **R4 — ouverture du navigateur — ✅ 2026-10-14** : Antigravity : `/usr/bin/open` + erreur affichée. Claude : abandonné sur décision 👤 (le login tourne dans la VM) ; `auth claude` affiche à la place les trois gestes à faire (copier l'URL, autoriser, coller le code).
 - **R5 — durcissement `auth antigravity` — ✅ code 2026-10-14** (test de bout en bout à confirmer par 👤).
 - **R7 — divers — ✅ 2026-10-14** : `exploration_solutions_gemini.md` déplacé sous `docs/` (contient le client secret Google, public dans le binaire Antigravity ; à savoir si le dépôt devient public). Le `lock.json` d'`antigravity-20261013-074439` édité à la main sera régénéré par le prochain `zevbox update`.
+- **R6 — mises à jour — ✅ 2026-10-14** : `zevbox update` → Claude 0.90.0 (`claude-20261014-151553`), Antigravity 1.4.0 (`antigravity-20261014-151642`), smoke tests OK ; `launch` + `initialize` + `session/new` réussis pour les deux, `auth --status` = authenticated. Threads Zed réels à confirmer par 👤. Précédentes releases conservées pour `rollback`.
 
 ## Reste à faire — mode d'emploi pour l'agent implémenteur
 
 Ce qui suit est écrit pour être exécuté sans autre contexte que `AGENTS.md`, `zevbox_plan_V2.md` et ce fichier. Lire aussi les « Faits vérifiés » plus haut.
 
 **Règles communes (obligatoires)**
-1. **Ordre d'exécution : (R8, R3, R2, R4, R5 faits) R6 → R7.** Un R à la fois. Ne pas commencer le suivant avant que le précédent soit commité.
+1. **Ordre d'exécution : (tous faits).** Un R à la fois. Ne pas commencer le suivant avant que le précédent soit commité.
 2. Avant de coder un R : lire les fichiers listés dans sa rubrique « Fichiers ». Copier le style des fichiers `WORKED EXAMPLE` (en-tête de fichier). Messages CLI en anglais, format `<problème>. Fix: <commande exacte>`.
 3. Interdits inchangés : `unwrap/expect/panic` dans `src/` (clippy les refuse), shell hôte (`sh -c`), montage de `$HOME`, `--all`, écriture dans un projet utilisateur, `-t` sur le conteneur ACP. Invariants I1–I12 du plan §3.
 4. **Fichiers protégés** (`tests/**` listés dans `tests/PROTECTED.sha256`, `scripts/**`, `clippy.toml`) : **ne pas les modifier**. Les nouveaux tests vont dans de **nouveaux fichiers** `tests/r<N>_<sujet>_test.rs` (ils peuvent faire `mod common;` et utiliser `common::TestEnv`, voir `tests/launch_cwd_test.rs` comme modèle) ou dans `#[cfg(test)]` du module. Si un R ne peut pas être fait sans toucher un test protégé : s'arrêter, écrire pourquoi dans `docs/PROGRESS.md`, demander au 👤.
 5. Le faux `container` (`tests/fixtures/fake-container`) ne sait pas faire `build` ni accéder au réseau : tout ce qui construit une image ou appelle le registre se teste **à la main** (preuve à consigner dans `docs/PROGRESS.md`), pas en test automatique.
 6. Fin de chaque R : `make check` (fmt + clippy -D warnings + tests + invariants) puis `make verify STEP=17` doit afficher `STEP 17: OK` ; `make install` ; test manuel indiqué dans « Acceptation » ; ligne de journal dans `docs/PROGRESS.md` (`- <date> — R<N> : …`) ; déplacer le R dans « Fait depuis l'acceptation » ci-dessus (3 lignes max) ; `git commit -m "r<N>: <titre>"`.
 7. Les lignes de code citées (`fichier:ligne`) datent du 2026-10-14 : vérifier avec `grep` avant d'éditer.
-
-### R6 — Mises à jour disponibles
-
-`zevbox update --check` (2026-10-14) : Claude 0.89.1 → 0.90.0, Antigravity 1.3.0 → 1.4.0. Après R8/R3/R2 : `zevbox update` (les deux), puis re-tester à la main un thread Zed par agent (le format d'`acp_token.json` ou du modèle par défaut peut changer entre versions). Si Antigravity 1.4.0 échoue à l'auth : `zevbox rollback --agent antigravity` et consigner l'erreur ici. Pas de code.
 
 ## Idées reportées
 
