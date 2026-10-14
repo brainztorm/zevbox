@@ -243,7 +243,20 @@ async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {
         "Opening browser for Google Antigravity authentication...\nIf the browser does not open automatically, visit:\n{auth_url}"
     ));
 
-    let _ = std::process::Command::new("open").arg(&auth_url).spawn();
+    // Absolute path: Zed-less shells may have a minimal PATH. The URL printed
+    // above stays the fallback.
+    match std::process::Command::new("/usr/bin/open")
+        .arg(&auth_url)
+        .status()
+    {
+        Ok(status) if status.success() => {}
+        Ok(status) => crate::ui::err(&format!(
+            "could not open the browser ({status}): open the URL above manually"
+        )),
+        Err(e) => crate::ui::err(&format!(
+            "could not open the browser ({e}): open the URL above manually"
+        )),
+    }
 
     listener.set_nonblocking(true)?;
     let start = std::time::Instant::now();
