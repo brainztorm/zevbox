@@ -80,7 +80,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                     Some(a.archive_url),
                     vec!["/opt/zevbox/antigravity/agy_acp_server.par".to_string()],
                     vec!["/opt/zevbox/antigravity/agy_acp_server.par".to_string()],
-                    "config".to_string(),
+                    ".gemini/antigravity-acp/acp_token.json".to_string(),
                 )
             };
 
@@ -226,12 +226,10 @@ pub async fn run_rollback(agent_arg: Option<AgentArg>) -> anyhow::Result<u8> {
         return Ok(EXIT_ERROR);
     }
     save_active(&paths, &active)?;
+    crate::ui::out(&format!("{}: rolled back", agent_arg.id()));
+
     let config = crate::config::load(&paths.config_file())?;
     let _ = crate::cli::project::update_zed(&paths, &config);
-    crate::ui::out(&format!(
-        "{}: rolled back to {}",
-        agent_arg.id(),
-        active[agent_arg.id()].current
-    ));
+
     Ok(EXIT_OK)
 }
