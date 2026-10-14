@@ -117,15 +117,28 @@ Ordre de priorité. Chaque point est un correctif ou une déviation du contrat (
 
 - `zevbox update --check` (2026-10-14) : Claude 0.89.1 → 0.90.0, Antigravity 1.3.0 → 1.4.0. À appliquer avec `zevbox update` une fois le premier dialogue Zed prouvé (re-tester l'auth Antigravity : le format d'`acp_token.json` peut changer entre versions).
 
-### R8 — Auto mode / `default_config_options` des entrées Zed (constaté le 2026-10-14)
+### R8 — « Auto mode unavailable » dans `zevbox · Claude` (constaté le 2026-10-14, cause trouvée)
 
-**Côté utilisateur (sans code)** : dans le thread `zevbox · Claude`, choisir un modèle qui supporte Auto (comme `fable`, celui de l'entrée `claude-acp`) ou un mode autre que Auto ; Zed réécrit `default_config_options` tout seul. Ou éditer `~/.config/zed/settings.json` → `"zevbox · Claude".default_config_options` : `{"model": "fable", "mode": "auto", "effort": "high", "fast": true}` comme `claude-acp`.
+**Faits vérifiés** (agent piloté à la main dans le conteneur avec le même montage d'état, 2026-10-14) :
+- Le message est émis par claude-agent-acp (`dist/session-mode.js`), **une fois par session**, dès qu'un passage en mode `auto` est demandé alors que le modèle courant a `supportsAutoMode !== true`. Il arrive dans Zed comme `agent_message_chunk` + `current_mode_update: acceptEdits`.
+- **Dans le conteneur, le modèle par défaut à `session/new` est « Default (recommended) = Haiku 4.5 »** (`claude-haiku-4-5-20251001`), car le dossier d'état ne contient aucun `~/.claude/settings.json` (seul `.credentials.json` y est écrit par `auth`). Sur l'hôte, `~/.claude/settings.json` fixe `model: haiku` et l'entrée `claude-acp` envoie `model: fable`.
+- Zed applique le **mode avant le modèle** à la création du thread : `set_mode auto` arrive quand le modèle est encore Haiku 4.5 → repli `acceptEdits` + message. Le `set model=fable` qui suit ne rétablit pas Auto (le repli est définitif pour la session). D'où : « le message reste même avec opus/sonnet/fable, même dans un nouveau thread ».
+- Séquence inverse testée : `set model=fable` **puis** `set_mode auto` → aucun message, Auto actif. Passer ensuite à `haiku` (5.5) ou `claude-haiku-4-5` → Auto retiré + message. Donc ici : Haiku (4.5 et 5.5) sans Auto ; Fable (et a priori Opus/Sonnet) avec.
+- Hors zevbox : ni le relais (il relaie `session/set_mode` / `set_config_option` tels quels, dans l'ordre), ni I1–I12 ne sont en cause ; la seule différence avec l'hôte est l'absence de `settings.json` (modèle par défaut) dans l'état de l'agent.
 
-**Côté zevbox (plan, non implémenté)** :
-1. `zed_settings::apply_entries` : ne gérer que les clés `type`, `command`, `args`, `env` de l'objet d'une entrée gérée ; **conserver toute autre clé** (`default_config_options`, …) telle quelle, octet pour octet via la CST (`obj.get(name)` / `prop.set_value` par clé, pas sur l'objet entier). Idempotence inchangée (ne rien écrire si les quatre clés sont déjà bonnes).
-2. Optionnel : `zevbox zed install` pose des `default_config_options` **initiales** seulement si l'entrée est créée (jamais sur une entrée existante), copiées de l'entrée registre correspondante si elle existe dans le fichier (`claude-acp` → `zevbox · Claude`, `antigravity-acp` → `zevbox · Antigravity`), sinon rien. Ainsi le modèle/mode par défaut dans zevbox = celui de l'agent standard de l'utilisateur.
-3. Tests : fixture Zed avec `default_config_options` sur une entrée gérée → conservée après `apply_entries` (changement de `command` compris) ; entrée créée → options copiées de `claude-acp` ; `uninstall` supprime l'entrée entière. `tests/zed_settings_test.rs` (protégé) à compléter avec autorisation 👤, ou nouveau fichier de test.
-4. Docs : MANUEL (étape 7 : choix du modèle, message Auto mode), README dépannage, plan §8.9.
+**Correctif immédiat (👤, sans code, réversible)** : donner à l'agent du conteneur un modèle par défaut qui supporte Auto :
+```bash
+printf '{"model": "fable"}\n' > "$HOME/Library/Application Support/zevbox/state/claude/.claude/settings.json"
+chmod 600 "$HOME/Library/Application Support/zevbox/state/claude/.claude/settings.json"
+```
+(ou `opus` / `sonnet`). Nouveau thread Zed → plus de message, Auto actif. Vérification : `zevbox shell claude` → `cat ~/.claude/settings.json`.
+
+**Plan zevbox (non implémenté)** :
+1. `zevbox auth claude` (ou une commande dédiée `zevbox agent-config claude --model fable`) écrit `state/claude/.claude/settings.json` (0600) avec `{"model": …}` : valeur = `--model` si donné, sinon le `model` lu (lecture seule, jamais monté) dans `~/.claude/settings.json` de l'hôte s'il existe, sinon rien. Ne jamais écraser un fichier existant sans `--force`. `doctor` : `WARN agent:claude — no default model in state (Auto mode falls back to Accept edits); Fix: …`.
+2. `zed_settings::apply_entries` : ne gérer que `type`, `command`, `args`, `env` ; **conserver** les autres clés (`default_config_options`) octet pour octet (aujourd'hui tout `update_zed` — `zed install`, `project add/remove`, `update`, `rollback` — remplace l'objet entier dès qu'il diffère).
+3. À la **création** d'une entrée gérée seulement : copier `default_config_options` de l'entrée registre homonyme si présente (`claude-acp` → `zevbox · Claude`, `antigravity-acp` → `zevbox · Antigravity`), sinon rien.
+4. Tests : fixture avec `default_config_options` → conservées après `apply_entries` (y compris quand `command` change) ; création → copie depuis `claude-acp` ; `uninstall` → entrée entière supprimée ; `auth claude` → `settings.json` créé / non écrasé. `tests/zed_settings_test.rs` et `cli_test.rs` (protégés) à compléter avec autorisation 👤, ou nouveaux fichiers de test.
+5. Docs : MANUEL (étape 4a : modèle par défaut ; étape 7 : message Auto mode), README dépannage, plan §8.1/§8.9.
 
 ### R7 — Divers
 
