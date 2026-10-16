@@ -67,3 +67,26 @@ pub async fn run(action: super::ZedAction) -> anyhow::Result<u8> {
         }
     }
 }
+
+/// Keeps the managed Zed entries in sync (one per agent with an active
+/// release). No-op write-wise unless an entry is missing or stale.
+pub fn update_zed(paths: &Paths, _config: &crate::config::Config) -> anyhow::Result<()> {
+    let zed_settings = match crate::paths::zed_settings_file() {
+        Ok(p) => p,
+        Err(_) => return Ok(()),
+    };
+    if !zed_settings.exists() {
+        return Ok(());
+    }
+    let mut active_agents = Vec::new();
+    for agent_spec in &crate::agents::AGENTS {
+        if crate::release::active_lock(paths, agent_spec.id).is_ok() {
+            active_agents.push(*agent_spec);
+        }
+    }
+    let installed_bin = crate::paths::installed_binary()?;
+    let entries =
+        crate::zed_settings::entries_for(&active_agents, &installed_bin.to_string_lossy());
+    let _ = crate::zed_settings::install(&zed_settings, &paths.backups_dir(), &entries);
+    Ok(())
+}

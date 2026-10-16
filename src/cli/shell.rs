@@ -26,41 +26,30 @@ pub async fn run(agent: super::AgentArg, project: Option<PathBuf>) -> anyhow::Re
         }
     };
 
-    let target_project = match project {
-        Some(p) => {
-            let canon = match std::fs::canonicalize(&p) {
-                Ok(c) => c,
-                Err(_) => {
-                    crate::ui::err(&format!("project not found: {}", p.display()));
-                    return Ok(EXIT_ERROR);
-                }
+    // Same zone rules as `launch` (I2, DECISIONS E1).
+    let rules = crate::paths::project_rules(&paths)?;
+    let explicit = project.is_some();
+    let candidate = match project {
+        Some(p) => p,
+        None => std::env::current_dir()?,
+    };
+    let target_project = match crate::config::validate_project_path(&candidate, &rules) {
+        Ok(c) => c,
+        Err(e) => {
+            let reason = match e {
+                crate::config::ConfigError::ProjectRejected { reason, .. } => reason,
+                other => other.to_string(),
             };
-            if !config.projects.contains(&canon) {
-                crate::ui::err(&format!(
-                    "{} is not an allowed project. Fix: run 'zevbox project add {}'",
-                    canon.display(),
-                    canon.display()
-                ));
-                return Ok(EXIT_ERROR);
-            }
-            canon
-        }
-        None => {
-            let cur = std::env::current_dir()
-                .ok()
-                .and_then(|c| std::fs::canonicalize(c).ok());
-            match cur.filter(|c| config.projects.contains(c)) {
-                Some(c) => c,
-                None => {
-                    let shown = std::env::current_dir()
-                        .map(|c| c.display().to_string())
-                        .unwrap_or_else(|_| "the current directory".to_string());
-                    crate::ui::err(&format!(
-                        "{shown} is not an allowed project. Fix: run 'zevbox project add {shown}' or pass --project <path>"
-                    ));
-                    return Ok(EXIT_PRECONDITION);
-                }
-            }
+            crate::ui::err(&format!(
+                "{} is not an allowed project: {reason}. {}",
+                candidate.display(),
+                crate::config::PROJECT_ZONES_FIX
+            ));
+            return Ok(if explicit {
+                EXIT_ERROR
+            } else {
+                EXIT_PRECONDITION
+            });
         }
     };
 

@@ -32,24 +32,20 @@ async fn check_preflight(
         }
     };
 
-    // 2. Project allowed (I2)
-    let canonical_project = match std::fs::canonicalize(project) {
+    // 2. Project allowed (I2, zones of DECISIONS E1). Choosing a zevbox agent
+    // in Zed is the user's consent (D1): no allow-list, the zone rules decide.
+    let rules = crate::paths::project_rules(paths).map_err(|e| format!("{e}"))?;
+    let canonical_project = match crate::config::validate_project_path(project, &rules) {
         Ok(p) => p,
-        Err(_) => {
+        Err(crate::config::ConfigError::ProjectRejected { reason, .. }) => {
             return Err(format!(
-                "{} is not an allowed project. Fix: run 'zevbox project add {}' in a macOS terminal.",
+                "{} is not an allowed project: {reason}. {}",
                 project.display(),
-                project.display()
+                crate::config::PROJECT_ZONES_FIX
             ));
         }
+        Err(e) => return Err(e.to_string()),
     };
-    if !config.projects.contains(&canonical_project) {
-        return Err(format!(
-            "{} is not an allowed project. Fix: run 'zevbox project add {}' in a macOS terminal.",
-            project.display(),
-            project.display()
-        ));
-    }
 
     // 3. Known agent
     let agent_spec = match crate::agents::find(agent) {

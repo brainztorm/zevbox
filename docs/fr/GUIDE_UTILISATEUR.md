@@ -18,7 +18,7 @@ flowchart TD
     Step1 --> Step2["Étape 2 : Installer le binaire de production\nmake install"]
     Step2 --> Step3["Étape 3 : Initialiser et construire les images\nzevbox setup · zevbox update"]
     Step3 --> Step4["Étape 4 : Authentifier les agents\nzevbox auth claude · zevbox auth antigravity"]
-    Step4 --> Step4b["Étape 5 : Autoriser vos projets\nzevbox project add <chemin>"]
+    Step4 --> Step4b["Étape 5 : Ouvrir un projet dans Zed\n(dossier personnel ou disque externe)"]
     Step4b --> Step5{"Étape 6 : Batterie de tests\nzevbox doctor & shell"}
     
     Step5 -- "Tests OK" --> Step6["Étape 7 : Lancer Zed\nSélectionner zevbox · Claude\nou zevbox · Antigravity"]
@@ -147,21 +147,17 @@ authenticated
 
 ---
 
-### Étape 5 : Autoriser Vos Projets
-zevbox ne monte jamais un dossier dans une micro-VM s'il n'a pas été explicitement autorisé (invariant I2). Pour chaque projet que vous voulez ouvrir avec un agent :
+### Étape 5 : Savoir Où Peuvent Être Vos Projets
+Il n'y a rien à enregistrer : quand vous choisissez **`zevbox · Claude`** ou **`zevbox · Antigravity`** avec **+** dans une fenêtre Zed, ce choix vaut consentement, et zevbox utilise le dossier ouvert dans cette fenêtre (premier dossier racine). Il vérifie seulement que ce dossier est dans une zone autorisée (invariant I2) :
 
-```bash
-zevbox project add /chemin/absolu/du/projet
-```
+- **autorisé** : tout dossier de votre dossier personnel, p. ex. `~/code/mon-app`, ou d'un disque externe, p. ex. `/Volumes/Data/travail/app` ;
+- **refusé** : `~/Library`, les dossiers cachés comme `~/.ssh` ou `~/.config`, votre dossier personnel lui-même, `/`, les dossiers système, `/Applications`, `/opt/homebrew` et les dossiers de zevbox. Le Mac exécute tout seul certains fichiers de ces dossiers : un agent qui y écrirait pourrait agir sur votre Mac.
 
-**Ce que fait cette commande :**
-1. Valide que le chemin est sain (interdit `/`, `$HOME` et ses parents, les dossiers système, les dossiers de zevbox).
-2. L'ajoute à la liste blanche `config.json`.
-3. S'assure que les deux entrées **`zevbox · Claude`** et **`zevbox · Antigravity`** sont présentes dans Zed (`~/.config/zed/settings.json`, sauvegarde dans `backups/` si quelque chose change). Pas besoin de redémarrer Zed.
+Dans un dossier refusé, Zed affiche `… is not an allowed project: <raison>` (voir Dépannage, problème 2).
 
-Répétez la commande pour chaque projet. `zevbox project list` affiche la liste ; `zevbox project remove <chemin>` retire un projet (les entrées Zed restent : elles ne dépendent pas des projets).
+> **Pourquoi seulement deux entrées ?** Les serveurs d'agents de Zed sont un réglage global, visible depuis tous les projets. Les entrées `zevbox · …` n'embarquent donc aucun chemin : au lancement, zevbox prend le dossier ouvert dans Zed.
 
-> **Pourquoi seulement deux entrées ?** Les serveurs d'agents de Zed sont un réglage global, visible depuis tous les projets. Les entrées `zevbox · …` n'embarquent donc aucun chemin : au lancement, zevbox prend le dossier ouvert dans Zed (premier dossier racine) et vérifie qu'il est dans la liste blanche. Dans un dossier non autorisé, Zed affiche `… is not an allowed project. Fix: run 'zevbox project add …'` (voir Dépannage, problème 2).
+> **Git et l'agent.** Dans la VM, le `.git` du projet est en lecture seule et son dossier `.zed` est masqué (I13) : l'agent lit l'historique et modifie vos fichiers, qui apparaissent aussitôt dans votre dossier, mais il ne committe pas. Committez son travail vous-même, ou avec un outil hors zevbox.
 
 ---
 
@@ -238,7 +234,7 @@ grep -C 4 "zevbox · " ~/.config/zed/settings.json
 ```
 
 **Résultat attendu :**
-Exactement deux blocs, quel que soit le nombre de projets autorisés :
+Exactement deux blocs, quel que soit le nombre de projets :
 ```json
     "zevbox · Claude": {
       "type": "custom",
@@ -280,7 +276,7 @@ sequenceDiagram
 
 ### La Marche à Suivre dans Zed :
 
-1. **Ouvrez un projet autorisé dans Zed** (un seul dossier racine par fenêtre) :
+1. **Ouvrez un projet dans Zed** (un seul dossier racine par fenêtre, dans votre dossier personnel ou sur un disque externe) :
    ```bash
    zed ~/code/demo-app
    ```
@@ -300,7 +296,7 @@ sequenceDiagram
 
 | ✅ Ce qu'il faut faire | ❌ Ce qu'il ne faut PAS faire |
 |---|---|
-| **Toujours ajouter vos projets via `zevbox project add <path>`** pour les déclarer dans la liste blanche de sécurité. | **Ne jamais tenter de monter `$HOME` direct, la racine `/` ou des dossiers système** (rejeté immédiatement par l'invariant I2). |
+| **Garder vos projets dans votre dossier personnel ou sur un disque externe**, et committer vous-même le travail de l'agent. | **Ne jamais ouvrir comme projet `$HOME` lui-même, la racine `/`, `~/Library`, un dossier caché `~/.…` ou un dossier système** (rejeté immédiatement par l'invariant I2). |
 | **Utiliser `zevbox tools add <paquet>`** si vous voulez que l'agent dispose d'outils Linux supplémentaires (p. ex. `ripgrep`, `clang`, `jq`). | **Ne jamais essayer d'installer des paquets avec `sudo apt` directement pendant une session** (la VM est éphémère et les droits root sont délestés). |
 | **Lancer `zevbox stop`** en fin de journée pour libérer toutes les instances d'arrière-plan. | **Ne jamais lancer `container stop --all` à la main** (cela arrêterait vos conteneurs personnels hors zevbox). |
 | **Faire un `zevbox doctor`** en cas de comportement inattendu pour voir immédiatement la cause. | **Ne jamais modifier à la main les clés `zevbox · ...` dans les réglages de Zed** (utilisez `zevbox zed install` ou `zevbox zed uninstall`). |
@@ -315,12 +311,13 @@ sequenceDiagram
 
 ---
 
-### Problème 2 : Zed affiche `... is not an allowed project. Fix: run 'zevbox project add ...'`
-- **Cause** : Le dossier ouvert dans Zed n'est pas dans la liste blanche de `zevbox`.
-- **Solution** : Dans votre terminal, ajoutez le dossier (pas besoin de redémarrer Zed, relancez juste le thread) :
-  ```bash
-  zevbox project add /chemin/vers/ce/dossier
-  ```
+### Problème 2 : Zed affiche `... is not an allowed project: <raison>`
+- **Cause** : Le dossier ouvert dans Zed est hors des zones autorisées (I2) : dossier caché `~/.…`, `~/Library`, votre dossier personnel lui-même, dossier système…
+- **Solution** : Déplacez le projet dans votre dossier personnel (p. ex. `~/code/…`) ou sur un disque externe, ou ouvrez le bon dossier dans Zed.
+
+### Problème 2b : Zed affiche `zevbox: stopped the agent: it created or changed git metadata at <chemin>`
+- **Cause** : L'agent a créé (ou modifié) un dépôt git dans le projet. Les réglages git peuvent faire lancer des programmes à Zed ou à git sur votre Mac : zevbox a donc arrêté l'agent (I13).
+- **Solution** : Vérifiez ce chemin et supprimez-le avant d'utiliser git ou de rouvrir le projet dans Zed.
 
 ---
 
@@ -363,7 +360,6 @@ sequenceDiagram
 | Se connecter à Claude / à Google (Antigravity) | `zevbox auth claude` / `zevbox auth antigravity` |
 | Vérifier le statut de connexion | `zevbox auth claude --status` / `zevbox auth antigravity --status` |
 | Ouvrir un shell Linux de test | `zevbox shell claude` |
-| Ajouter un nouveau projet | `zevbox project add /mon/projet` |
 | Ajouter un outil Linux dans la VM | `zevbox tools add ripgrep` |
 | Consulter les logs récents | `zevbox logs` |
 | Arrêter les VM actives | `zevbox stop` |

@@ -2,9 +2,8 @@
 
 use crate::paths::Paths;
 use crate::supervisor::{EXIT_ERROR, EXIT_OK};
-use std::path::PathBuf;
 
-pub async fn run(project: Option<PathBuf>) -> anyhow::Result<u8> {
+pub async fn run() -> anyhow::Result<u8> {
     let paths = Paths::from_env()?;
     let config_existed = paths.config_file().exists();
 
@@ -18,25 +17,7 @@ pub async fn run(project: Option<PathBuf>) -> anyhow::Result<u8> {
         crate::ui::out("zevbox already initialized (keeping existing config)");
     }
 
-    let mut config = crate::config::load(&paths.config_file())?;
-
-    if let Some(p) = project {
-        let canon = std::fs::canonicalize(&p).unwrap_or(p.clone());
-        if !config.projects.contains(&canon) {
-            crate::ui::out(&format!("adding project {}", canon.display()));
-            let code = crate::cli::project::run(super::ProjectAction::Add {
-                path: p,
-                no_zed: false,
-            })
-            .await?;
-            if code != EXIT_OK {
-                return Ok(code);
-            }
-            config = crate::config::load(&paths.config_file())?;
-        } else {
-            crate::ui::out(&format!("project {} already registered", canon.display()));
-        }
-    }
+    let config = crate::config::load(&paths.config_file())?;
 
     // Releases first: Zed gets one entry per agent that has an active release.
     let missing_release = crate::agents::AGENTS
@@ -89,9 +70,7 @@ pub async fn run(project: Option<PathBuf>) -> anyhow::Result<u8> {
             }
         ));
     }
-    if config.projects.is_empty() {
-        crate::ui::out("next: zevbox project add <path>");
-    }
+    crate::ui::out("next: open a project in Zed, then choose a zevbox agent with '+'");
     Ok(EXIT_OK)
 }
 

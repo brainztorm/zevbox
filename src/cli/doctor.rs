@@ -83,23 +83,6 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
         }
     }
 
-    // 4. Projects exist and canonical
-    for p in &config.projects {
-        if p.exists() {
-            checks.push((
-                format!("project:{}", p.display()),
-                "OK".to_string(),
-                "project directory exists".to_string(),
-            ));
-        } else {
-            checks.push((
-                format!("project:{}", p.display()),
-                "FAIL".to_string(),
-                "project directory does not exist".to_string(),
-            ));
-        }
-    }
-
     // 5. Active agents status
     let active = crate::release::load_active(&paths).unwrap_or_default();
     for spec in crate::agents::AGENTS {

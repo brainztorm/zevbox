@@ -72,20 +72,44 @@ async fn launch_without_project_uses_allowed_cwd() {
     assert_eq!(code, Some(0));
 }
 
+/// DECISIONS D1 (2026-10-16): a new project in the home folder needs no
+/// `zevbox project add`; choosing the agent in Zed is the consent.
 #[tokio::test]
-async fn launch_without_project_refuses_unknown_cwd() {
+async fn launch_without_project_accepts_new_cwd_in_home() {
     let env = TestEnv::new();
     let other = env.home.join("code/other");
+    std::fs::create_dir_all(&other).unwrap();
+    let other = std::fs::canonicalize(&other).unwrap();
+    let mut l = launch_in(&env, &other);
+    let r = l.initialize().await;
+    assert!(r.get("result").is_some(), "initialize must succeed: {r}");
+    l.send(json!({
+        "jsonrpc": "2.0", "id": 1, "method": "session/new",
+        "params": {"cwd": other, "mcpServers": []}
+    }))
+    .await;
+    let s = l.recv().await;
+    assert!(
+        s.get("result").is_some(),
+        "session/new in the new project: {s}"
+    );
+    l.close_stdin();
+    let (code, _) = l.wait(Duration::from_secs(15)).await;
+    assert_eq!(code, Some(0));
+}
+
+/// I2 zones (DECISIONS E1): a hidden home folder is refused.
+#[tokio::test]
+async fn launch_without_project_refuses_hidden_home_folder() {
+    let env = TestEnv::new();
+    let other = env.home.join(".ssh");
     std::fs::create_dir_all(&other).unwrap();
     let mut l = launch_in(&env, &other);
     let r = l.initialize().await;
     assert_eq!(r["error"]["code"], -32000, "{r}");
     let msg = r["error"]["message"].as_str().unwrap();
     assert!(msg.contains("is not an allowed project"), "{msg}");
-    assert!(
-        msg.contains(&format!("zevbox project add {}", other.display())),
-        "{msg}"
-    );
+    assert!(msg.contains("hidden folder"), "{msg}");
     let (code, _) = l.wait(Duration::from_secs(5)).await;
     assert_eq!(code, Some(3));
     assert!(

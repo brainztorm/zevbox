@@ -21,7 +21,7 @@ pub struct ManagedEntry {
     /// Absolute path of the installed binary.
     pub command: String,
     /// ["launch", <agent>]: the project is the working directory Zed starts
-    /// the agent in (its first worktree), checked against `config.projects`
+    /// the agent in (its first worktree), checked against the zone rules
     /// by `launch` (I2).
     pub args: Vec<String>,
 }
@@ -47,7 +47,7 @@ pub enum ZedSettingsError {
 }
 
 /// One entry per agent, agents in the given order, independent of the
-/// allowed projects (Zed's `agent_servers` is a global setting with no
+/// project (Zed's `agent_servers` is a global setting with no
 /// per-project filtering, so one entry per project would show them all in
 /// every project). Name: `zevbox · <display>`.
 pub fn entries_for(agents: &[AgentSpec], command: &str) -> Vec<ManagedEntry> {

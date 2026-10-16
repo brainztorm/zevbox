@@ -307,7 +307,7 @@ pub fn blocked_message(method: &str) -> String {
 }
 
 pub fn cwd_message(root: &str, cwd: &str) -> String {
-    format!("zevbox: this agent is bound to {root}; this session asked for {cwd}. Open {root} in Zed, or run 'zevbox project add {cwd}' in a terminal.")
+    format!("zevbox: this agent is bound to {root}; this session asked for {cwd}. Open {root} in Zed, or open {cwd} in its own Zed window and choose the zevbox agent there.")
 }
 
 pub fn additional_directories_message() -> String {

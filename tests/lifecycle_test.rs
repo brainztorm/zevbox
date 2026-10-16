@@ -123,7 +123,7 @@ async fn session_with_wrong_cwd_rejected_before_agent() {
     assert!(r["error"]["message"]
         .as_str()
         .unwrap()
-        .contains("zevbox project add /etc"));
+        .contains("open /etc in its own Zed window"));
     assert!(!received_methods(&env).contains(&"session/new".to_string()));
     l.close_stdin();
     l.wait(S(5)).await;
@@ -282,12 +282,13 @@ async fn expect_preflight_error(env: &TestEnv, project: &str, needle: &str) {
     );
 }
 
+/// I2 zones (DECISIONS E1): a hidden home folder is refused before any container.
 #[tokio::test]
-async fn preflight_unknown_project() {
+async fn preflight_forbidden_project() {
     let env = TestEnv::new();
-    let other = env.home.join("code/other");
-    std::fs::create_dir_all(&other).unwrap();
-    expect_preflight_error(&env, &other.to_string_lossy(), "zevbox project add").await;
+    let hidden = env.home.join(".config/tool");
+    std::fs::create_dir_all(&hidden).unwrap();
+    expect_preflight_error(&env, &hidden.to_string_lossy(), "is not an allowed project").await;
 }
 
 #[tokio::test]

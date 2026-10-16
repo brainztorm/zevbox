@@ -106,24 +106,22 @@ make install
 #    and builds the agent image (network, 1–3 min); afterwards it rebuilds nothing.
 zevbox auth claude        # Claude account (Pro/Max) — runs in an interactive container
 zevbox auth antigravity   # Google account (AI Pro / One AI Premium) — OAuth PKCE on the Mac
-
-# 3. Allow a project (repeat for every project you want to open with an agent)
-zevbox project add /path/to/your/project
 ```
 
 ```mermaid
 flowchart LR
     A["make install"] --> B["zevbox auth claude\nzevbox auth antigravity"]
-    B --> C["zevbox project add /path"]
-    C --> D["Zed ▸ agent panel ▸\nzevbox · Claude"]
+    B --> D["Zed ▸ open a project ▸ + ▸\nzevbox · Claude"]
     D --> E(["agent runs in a micro-VM"])
 ```
 
-Zed now shows two agent servers, **`zevbox · Claude`** and **`zevbox · Antigravity`**. They work
-in every project you allowed with `zevbox project add`; in any other folder the agent answers
-`… is not an allowed project` (invariant I2 — only explicitly allowed directories are ever
-mounted in a VM). `zevbox setup /path` does all of the above in one go; `init`, `update` and
-`auth` stay available separately (see the command reference).
+Zed now shows two agent servers, **`zevbox · Claude`** and **`zevbox · Antigravity`**. Open a
+project in Zed and pick one with **+**: choosing it is your consent, there is no list of projects
+to maintain. The project must be a folder inside your home folder (not `~/Library` nor a hidden
+`~/.…` folder) or on an external disk; anywhere else the agent answers `… is not an allowed
+project` (invariant I2 — folders whose files the Mac runs by itself are never mounted in a VM).
+`zevbox setup` does all of the above in one go; `init`, `update` and `auth` stay available
+separately (see the command reference).
 
 > Both `auth` commands print the sign-in URL: if your browser does not open by itself, paste it.
 
@@ -135,12 +133,12 @@ Documentation en français : **[docs/fr/](docs/fr/README.md)**.
 
 ## Everyday use
 
-- **In Zed**: open an allowed project, open the agent panel, pick **zevbox · Claude** or
-  **zevbox · Antigravity**. The project is the one open in Zed (its first root folder). For a
-  folder you have not allowed yet, `zevbox project add /that/folder` is enough — no Zed restart.
+- **In Zed**: open a project, open the agent panel, pick **zevbox · Claude** or
+  **zevbox · Antigravity** with **+**. The project is the one open in Zed (its first root folder).
   The agent runs in a dedicated, temporary Linux VM with your source mounted under your own
-  UID/GID.
-- **Allow another project**: `zevbox project add /other/project`
+  UID/GID. Its file changes appear in your folder immediately.
+- **Commit the agent's work yourself** (or with any tool outside zevbox): inside the VM the
+  project's `.git` is read-only, so the agent can read the history but cannot commit (I13).
 - **Interactive shell in the agent's VM**: `zevbox shell claude`
 - **Extra Linux tools (apt packages) in the VMs**: `zevbox tools add ripgrep clang`
 - **Check and diagnose**: `zevbox status` · `zevbox doctor`
@@ -152,20 +150,17 @@ Documentation en français : **[docs/fr/](docs/fr/README.md)**.
 
 | Command | What it does |
 |---|---|
-| `zevbox setup [PROJECT]` | Guided, idempotent set-up: writes the configuration, registers the project, builds missing releases (`update`), offers `auth` for each unauthenticated agent (terminal only), configures Zed, runs `doctor` and prints a per-agent summary. |
+| `zevbox setup` | Guided, idempotent set-up: writes the configuration, builds missing releases (`update`), offers `auth` for each unauthenticated agent (terminal only), configures Zed, runs `doctor` and prints a per-agent summary. |
 | `zevbox init` | Creates the state directories (`~/.local/share/zevbox` or Application Support) with mode `0700`, plus `config.json` and `tools.json`. |
-| `zevbox doctor [--json]` | Full health check: `container` ≥ 1.5.0, runtime running, arm64, projects valid, releases present, `0700` permissions. |
-| `zevbox project add <path>` | Canonicalises and validates the path (rejects `/`, `$HOME` itself, system folders, zevbox's own folders), adds it to the allow-list (I2), syncs Zed. |
-| `zevbox project remove <path>` | Removes a project from the allow-list and updates Zed. |
-| `zevbox project list` | Lists allowed projects. |
+| `zevbox doctor [--json]` | Full health check: `container` ≥ 1.5.0, runtime running, arm64, releases present, `0700` permissions. |
 | `zevbox zed install [--dry-run]` | Non-destructively inserts the managed `zevbox · …` entries into `~/.config/zed/settings.json`, preserving comments and formatting (CST edit). Automatic backup in `backups/`. |
 | `zevbox zed uninstall` | Removes all managed entries from Zed and restores the settings byte for byte. |
 | `zevbox auth <agent> [--status]` | Claude: runs the interactive login in a `-it` container. Antigravity: runs the Google OAuth 2.0 PKCE flow **on the Mac** (ephemeral HTTP server on `127.0.0.1:<random port>`, no port published on the VM, no keychain access) and writes `state/antigravity/.gemini/antigravity-acp/{settings.json,acp_token.json}` with mode `0600`. `--status` prints `authenticated`, `not authenticated` or `unknown`. |
-| `zevbox launch <agent> [--project <path>]` | Called by Zed: starts the micro-VM and relays ACP over stdin/stdout with strict filtering. Without `--project`, the project is the current directory (Zed starts the agent in the first root folder). |
+| `zevbox launch <agent> [--project <path>]` | Called by Zed: checks the project against the allowed zones (I2), starts the micro-VM and relays ACP over stdin/stdout with strict filtering, and watches the project (I13). Without `--project`, the project is the current directory (Zed starts the agent in the first root folder). |
 | `zevbox status [--json]` | Shows active, orphaned and unregistered instances. |
 | `zevbox stop [ID \| --project <path>]` | Cleanly stops the given instances, or every active zevbox instance (never with the global `--all`). |
 | `zevbox clean [--images]` | Removes verified orphan containers and stale records, prunes old logs (>30) and backups (>20). With `--images`, deletes unused old images. |
-| `zevbox shell <agent> [--project <path>]` | Interactive Bash in a disposable VM identical to the agent's. Without `--project`, the current directory must be an allowed project (exit code 3 otherwise). |
+| `zevbox shell <agent> [--project <path>]` | Interactive Bash in a disposable VM identical to the agent's. Without `--project`, the current directory must be in an allowed zone (exit code 3 otherwise). |
 | `zevbox logs [ID] [--path]` | Shows the last 200 lines of the most recent session log, or of the given ID. `--path` prints the log file path. |
 | `zevbox update [--check] [--agent <agent>]` | Checks for or builds a new agent release from the official ACP registry, runs the smoke test and promotes it. |
 | `zevbox rollback [--agent <agent>]` | Swaps the active release (`current`) with the previous one. |
@@ -202,11 +197,11 @@ flowchart LR
 These are enforced by tests and by `scripts/check-invariants.sh` on every `make check`, and are
 never weakened to make a test pass:
 
-- **I1 — Two mounts only**: the allowed project directory and the agent's state sub-directory. Never `$HOME`, `~/.ssh`, `~/.claude`, …
-- **I2 — Allow-listed projects**: only directories explicitly validated and canonicalised in `config.json` can be launched.
+- **I1 — Two mounts only**: the project directory and the agent's state sub-directory. Never `$HOME`, `~/.ssh`, `~/.claude`, …
+- **I2 — Projects in allowed zones**: a project is a canonical folder strictly inside your home folder (not `~/Library`, not a hidden `~/.…` folder) or on an external disk under `/Volumes`; `/`, system folders, `/Applications`, `/opt/homebrew` and zevbox's own folders are refused. Writing in those folders would let the Mac run the agent's code.
 - **I3 — No host access through Zed**: every ACP request asking the editor for filesystem (`fs/*`), terminal (`terminal/*`) or terminal-based authentication is intercepted and rejected.
 - **I4 — Allow-list both ways**: only known, safe ACP methods pass between Zed and the agent; responses are routed by pending request id.
-- **I5 — Confined `cwd`**: the working directory is always exactly the allowed project root; `mcpServers` is emptied.
+- **I5 — Confined `cwd`**: the working directory is always exactly the project root; `mcpServers` is emptied.
 - **I6 — Pure JSON-RPC on stdout**: in `launch` mode stdout carries nothing but JSON-RPC, so Zed never sees garbage.
 - **I7 — No host shell**: zevbox never spawns `sh`, `bash` or `zsh` on the Mac.
 - **I8 — Surgical container targeting**: `container stop`/`delete` never use `--all` and only touch containers with the `zevbox-` prefix **and** the zevbox label.
@@ -214,6 +209,7 @@ never weakened to make a test pass:
 - **I10 — No network or build in `launch`**: launching uses the active release only.
 - **I11 — No panics in production**: zero `unwrap()`, `expect()`, `panic!()` in `src/` (Clippy `deny`).
 - **I12 — zevbox is out of reach**: its binary, configuration and releases are never mounted into a container.
+- **I13 — Project files the Mac would run**: in the VM, the project's `.zed` folder is masked (the agent's edits stay in VM memory) and an existing `.git` is read-only. During the session zevbox watches the project and stops the agent if a `.git` appears or changes anywhere else. Reason: Zed runs programs named in `.zed/settings.json` and in git settings by itself ([EXP-01](docs/experiments/EXP-01-resultats.md)).
 
 ### Threat model and known limits
 
@@ -230,11 +226,12 @@ zevbox protects **your Mac** from the agent. It does **not** protect the project
 ## Troubleshooting by error message
 
 - **`zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init'`** — run `zevbox setup` in a terminal.
-- **`<path> is not an allowed project. Fix: run 'zevbox project add <path>'`** — the open folder is not allow-listed; add it.
+- **`<path> is not an allowed project: <reason>. Fix: open a folder inside your home folder …`** — the folder open in Zed is outside the allowed zones (I2), for example a hidden `~/.…` folder or a system folder. Move the project or open another folder.
+- **`zevbox: stopped the agent: it created or changed git metadata at <path>`** — the agent created a git repository (or changed one) inside the project (I13). Review that path and delete it before using git or reopening the project in Zed.
 - **`no active Claude release. Fix: run 'zevbox update --agent claude'`** — the agent image has not been built yet.
 - **`Claude is not authenticated. Fix: run 'zevbox auth claude'`** — sign in from a terminal.
 - **`Antigravity is not authenticated. Fix: run 'zevbox auth antigravity'`** — sign in with your Google account in the browser.
-- **`zevbox: this agent is bound to <A>; this session asked for <B>. Open <A> in Zed, or run 'zevbox project add <B>'`** — the Zed session asks for a different folder than the one the agent was launched in, typically a multi-root workspace. Open one root folder per Zed window.
+- **`zevbox: this agent is bound to <A>; this session asked for <B>. Open <A> in Zed, or open <B> in its own Zed window …`** — the Zed session asks for a different folder than the one the agent was launched in, typically a multi-root workspace. Open one root folder per Zed window.
 - **`Auto mode unavailable: the selected model does not support Auto mode`** — Claude's default model in the VM is Haiku 4.5. `zevbox doctor` reports `no default model`; run `zevbox auth claude` (writes `state/claude/.claude/settings.json`) or write `{"model": "fable"}` there, then open a new Zed thread.
 - **`Apple Container system is not running. Fix: run 'container system start'`** — start the runtime.
 

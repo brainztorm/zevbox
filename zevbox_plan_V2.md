@@ -34,7 +34,7 @@ Un binaire unique `zevbox` (Rust, macOS arm64) qui permet de :
 
 ```bash
 cd ~/code/zevbox && make install          # compile et installe ~/.local/bin/zevbox
-zevbox setup --project ~/code/myproject   # configuration guidée, images, auth, Zed
+zevbox setup                             # configuration guidée, images, auth, Zed
 # → ouvrir le projet dans Zed, choisir « zevbox · Claude » dans le panneau Agent (amendement 2026-10-14, §8.9)
 zevbox status                                         # voir ce qui tourne
 zevbox stop                                           # tout arrêter (seulement les instances zevbox)
@@ -73,7 +73,7 @@ Ces points corrigent le plan v1. Ils sont des exigences.
 Chaque invariant est couvert par au moins un test (§9) ou une vérification (`make check`, §6.4).
 
 - **I1 — Montages minimaux.** Un conteneur zevbox ne reçoit que deux montages : le projet autorisé (même chemin absolu, lecture-écriture) et `stateRoot/state/<agent>` (monté en `/home/agent`). Jamais `$HOME`, `/Users`, `~/.claude`, `~/.gemini`, `~/.ssh`, le Trousseau, un socket, le dossier du dépôt zevbox ni `stateRoot` lui-même.
-- **I2 — Projets sur liste blanche.** `--project` doit, après canonicalisation (`std::fs::canonicalize`), être **exactement** un chemin de `config.projects`. Refuser `/`, `$HOME`, un parent de `$HOME`, un chemin contenant `stateRoot` ou le dépôt zevbox, ou un chemin contenu dans ceux-ci.
+- **I2 — Projets dans les zones autorisées** (amendement 2026-10-16, DECISIONS D1/E1/F1 ; ~~liste blanche `config.projects`~~). Choisir un agent `zevbox · …` dans Zed vaut consentement : plus de liste ni de `project add`. Le projet (répertoire de travail ou `--project`) doit, après canonicalisation (`std::fs::canonicalize`), être **strictement** sous `$HOME` sans être dans `~/Library` ni dans un dossier caché `~/.*`, ou strictement dans un disque sous `/Volumes` (`config::zone_rejection`). Refuser aussi `/`, `$HOME`, un parent de `$HOME`, un chemin contenant `stateRoot` ou le dossier du binaire installé, ou contenu dans ceux-ci. Motif : écrire dans les autres dossiers permet de faire exécuter du code par le Mac.
 - **I3 — Aucune délégation à l'hôte via ACP.** Requêtes agent→Zed `fs/*`, `terminal/*` et `elicitation/*` refusées par le relais, jamais transmises. Capacités client réécrites. Méthodes d'auth terminal supprimées.
 - **I4 — Liste blanche dans les deux sens.** Une méthode absente des tables du §7.3 est refusée (requête) ou ignorée (notification), et le refus est journalisé. Les réponses dont l'`id` ne correspond à aucune requête transmise sont ignorées.
 - **I5 — `cwd` verrouillé.** Toute requête portant `cwd` doit avoir `cwd` == racine du projet de l'instance (comparaison après normalisation, sans accès disque). `additionalDirectories` non vide → refus. `mcpServers` → remplacé par `[]`.
@@ -193,7 +193,7 @@ Créé par `zevbox init`. Champs inconnus → erreur (`#[serde(deny_unknown_fiel
 ```
 
 - `containerBinary` : chemin absolu, détecté par `init` (recherche dans le PATH puis `/opt/homebrew/bin/container`, `/usr/local/bin/container`). Zed lance zevbox avec un PATH réduit : ne **jamais** compter sur le PATH au lancement.
-- `projects` : chemins canoniques, gérés par `zevbox project add/remove`. Valeur initiale : liste vide.
+- `projects` : **héritage** (avant 2026-10-16) ; plus lu ni modifié par aucune commande, conservé pour que les `config.json` existants restent valides. Valeur initiale : liste vide.
 - `resources` : valeurs de départ par instance ; plusieurs instances s'additionnent.
 - `maxMessageBytes` : 32 Mio par défaut (les images collées dans un prompt sont encodées en base64).
 - `hostUid/hostGid` : détectés par `init` (`nix::unistd::getuid/getgid`).
@@ -388,7 +388,7 @@ pub fn decide(policy: &Policy, state: &mut RelayState, dir: Direction, msg: serd
 **Messages d'erreur** (exactement ce format, pour qu'ils soient compréhensibles dans Zed) :
 
 - `-32601` : `zevbox: '<method>' is blocked by zevbox strict mode (the agent runs in an isolated Linux VM).`
-- `-32602` cwd : `zevbox: this agent is bound to <root>; this session asked for <cwd>. Open <root> in Zed, or run 'zevbox project add <cwd>' in a terminal.`
+- `-32602` cwd : `zevbox: this agent is bound to <root>; this session asked for <cwd>. Open <root> in Zed, or open <cwd> in its own Zed window and choose the zevbox agent there.`
 - `-32602` additionalDirectories : `zevbox: extra workspace folders are not supported; open a single folder.`
 
 **Indication d'auth :** si l'agent répond par une erreur de code `-32000` (« auth required » en ACP), le relais ajoute au message : ` → run 'zevbox auth <agent>' in a macOS terminal.`
@@ -405,10 +405,10 @@ Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manq
 
 | Commande | Effet |
 |---|---|
-| `zevbox setup [--project PATH]` (conforme depuis R3, 2026-10-14) | Assistant idempotent : `init` → écrit `inventory-preexisting.json` s'il manque (noms des conteneurs non-zevbox) → `doctor` → `update` (les deux agents ; l'échec de l'un ne bloque pas l'autre) → `auth claude` → `auth antigravity` (chacune peut être passée en répondant `n`) → `project add PATH` si fourni → résumé final avec l'état de chaque agent et la prochaine action. |
+| `zevbox setup` (conforme depuis R3, 2026-10-14 ; `--project` retiré le 2026-10-16) | Assistant idempotent : `init` → écrit `inventory-preexisting.json` s'il manque (noms des conteneurs non-zevbox) → `doctor` → `update` (les deux agents ; l'échec de l'un ne bloque pas l'autre) → `auth claude` → `auth antigravity` (chacune peut être passée en répondant `n`) → résumé final avec l'état de chaque agent et la prochaine action. |
 | `zevbox init` | Crée `stateRoot` (0700) et ses sous-dossiers, `config.json` et `tools.json` s'ils manquent. Ne remplace jamais un fichier existant. Si le CLI `container` est introuvable, écrit `/opt/homebrew/bin/container` (et `doctor` le signale). |
 | `zevbox doctor [--json]` | Liste de contrôles `OK/WARN/FAIL` + action corrective pour chacun (§8.6). Sortie 1 si au moins un `FAIL`. |
-| `zevbox project add PATH [--no-zed]` / `remove PATH` / `list` | Gère `config.projects` (validation I2), puis lance `zed install` sauf `--no-zed`. `remove` arrête d'abord les instances de ce projet. |
+| ~~`zevbox project add PATH [--no-zed]` / `remove PATH` / `list`~~ | **Supprimées le 2026-10-16** (DECISIONS F1) : le projet est celui ouvert dans Zed, contrôlé par les zones I2. |
 | `zevbox zed install [--settings PATH] [--dry-run]` / `zed uninstall` | Synchronise les entrées `zevbox · …` des réglages Zed : ~~`config.projects` ×~~ une par agent ayant une release active (§8.9, amendement 2026-10-14). `--dry-run` affiche le texte avant/après des entrées concernées. |
 | `zevbox auth <agent> [--status]` | Session interactive d'authentification dans le conteneur (§8.2). *Amendement 2026-10-14 (R2) : hors `--status`, fait d'abord `init` si `config.json` manque, démarre le runtime s'il est arrêté, et `update --agent <a>` si la release ou son image manque ; idempotent.* `--status` : `authenticated`/`not authenticated`/`unknown`. |
 | `zevbox launch <agent> [--project PATH]` | Appelé par Zed. Ne jamais l'appeler à la main sauf pour tester. Sans `--project` (amendement 2026-10-14) : projet = répertoire de travail, que Zed fixe au premier worktree du projet ; toujours contrôlé par I2. |
@@ -444,7 +444,7 @@ run -i --rm --init --progress none
 
 - `<id8>` = 8 premiers caractères hexadécimaux d'un UUID v4 ; en cas de collision avec un enregistrement existant, en tirer un autre.
 - Jamais `-t`, `-p`, `--publish-socket`, `--ssh`, `--virtualization`, `-v`, ni `-e` sans valeur (qui hériterait d'une variable de l'hôte).
-- Une virgule dans un chemin casserait la syntaxe `--mount` : `project add` et `init` refusent les chemins contenant `,`.
+- Une virgule dans un chemin casserait la syntaxe `--mount` : `launch` et `shell` refusent les projets dont le chemin contient `,`.
 - `--cap-drop ALL` : vérifié viable sur la VM (F15) ; reconfirmer avec le vrai agent à l'étape 11 (smoke test).
 - Antigravity : la commande est `cmd` + `args` du manifeste, exécutée depuis son dossier d'installation (`/opt/zevbox/antigravity/agy_acp_server.par --uid=`). VÉRIFIER à l'étape 14 la signification de `--uid=` (vide dans le registre) et consigner le résultat.
 
@@ -483,7 +483,7 @@ Ordre : config présente (sinon `zevbox is not set up. Fix: run 'zevbox setup'`)
 En cas d'échec, zevbox ne démarre pas de conteneur. Il lit la première ligne de Zed. Si c'est une requête, il répond `{"jsonrpc":"2.0","id":<id>,"error":{"code":-32000,"message":"zevbox: <problème>. Fix: <commande exacte>"}}`, puis il sort avec le code 3. Il écrit le même message sur stderr. Exemples :
 
 - `zevbox: Claude is not authenticated. Fix: run 'zevbox auth claude' in a macOS terminal.`
-- `zevbox: /x/y is not an allowed project. Fix: run 'zevbox project add /x/y'.`
+- `zevbox: /x/y is not an allowed project: <raison>. Fix: open a folder inside your home folder (not ~/Library or a hidden ~/.… folder) or on an external disk.`
 - `zevbox: no active Claude image. Fix: run 'zevbox update --agent claude'.`
 
 VÉRIFIER à l'étape 16 (👤) comment Zed affiche ce message, et le consigner dans le README.
@@ -624,7 +624,7 @@ Ils existent déjà. **Ne pas les écrire, les faire passer.** Lire le test avan
 | `release_test.rs` | 10 | manifestes réels du registre et variantes cassées, format d'id, `promote`/`rollback`, `active.json` | 7 |
 | `zed_settings_test.rs` | 23 | noms des entrées, préservation des commentaires et de `claude-acp` à l'octet, idempotence, entrées obsolètes, désinstallation, fichier absent/invalide, modification concurrente, droits 0600/0644, sauvegarde | 8 |
 | `lifecycle_test.rs` | 22 | bout en bout avec le vrai binaire : réécritures vues par l'agent, aucune requête hôte reçue par Zed, arguments exacts, enregistrement d'instance, arrêt sur EOF/agent têtu/SIGTERM/crash/sortie invalide, erreurs préalables visibles dans Zed (5 cas), noms distincts, `stop` ne touche que zevbox, orphelins, non-enregistrés, jamais `--all` ni TTY | 9 |
-| `cli_test.rs` | 8 | `init` (droits, idempotence), `project add/list/remove` (+ refus dangereux, mise à jour Zed), `zed install --dry-run/install/uninstall`, codes de sortie 2 et 3 | 9 |
+| `cli_test.rs` | 8 | `init` (droits, idempotence), commande `project` absente, refus des chemins dangereux (zones I2), une entrée Zed par agent, `zed install --dry-run/install/uninstall`, codes de sortie 2 et 3 | 9 |
 | `integration_test.rs` | 8 (`#[ignore]`) | vraie VM : témoin hors projet invisible et intact, écriture projet avec l'UID hôte, symlink non suivi, seulement 2 montages virtiofs, `$HOME` = état dédié, `--cap-drop ALL` viable, EOF et **SIGKILL** de zevbox → VM supprimée, conteneurs préexistants intacts | 10 |
 
 Faux outils : `fake-container` reproduit les formats JSON de `container` 1.5.0 et journalise chaque appel dans `$FAKE_CONTAINER_LOG` ; `run` exécute `fake-agent.py` (le PID du conteneur = celui de l'agent). `fake-agent.py` se comporte comme l'adaptateur Claude (méthodes d'auth terminal, demande `fs/read_text_file`, `terminal/create` et `session/request_permission` pendant un prompt) et journalise tout ce qu'il reçoit dans `$FAKE_AGENT_LOG`.
