@@ -14,6 +14,8 @@ pub const SCHEMA_VERSION: u32 = 1;
 pub struct Config {
     pub schema_version: u32,
     pub container_binary: PathBuf,
+    /// Legacy allow-list (before 2026-10-16, DECISIONS D1/F1): no command reads
+    /// or adds to it any more; kept so existing config.json files still load.
     pub projects: Vec<PathBuf>,
     pub resources: Resources,
     pub relay: RelayConfig,
@@ -159,7 +161,8 @@ pub fn save(path: &Path, config: &Config) -> Result<(), ConfigError> {
 
 /// I2. Canonicalizes `path` (must exist and be a directory), then rejects:
 /// a path containing ','; `/`; `home` itself or any ancestor of `home`;
-/// a path inside a `forbidden` dir or containing one. Returns the canonical path.
+/// a path inside a `forbidden` dir or containing one; a path outside the
+/// allowed zones ([`zone_rejection`]). Returns the canonical path.
 pub fn validate_project_path(path: &Path, rules: &ProjectRules) -> Result<PathBuf, ConfigError> {
     let reject = |reason: &str| ConfigError::ProjectRejected {
         path: path.to_path_buf(),
@@ -194,8 +197,44 @@ pub fn validate_project_path(path: &Path, rules: &ProjectRules) -> Result<PathBu
             )));
         }
     }
+    if let Some(reason) = zone_rejection(&canonical, &home) {
+        return Err(reject(reason));
+    }
     Ok(canonical)
 }
+
+/// Mount point of external disks on macOS.
+const VOLUMES: &str = "/Volumes";
+
+/// I2 zones (DECISIONS E1, 2026-10-16). The agent writes in its project, and
+/// some folders hold files the Mac runs by itself (LaunchAgents, app and tool
+/// settings, binaries on the PATH, `Zed.app`...). A project must therefore be
+/// strictly inside `home` but not in `~/Library` nor in a hidden `~/.*`
+/// folder, or strictly inside a disk under `/Volumes`. Pure path logic on
+/// canonical paths; `None` means allowed.
+pub fn zone_rejection(canonical: &Path, home: &Path) -> Option<&'static str> {
+    if let Ok(relative) = canonical.strip_prefix(home) {
+        let first = relative.components().next()?.as_os_str().to_string_lossy();
+        if first == "Library" {
+            return Some("it is inside ~/Library, where macOS and apps keep settings the Mac runs");
+        }
+        if first.starts_with('.') {
+            return Some("it is inside a hidden folder of your home (~/.…), where tools keep settings the Mac runs");
+        }
+        return None;
+    }
+    if let Ok(relative) = canonical.strip_prefix(VOLUMES) {
+        return match relative.components().count() {
+            0 | 1 => Some("it is a whole disk; use a folder on that disk"),
+            _ => None,
+        };
+    }
+    Some("it is outside your home folder and external disks (system folders, /Applications, /opt/homebrew…)")
+}
+
+/// The fix shown with every project rejection.
+pub const PROJECT_ZONES_FIX: &str =
+    "Fix: open a folder inside your home folder (not ~/Library or a hidden ~/.… folder) or on an external disk.";
 
 /// Rules may name directories that do not exist yet (e.g. ~/.local/bin).
 fn canonicalize_or_keep(path: &Path) -> PathBuf {
@@ -216,5 +255,61 @@ pub fn validate_apt_package(name: &str) -> Result<(), ConfigError> {
         Ok(())
     } else {
         Err(ConfigError::InvalidAptName(name.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod zone_tests {
+    use super::*;
+
+    fn rejected(p: &str) -> bool {
+        zone_rejection(Path::new(p), Path::new("/Users/me")).is_some()
+    }
+
+    #[test]
+    fn ordinary_projects_in_home_are_allowed() {
+        assert!(!rejected("/Users/me/code/app"));
+        assert!(!rejected("/Users/me/Documents/site"));
+        assert!(
+            !rejected("/Users/me/code/app/.hidden-sub"),
+            "only ~/.* is refused"
+        );
+    }
+
+    #[test]
+    fn library_and_hidden_home_folders_are_refused() {
+        for p in [
+            "/Users/me/Library",
+            "/Users/me/Library/LaunchAgents",
+            "/Users/me/Library/Application Support/com.apple.container",
+            "/Users/me/.ssh",
+            "/Users/me/.config/zed",
+            "/Users/me/.local/bin",
+            "/Users/me/.aws",
+        ] {
+            assert!(rejected(p), "{p} must be refused");
+        }
+    }
+
+    #[test]
+    fn external_disks_are_allowed_but_not_whole() {
+        assert!(!rejected("/Volumes/Data/code/app"));
+        assert!(rejected("/Volumes/Data"));
+        assert!(rejected("/Volumes"));
+    }
+
+    #[test]
+    fn everything_else_is_refused() {
+        for p in [
+            "/Applications/Zed.app",
+            "/opt/homebrew",
+            "/usr/local/bin",
+            "/private/tmp/x",
+            "/private/etc",
+            "/Users/Shared/x",
+            "/Users/other/code",
+        ] {
+            assert!(rejected(p), "{p} must be refused");
+        }
     }
 }

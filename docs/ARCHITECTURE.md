@@ -31,7 +31,7 @@ flowchart LR
         Zed["Zed editor"]
         Zevbox["zevbox relay (Rust binary)"]
         UserFS["Mac filesystem\n(~/.ssh, ~/.gemini, …)"]
-        ProjectDir["Allowed project directory"]
+        ProjectDir["Project directory\n(home folder or external disk)"]
         StateDir["Agent state directory\n(Application Support/zevbox/state)"]
     end
 
@@ -138,7 +138,7 @@ Four key components:
 ```mermaid
 flowchart TD
     subgraph SupervisorArea ["zevbox supervisor"]
-        Preflight["1. Preflight checks\n- config present\n- project allow-listed\n- local image available\n- Apple Container runtime running"]
+        Preflight["1. Preflight checks\n- config present\n- project in an allowed zone\n- local image available\n- Apple Container runtime running"]
         Spawn["2. Start the micro-VM\ncontainer run -i --rm --cap-drop ALL …"]
         CleanOrphans["Orphan clean-up (I8)"]
     end
@@ -312,10 +312,10 @@ Checked automatically on every build (`scripts/check-invariants.sh` and the test
 never relaxed:
 
 1. **I1 — Exactly two mounts**: the project directory and the agent's state directory. Personal folders (`$HOME`, `~/.ssh`, `~/.gemini`, …) are never mounted.
-2. **I2 — Canonically validated projects**: only directories explicitly listed in `config.projects` are reachable.
+2. **I2 — Projects in allowed zones**: the canonical project must be strictly inside the home folder (not `~/Library`, not a hidden `~/.…` folder) or on a disk under `/Volumes`; picking a zevbox agent in Zed is the consent, there is no project list.
 3. **I3 — Host filesystem and terminal blocked**: no `fs/*` or `terminal/*` call ever reaches Zed.
 4. **I4 — Bidirectional filtering by id**: only listed methods are routed; responses are matched to their pending request.
-5. **I5 — Confined working directory**: `cwd` is always the allowed project root.
+5. **I5 — Confined working directory**: `cwd` is always the project root.
 6. **I6 — Pure JSON-RPC on stdout**: nothing but strict JSON-RPC is written to stdout, to keep Zed stable.
 7. **I7 — Zero host shell**: `/bin/sh`, `bash` or `zsh` are never spawned on the Mac.
 8. **I8 — Surgical container targeting**: `stop` and `delete` only target verified containers with the `zevbox-` prefix; `--all` is banned.
@@ -323,3 +323,4 @@ never relaxed:
 10. **I10 — No build or network at launch**: `launch` is instant and downloads nothing.
 11. **I11 — Rust robustness**: zero `unwrap()`, `expect()` or `panic!()` in production code (`src/`).
 12. **I12 — zevbox isolation**: zevbox's own binary and internal files are never mounted into a container.
+13. **I13 — Project files the Mac would run**: in the ACP container, `<project>/.zed` is masked by a tmpfs and an existing `<project>/.git` is read-only; during the session `guard.rs` watches the project and stops the agent if a `.git` appears or changes elsewhere. Zed runs programs named in `.zed/settings.json` and git filters by itself (see [EXP-01](experiments/EXP-01-resultats.md)).

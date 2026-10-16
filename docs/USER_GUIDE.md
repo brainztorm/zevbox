@@ -16,7 +16,7 @@ flowchart TD
     Step1 --> Step2["Step 2: build and install the binary\nmake install"]
     Step2 --> Step3["Step 3: initialise and build the images\nzevbox setup · zevbox update"]
     Step3 --> Step4["Step 4: sign in to the agents\nzevbox auth claude · zevbox auth antigravity"]
-    Step4 --> Step4b["Step 5: allow your projects\nzevbox project add <path>"]
+    Step4 --> Step4b["Step 5: open a project in Zed\n(home folder or external disk)"]
     Step4b --> Step5{"Step 6: checks\nzevbox doctor & shell"}
 
     Step5 -- "all good" --> Step6["Step 7: open Zed\npick zevbox · Claude\nor zevbox · Antigravity"]
@@ -165,30 +165,28 @@ authenticated
 
 ---
 
-### Step 5: allow your projects
-zevbox never mounts a directory into a micro-VM unless it has been explicitly allowed (invariant
-I2). For each project you want to open with an agent:
+### Step 5: know where your projects can be
+There is nothing to register: when you pick **`zevbox · Claude`** or **`zevbox · Antigravity`**
+with **+** in a Zed window, that choice is your consent, and zevbox uses the folder open in that
+window (first root folder). It only checks that the folder is in an allowed zone (invariant I2):
 
-```bash
-zevbox project add /absolute/path/to/project
-```
+- **allowed**: any folder inside your home folder, e.g. `~/code/my-app`, or on an external disk,
+  e.g. `/Volumes/Data/work/app`;
+- **refused**: `~/Library`, hidden folders such as `~/.ssh` or `~/.config`, your home folder
+  itself, `/`, system folders, `/Applications`, `/opt/homebrew`, and zevbox's own folders.
+  The Mac runs some files of these folders by itself, so an agent writing there could act on
+  your Mac.
 
-**What it does:**
-1. Validates the path (rejects `/`, `$HOME` and its parents, system folders, zevbox's own
-   folders).
-2. Adds it to the allow-list in `config.json`.
-3. Makes sure both **`zevbox · Claude`** and **`zevbox · Antigravity`** entries exist in Zed
-   (`~/.config/zed/settings.json`, with a backup in `backups/` if anything changes). No Zed
-   restart needed.
-
-Repeat for each project. `zevbox project list` shows the list; `zevbox project remove <path>`
-removes one (the Zed entries stay: they do not depend on projects).
+In a refused folder, Zed shows `… is not an allowed project: <reason>` (see Troubleshooting,
+problem 2).
 
 > **Why only two entries?** Zed's agent servers are a global setting, visible from every
 > project. The `zevbox · …` entries therefore carry no path: at launch, zevbox takes the folder
-> open in Zed (first root folder) and checks it against the allow-list. In a folder that is not
-> allowed, Zed shows `… is not an allowed project. Fix: run 'zevbox project add …'` (see
-> Troubleshooting, problem 2).
+> open in Zed.
+
+> **Git and the agent.** Inside the VM, the project's `.git` is read-only and its `.zed` folder
+> is masked (I13): the agent reads the history and edits your files, which appear in your folder
+> immediately, but it cannot commit. Commit its work yourself, or with any tool outside zevbox.
 
 ---
 
@@ -301,7 +299,7 @@ sequenceDiagram
 
 ### In Zed:
 
-1. **Open an allowed project** (one root folder per window):
+1. **Open a project** (one root folder per window, inside your home folder or on an external disk):
    ```bash
    zed ~/code/demo-app
    ```
@@ -321,7 +319,7 @@ sequenceDiagram
 
 | ✅ Do | ❌ Don't |
 |---|---|
-| **Add projects with `zevbox project add <path>`** so they are on the allow-list. | **Don't try to mount `$HOME` itself, `/` or system folders** (rejected immediately by I2). |
+| **Keep your projects in your home folder or on an external disk**, and commit the agent's work yourself. | **Don't open `$HOME` itself, `/`, `~/Library`, hidden `~/.…` folders or system folders as a project** (rejected immediately by I2). |
 | **Use `zevbox tools add <package>`** to give the agent extra Linux tools (e.g. `ripgrep`, `clang`, `jq`). | **Don't `sudo apt install` inside a session** (the VM is ephemeral and capabilities are dropped). |
 | **Run `zevbox stop`** at the end of the day to free background instances. | **Never run `container stop --all` by hand** (it would stop your own non-zevbox containers). |
 | **Run `zevbox doctor`** when something looks odd. | **Don't hand-edit the `zevbox · …` keys in Zed's settings** (use `zevbox zed install` / `zevbox zed uninstall`). |
@@ -335,12 +333,16 @@ sequenceDiagram
 - **Fix**: in a terminal, run `zevbox auth claude` (or `zevbox auth antigravity`), then check with
   `zevbox auth <agent> --status`.
 
-### Problem 2: Zed shows `... is not an allowed project. Fix: run 'zevbox project add ...'`
-- **Cause**: the folder open in Zed is not on the allow-list.
-- **Fix**: add it (no Zed restart; just start a new thread):
-  ```bash
-  zevbox project add /path/to/that/folder
-  ```
+### Problem 2: Zed shows `... is not an allowed project: <reason>`
+- **Cause**: the folder open in Zed is outside the allowed zones (I2): a hidden `~/.…` folder,
+  `~/Library`, your home folder itself, a system folder…
+- **Fix**: move the project into your home folder (e.g. `~/code/…`) or onto an external disk,
+  or open the right folder in Zed.
+
+### Problem 2b: Zed shows `zevbox: stopped the agent: it created or changed git metadata at <path>`
+- **Cause**: the agent created (or changed) a git repository inside the project. Git settings can
+  make Zed or git run programs on your Mac, so zevbox stopped the agent (I13).
+- **Fix**: review that path and delete it before using git or reopening the project in Zed.
 
 ### Problem 3: Zed shows `zevbox: this agent is bound to <A>; this session asked for <B>`
 - **Cause**: the Zed session asks for a folder (`<B>`) different from the one the agent was
@@ -379,7 +381,6 @@ sequenceDiagram
 | Sign in to Claude / Google (Antigravity) | `zevbox auth claude` / `zevbox auth antigravity` |
 | Check sign-in status | `zevbox auth claude --status` / `zevbox auth antigravity --status` |
 | Open a Linux test shell | `zevbox shell claude` |
-| Allow a new project | `zevbox project add /my/project` |
 | Add a Linux tool to the VM | `zevbox tools add ripgrep` |
 | Read recent logs | `zevbox logs` |
 | Stop the running VMs | `zevbox stop` |

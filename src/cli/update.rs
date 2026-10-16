@@ -193,7 +193,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                     "{}: promoted to {}",
                     agent_spec.display, release_id
                 ));
-                let _ = crate::cli::project::update_zed(&paths, &config);
+                let _ = crate::cli::zed::update_zed(&paths, &config);
             }
             Err(e) => {
                 crate::ui::err(&format!("{}: smoke test failed: {e}", agent_spec.display));
@@ -233,7 +233,7 @@ pub async fn run_rollback(agent_arg: Option<AgentArg>) -> anyhow::Result<u8> {
     crate::ui::out(&format!("{}: rolled back to {now_current}", agent_arg.id()));
 
     let config = crate::config::load(&paths.config_file())?;
-    let _ = crate::cli::project::update_zed(&paths, &config);
+    let _ = crate::cli::zed::update_zed(&paths, &config);
 
     Ok(EXIT_OK)
 }

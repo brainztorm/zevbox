@@ -25,7 +25,7 @@ flowchart LR
         Zed["Éditeur Zed"]
         Zevbox["Relais zevbox (Binaire Rust)"]
         UserFS["Système de fichiers Mac\n(~/.ssh, ~/.gemini, etc.)"]
-        ProjectDir["Dossier Projet Autorisé\n(/Users/.../projet)"]
+        ProjectDir["Dossier du projet\n(dossier personnel ou disque externe)"]
         StateDir["Dossier d'état de l'agent\n(Application Support/zevbox/state)"]
     end
 
@@ -114,7 +114,7 @@ L'architecture repose sur quatre composants clés :
 ```mermaid
 flowchart TD
     subgraph SupervisorArea ["Superviseur zevbox"]
-        Preflight["1. Contrôles préalables (Preflight)\n- Config présente\n- Projet dans la liste blanche\n- Image locale disponible\n- Runtime Apple Container actif"]
+        Preflight["1. Contrôles préalables (Preflight)\n- Config présente\n- Projet dans une zone autorisée\n- Image locale disponible\n- Runtime Apple Container actif"]
         Spawn["2. Démarrage Micro-VM\ncontainer run -i --rm --cap-drop ALL ..."]
         CleanOrphans["Nettoyage des orphelins (I8)"]
     end
@@ -282,10 +282,10 @@ zevbox exécute donc le flux OAuth 2.0 **PKCE d'Antigravity sur l'hôte** (`zevb
 Ces règles sont testées automatiquement à chaque compilation (`scripts/check-invariants.sh`) et ne peuvent jamais être relâchées :
 
 1. **I1 — Deux montages exclusifs** : Seuls le dossier du projet et le dossier d'état de l'agent sont montés. Les dossiers personnels (`$HOME`, `~/.ssh`, `~/.gemini`, etc.) ne sont jamais montés directement.
-2. **I2 — Projets validés canoniquement** : Seuls les répertoires explicitement listés dans `config.projects` sont accessibles.
+2. **I2 — Projets dans les zones autorisées** : le projet canonisé doit être strictement dans le dossier personnel (hors `~/Library` et hors dossier caché `~/.…`) ou sur un disque sous `/Volumes` ; choisir un agent zevbox dans Zed vaut consentement, il n'y a plus de liste de projets.
 3. **I3 — Blocage du système de fichiers et du terminal hôte** : Aucun appel `fs/*` ou `terminal/*` ne parvient à Zed.
 4. **I4 — Filtrage bidirectionnel par ID** : Seules les méthodes répertoriées sont routées, les réponses sont associées à leur requête en attente.
-5. **I5 — Confinement du répertoire de travail** : Le `cwd` est invariablement contraint à la racine du projet autorisé.
+5. **I5 — Confinement du répertoire de travail** : Le `cwd` est invariablement contraint à la racine du projet.
 6. **I6 — Pureté JSON-RPC sur stdout** : Seuls des messages JSON-RPC stricts sont émis sur stdout pour préserver la stabilité de Zed.
 7. **I7 — Zéro shell sur l'hôte** : Aucun appel à `/bin/sh`, `bash` ou `zsh` n'est exécuté sur le Mac hôte.
 8. **I8 — Ciblage chirurgical des conteneurs** : `stop` et `delete` ne ciblent que des conteneurs validés avec le préfixe `zevbox-`. L'option globale `--all` est bannie.
@@ -293,3 +293,4 @@ Ces règles sont testées automatiquement à chaque compilation (`scripts/check-
 10. **I10 — Absence de build ou réseau au lancement** : La commande `launch` est instantanée et ne réalise aucun téléchargement.
 11. **I11 — Robustesse Rust** : Zéro `unwrap()`, `expect()` ou `panic!()` dans le code de production (`src/`).
 12. **I12 — Isolation de zevbox** : Les binaires et fichiers internes de zevbox ne sont jamais montés dans les conteneurs.
+13. **I13 — Fichiers du projet que le Mac exécuterait** : dans le conteneur ACP, `<projet>/.zed` est masqué par un tmpfs et un `<projet>/.git` existant est en lecture seule ; pendant la session, `guard.rs` surveille le projet et arrête l'agent si un `.git` apparaît ou change ailleurs. Zed lance tout seul les programmes indiqués dans `.zed/settings.json` et les filtres git (voir [EXP-01](../experiments/EXP-01-resultats.md)).

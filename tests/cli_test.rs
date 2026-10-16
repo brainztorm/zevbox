@@ -55,67 +55,44 @@ async fn init_creates_private_layout_and_is_idempotent() {
     assert_eq!(config(&env)["resources"]["cpus"], 7);
 }
 
+/// DECISIONS F1 (2026-10-16): no project list any more; choosing a zevbox
+/// agent in Zed is the consent (D1), the zone rules (E1) decide.
 #[tokio::test]
-async fn project_add_list_remove() {
+async fn project_command_is_gone() {
     let env = TestEnv::new();
-    let p2 = env.home.join("code/second");
-    fs::create_dir_all(&p2).unwrap();
-    let link = env.home.join("second-link");
-    std::os::unix::fs::symlink(&p2, &link).unwrap();
-
-    let out = env
-        .run(&["project", "add", link.to_str().unwrap(), "--no-zed"])
-        .await;
-    assert_eq!(out.code, Some(0), "{}", out.stderr);
-    let projects = config(&env)["projects"].clone();
-    assert_eq!(projects.as_array().unwrap().len(), 2);
-    assert_eq!(
-        projects[1],
-        p2.to_string_lossy().as_ref(),
-        "stored canonical"
-    );
-
-    // Idempotent.
-    assert_eq!(
-        env.run(&["project", "add", p2.to_str().unwrap(), "--no-zed"])
-            .await
-            .code,
-        Some(0)
-    );
-    assert_eq!(config(&env)["projects"].as_array().unwrap().len(), 2);
-
-    let list = env.run(&["project", "list"]).await;
-    assert!(list.stdout.contains(p2.to_str().unwrap()));
-    assert!(list.stdout.contains(env.project.to_str().unwrap()));
-
-    assert_eq!(
-        env.run(&["project", "remove", p2.to_str().unwrap()])
-            .await
-            .code,
-        Some(0)
-    );
-    assert_eq!(config(&env)["projects"].as_array().unwrap().len(), 1);
+    for args in [&["project", "list"][..], &["project", "add", "/tmp"][..]] {
+        assert_eq!(env.run(args).await.code, Some(2), "{args:?}");
+    }
 }
 
+/// I2 zones (DECISIONS E1): dangerous folders are refused before any container.
 #[tokio::test]
-async fn project_add_rejects_dangerous_paths() {
+async fn dangerous_paths_are_refused_as_projects() {
     let env = TestEnv::new();
+    let hidden = env.home.join(".ssh");
+    let library = env.home.join("Library/LaunchAgents");
+    fs::create_dir_all(&hidden).unwrap();
+    fs::create_dir_all(&library).unwrap();
     for bad in [
         env.home.clone(),
         std::path::PathBuf::from("/"),
+        std::path::PathBuf::from("/Applications"),
         env.state_root.clone(),
         env.home.join("does-not-exist"),
+        hidden,
+        library,
     ] {
         let out = env
-            .run(&["project", "add", bad.to_str().unwrap(), "--no-zed"])
+            .run(&["shell", "claude", "--project", bad.to_str().unwrap()])
             .await;
         assert_eq!(out.code, Some(1), "{} must be refused", bad.display());
         assert!(
-            !out.stderr.is_empty(),
-            "an explanation is required on stderr"
+            out.stderr.contains("is not an allowed project"),
+            "an explanation is required on stderr: {}",
+            out.stderr
         );
     }
-    assert_eq!(config(&env)["projects"].as_array().unwrap().len(), 1);
+    assert!(!env.container_calls().iter().any(|c| c.starts_with("run ")));
 }
 
 #[tokio::test]
@@ -182,22 +159,16 @@ async fn zed_install_dry_run_install_uninstall() {
 }
 
 #[tokio::test]
-async fn project_add_updates_zed_by_default() {
+async fn zed_entries_are_one_per_agent_without_project() {
     let env = TestEnv::new();
     fs::write(&env.zed_settings, "{}\n").unwrap();
-    let p2 = env.home.join("code/second");
-    fs::create_dir_all(&p2).unwrap();
-    let out = env.run(&["project", "add", p2.to_str().unwrap()]).await;
+    let out = env.run(&["zed", "install"]).await;
     assert_eq!(out.code, Some(0), "{}", out.stderr);
     let text = fs::read_to_string(&env.zed_settings).unwrap();
-    // One entry per agent: adding a project never adds a Zed entry.
+    // One entry per agent; the project comes from Zed's working directory.
     assert!(text.contains("\"zevbox · Claude\""), "{text}");
-    assert!(!text.contains("zevbox · Claude · second"), "{text}");
+    assert!(!text.contains("zevbox · Claude · "), "{text}");
     assert!(!text.contains("--project"), "{text}");
-    assert_eq!(
-        env.run(&["project", "list"]).await.stdout.lines().count(),
-        2
-    );
 }
 
 #[tokio::test]

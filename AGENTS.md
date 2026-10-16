@@ -42,7 +42,7 @@ in the manifest.
 ## Module map
 
 - `cli/` clap definitions + one file per command (thin) · `ui.rs` only human stdout/stderr
-- `paths.rs` every location (env overrides for tests) · `config.rs` config.json + project rules (I2)
+- `paths.rs` every location (env overrides for tests) · `config.rs` config.json + project zone rules (I2)
 - `agents.rs` static agent table · `release.rs` registry, locks, build, promote, rollback
 - `container.rs` the only module calling the `container` CLI · `instances.rs` instance records
 - `supervisor.rs` `launch`: preflight, start, relay, bounded shutdown · `relay/` ACP relay
@@ -52,7 +52,8 @@ in the manifest.
 
 ## Invariants (details: plan §3) — never weaken them to pass a test
 
-I1 only two mounts (project, state dir) · I2 allow-listed canonical projects ·
+I1 only two mounts (project, state dir) · I2 canonical project in an allowed zone
+(home minus ~/Library and ~/.*, or /Volumes/<disk>/…), no project list ·
 I3 no fs/terminal/elicitation/terminal-auth through Zed · I4 allow-list both
 ways, responses routed by pending id · I5 `cwd` == project root, no extra dirs,
 `mcpServers: []` · I6 stdout = JSON-RPC only in `launch` · I7 no host shell ·

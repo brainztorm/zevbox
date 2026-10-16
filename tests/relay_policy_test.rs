@@ -728,7 +728,7 @@ fn messages_match_plan_exactly() {
     );
     assert_eq!(
         cwd_message("/a", "/b"),
-        "zevbox: this agent is bound to /a; this session asked for /b. Open /a in Zed, or run 'zevbox project add /b' in a terminal."
+        "zevbox: this agent is bound to /a; this session asked for /b. Open /a in Zed, or open /b in its own Zed window and choose the zevbox agent there."
     );
     assert_eq!(
         additional_directories_message(),

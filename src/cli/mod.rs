@@ -7,7 +7,6 @@ mod doctor;
 mod init;
 mod launch;
 mod logs;
-mod project;
 mod setup;
 mod shell;
 mod status;
@@ -49,21 +48,13 @@ impl AgentArg {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Guided first-time setup (safe to re-run)
-    Setup {
-        #[arg(long)]
-        project: Option<PathBuf>,
-    },
+    Setup,
     /// Create the state directory, config.json and tools.json if missing
     Init,
     /// Check the installation and print fixes
     Doctor {
         #[arg(long)]
         json: bool,
-    },
-    /// Manage allowed projects
-    Project {
-        #[command(subcommand)]
-        action: ProjectAction,
     },
     /// Manage zevbox entries in Zed settings
     Zed {
@@ -133,19 +124,6 @@ pub enum Command {
 }
 
 #[derive(Debug, Subcommand)]
-pub enum ProjectAction {
-    Add {
-        path: PathBuf,
-        #[arg(long)]
-        no_zed: bool,
-    },
-    Remove {
-        path: PathBuf,
-    },
-    List,
-}
-
-#[derive(Debug, Subcommand)]
 pub enum ZedAction {
     Install {
         #[arg(long)]
@@ -202,7 +180,7 @@ async fn dispatch(command: Command) -> anyhow::Result<u8> {
     let paths = crate::paths::Paths::from_env()?;
     if !matches!(
         command,
-        Command::Init | Command::Setup { .. } | Command::Launch { .. } | Command::Auth { .. }
+        Command::Init | Command::Setup | Command::Launch { .. } | Command::Auth { .. }
     ) && !paths.config_file().exists()
     {
         crate::ui::err(
@@ -212,10 +190,9 @@ async fn dispatch(command: Command) -> anyhow::Result<u8> {
     }
 
     match command {
-        Command::Setup { project } => setup::run(project).await,
+        Command::Setup => setup::run().await,
         Command::Init => init::run().await,
         Command::Doctor { json } => doctor::run(json).await,
-        Command::Project { action } => project::run(action).await,
         Command::Zed { action } => zed::run(action).await,
         Command::Auth { agent, status } => auth::run(agent, status).await,
         Command::Launch { agent, project } => launch::run(agent, project).await,

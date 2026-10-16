@@ -95,6 +95,20 @@ impl Paths {
     }
 }
 
+/// I2 rules for this installation: the user's home, and zevbox's own folders
+/// (state root, folder of the installed binary) as forbidden overlaps (I12).
+pub fn project_rules(paths: &Paths) -> Result<crate::config::ProjectRules, PathsError> {
+    let installed = installed_binary()?;
+    let mut forbidden = vec![paths.state_root.clone()];
+    if let Some(dir) = installed.parent() {
+        forbidden.push(dir.to_path_buf());
+    }
+    Ok(crate::config::ProjectRules {
+        home: home_dir()?,
+        forbidden,
+    })
+}
+
 /// `ZEVBOX_ZED_SETTINGS` if set, else `~/.config/zed/settings.json`.
 pub fn zed_settings_file() -> Result<PathBuf, PathsError> {
     if let Some(p) = std::env::var_os("ZEVBOX_ZED_SETTINGS").filter(|p| !p.is_empty()) {
