@@ -197,7 +197,9 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
         command: lock.agent_command.clone(),
         interactive: false,
     };
-    let run_args = crate::container::run_args(&spec);
+    // EXP-01 / P1: mask .zed, lock an existing .git, guard the rest (guard.rs).
+    let root_git_existed = std::fs::symlink_metadata(canonical_project.join(".git")).is_ok();
+    let run_args = crate::container::launch_args(&spec, root_git_existed);
 
     let _ = crate::fsutil::ensure_private_dir(&paths.logs_dir());
     let log_file = match std::fs::OpenOptions::new()
@@ -246,6 +248,18 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
 
     let shutdown = tokio_util::sync::CancellationToken::new();
     let sig_token = shutdown.clone();
+    // Fail closed: without the guard, a new .git in the project goes unnoticed.
+    let guard = match crate::guard::start(&canonical_project, root_git_existed, shutdown.clone()) {
+        Ok(g) => g,
+        Err(e) => {
+            crate::ui::err(&format!("zevbox: cannot watch the project folder: {e}"));
+            let _ = child.start_kill();
+            let _ = tokio::time::timeout(Duration::from_secs(3), child.wait()).await;
+            let _ = cli.stop_and_delete_verified(&container_name).await;
+            let _ = crate::instances::remove(paths, &id);
+            return EXIT_ERROR;
+        }
+    };
     let mut sigterm =
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).ok();
     let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()).ok();
@@ -340,6 +354,12 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
     if gone {
         let _ = crate::instances::remove(paths, &id);
     }
+
+    if let Some(path) = guard.tripped() {
+        crate::ui::err(&crate::guard::tripped_message(&path));
+        return EXIT_ERROR;
+    }
+    drop(guard);
 
     let is_error = matches!(relay_end, crate::relay::RelayEnd::Fatal(_)) || !gone;
     if is_error {

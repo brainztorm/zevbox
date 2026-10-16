@@ -74,7 +74,7 @@ case "$cmd" in
         --label) k="${2%%=*}"; v="${2#*=}"; labels="${labels}${labels:+,}\"$k\":\"$v\""; shift 2 ;;
         --rm|--remove) rm=1; shift ;;
         -i|-it|-t|--init|--interactive|--tty) shift ;;
-        --cpus|-c|--memory|-m|--uid|--gid|--cap-drop|-e|--env|--mount|-w|--workdir|--cwd|--progress) shift 2 ;;
+        --cpus|-c|--memory|-m|--uid|--gid|--cap-drop|-e|--env|--mount|-w|--workdir|--cwd|--progress|--tmpfs|--read-only-path) shift 2 ;;
         -*) echo "fake-container: unknown run option $1" >&2; exit 64 ;;
         *) break ;;
       esac
