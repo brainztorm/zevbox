@@ -82,6 +82,30 @@ pub fn run_args(spec: &RunSpec) -> Vec<String> {
     args
 }
 
+/// `run_args` for an ACP launch, plus the project-file protections of EXP-01
+/// (decision P1, `docs/DECISIONS.md` 2026-10-16), inserted after `-w project`:
+/// `<project>/.zed` is masked by a tmpfs (agent writes never reach the Mac,
+/// whether the folder exists or not) and an existing `<project>/.git` is made
+/// read-only (the agent can read history but not change git settings, hooks or
+/// commit). A missing `.git` is left to the project guard (`guard.rs`).
+pub fn launch_args(spec: &RunSpec, git_exists: bool) -> Vec<String> {
+    let project = spec.project.to_string_lossy();
+    let mut protections = vec!["--tmpfs".to_string(), format!("{project}/.zed")];
+    if git_exists {
+        protections.push("--read-only-path".to_string());
+        protections.push(format!("{project}/.git"));
+    }
+    let mut args = run_args(spec);
+    // "-w <project>" is always present in run_args; insert right after it.
+    let at = args
+        .windows(2)
+        .position(|w| w[0] == "-w")
+        .map(|i| i + 2)
+        .unwrap_or(args.len());
+    args.splice(at..at, protections);
+    args
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContainerInfo {
     /// `configuration.id`.
@@ -312,5 +336,66 @@ impl ContainerCli {
             self.delete_force(name).await?;
         }
         Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod launch_args_tests {
+    use super::*;
+
+    fn spec() -> RunSpec {
+        RunSpec {
+            name: "zevbox-claude-0a1b2c3d".into(),
+            instance_id: "0a1b2c3d".into(),
+            agent: "claude".into(),
+            cpus: 4,
+            memory: "4G".into(),
+            uid: 501,
+            gid: 20,
+            project: PathBuf::from("/Users/test/code/my project"),
+            state_dir: PathBuf::from("/Users/test/state/claude"),
+            image: "zevbox/claude:t".into(),
+            command: vec!["agent".into()],
+            interactive: false,
+        }
+    }
+
+    fn s(v: &[&str]) -> Vec<String> {
+        v.iter().map(|x| x.to_string()).collect()
+    }
+
+    #[test]
+    fn protections_follow_workdir_and_precede_image() {
+        let a = launch_args(&spec(), true);
+        let w = a.iter().position(|x| x == "-w").unwrap_or(usize::MAX);
+        assert_eq!(
+            a[w..w + 7],
+            s(&[
+                "-w",
+                "/Users/test/code/my project",
+                "--tmpfs",
+                "/Users/test/code/my project/.zed",
+                "--read-only-path",
+                "/Users/test/code/my project/.git",
+                "zevbox/claude:t",
+            ])[..]
+        );
+        assert_eq!(a.last().map(String::as_str), Some("agent"));
+    }
+
+    #[test]
+    fn missing_git_only_masks_zed() {
+        let a = launch_args(&spec(), false);
+        assert!(a
+            .windows(2)
+            .any(|w| w == ["--tmpfs", "/Users/test/code/my project/.zed"]));
+        assert!(!a.iter().any(|x| x == "--read-only-path"));
+    }
+
+    #[test]
+    fn keeps_exactly_two_host_mounts() {
+        let a = launch_args(&spec(), true);
+        assert_eq!(a.iter().filter(|x| *x == "--mount").count(), 2, "I1");
+        assert_eq!(a.len(), run_args(&spec()).len() + 4);
     }
 }

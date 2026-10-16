@@ -48,6 +48,7 @@ in the manifest.
 - `supervisor.rs` `launch`: preflight, start, relay, bounded shutdown · `relay/` ACP relay
   (`policy.rs` = pure security decisions, `jsonrpc.rs` helpers, `mod.rs` I/O loop)
 - `zed_settings.rs` JSONC edits of Zed `agent_servers` · `tools.rs` extra apt packages · `fsutil.rs`
+- `guard.rs` project watcher during `launch` (I13)
 
 ## Invariants (details: plan §3) — never weaken them to pass a test
 
@@ -57,7 +58,8 @@ ways, responses routed by pending id · I5 `cwd` == project root, no extra dirs,
 `mcpServers: []` · I6 stdout = JSON-RPC only in `launch` · I7 no host shell ·
 I8 stop/delete one verified `zevbox-*` + label container, never `--all` ·
 I9 no message content/tokens in logs · I10 no network/build in `launch` ·
-I11 no unwrap/expect/panic in `src/` · I12 zevbox files never mounted.
+I11 no unwrap/expect/panic in `src/` · I12 zevbox files never mounted ·
+I13 `.zed` masked, existing `.git` read-only in the ACP container, project guard stops the agent on a new `.git` (`guard.rs`).
 
 ## Common changes
 
