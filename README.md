@@ -152,17 +152,17 @@ Documentation en français : **[docs/fr/](docs/fr/README.md)**.
 |---|---|
 | `zevbox setup` | Guided, idempotent set-up: writes the configuration, builds missing releases (`update`), offers `auth` for each unauthenticated agent (terminal only), configures Zed, runs `doctor` and prints a per-agent summary. |
 | `zevbox init` | Creates the state directories (`~/.local/share/zevbox` or Application Support) with mode `0700`, plus `config.json` and `tools.json`. |
-| `zevbox doctor [--json]` | Full health check: `container` ≥ 1.5.0, runtime running, arm64, releases present, `0700` permissions. |
+| `zevbox doctor [--json]` | Full health check: `container` ≥ 1.5.0, runtime running, arm64, releases present, disk used by zevbox images (WARN when old ones can be reclaimed), `0700` permissions. |
 | `zevbox zed install [--dry-run]` | Non-destructively inserts the managed `zevbox · …` entries into `~/.config/zed/settings.json`, preserving comments and formatting (CST edit). Automatic backup in `backups/`. |
 | `zevbox zed uninstall` | Removes all managed entries from Zed and restores the settings byte for byte. |
 | `zevbox auth <agent> [--status]` | Claude: runs the interactive login in a `-it` container. Antigravity: runs the Google OAuth 2.0 PKCE flow **on the Mac** (ephemeral HTTP server on `127.0.0.1:<random port>`, no port published on the VM, no keychain access) and writes `state/antigravity/.gemini/antigravity-acp/{settings.json,acp_token.json}` with mode `0600`. `--status` prints `authenticated`, `not authenticated` or `unknown`. |
 | `zevbox launch <agent> [--project <path>]` | Called by Zed: checks the project against the allowed zones (I2), starts the micro-VM and relays ACP over stdin/stdout with strict filtering, and watches the project (I13). Without `--project`, the project is the current directory (Zed starts the agent in the first root folder). |
 | `zevbox status [--json]` | Shows active, orphaned and unregistered instances. |
 | `zevbox stop [ID \| --project <path>]` | Cleanly stops the given instances, or every active zevbox instance (never with the global `--all`). |
-| `zevbox clean [--images]` | Removes verified orphan containers and stale records, prunes old logs (>30) and backups (>20). With `--images`, deletes unused old images. |
+| `zevbox clean [--images]` | Removes verified orphan containers and stale records, prunes old logs (>30) and backups (>20). With `--images`, deletes the zevbox images of releases that are neither current nor previous (never another tool's images) and removes the image builder VM, whose disk never shrinks. |
 | `zevbox shell <agent> [--project <path>]` | Interactive Bash in a disposable VM identical to the agent's. Without `--project`, the current directory must be in an allowed zone (exit code 3 otherwise). |
 | `zevbox logs [ID] [--path]` | Shows the last 200 lines of the most recent session log, or of the given ID. `--path` prints the log file path. |
-| `zevbox update [--check] [--agent <agent>]` | Checks for or builds a new agent release from the official ACP registry, runs the smoke test and promotes it. |
+| `zevbox update [--check] [--agent <agent>]` | Checks for or builds a new agent release from the official ACP registry, runs the smoke test and promotes it. After a build, the same image cleanup as `clean --images` runs. |
 | `zevbox rollback [--agent <agent>]` | Swaps the active release (`current`) with the previous one. |
 | `zevbox tools list` / `add <pkgs…>` / `remove <pkgs…>` | Manages extra Debian packages (`tools.json`) and rebuilds the active agent images. |
 

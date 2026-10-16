@@ -257,6 +257,49 @@ pub fn active_lock(paths: &Paths, agent: &str) -> Result<ReleaseLock, ReleaseErr
     load_lock(paths, &entry.current)
 }
 
+/// Images that disk cleanup must keep (DECISIONS G1): for every agent, the
+/// image of its `current` and `previous` releases (from the lock, or the
+/// `zevbox/<agent>:<release>` naming if the lock is gone), plus the image of
+/// every recorded instance (a running agent keeps its image).
+pub fn images_to_keep(paths: &Paths) -> Vec<String> {
+    let mut keep = Vec::new();
+    for (agent, entry) in load_active(paths).unwrap_or_default() {
+        for release in std::iter::once(entry.current).chain(entry.previous) {
+            keep.push(match load_lock(paths, &release) {
+                Ok(lock) => lock.image,
+                Err(_) => format!("zevbox/{agent}:{release}"),
+            });
+        }
+    }
+    for record in crate::instances::list(paths).unwrap_or_default() {
+        keep.push(record.image);
+    }
+    keep
+}
+
+/// Deletes zevbox images not in [`images_to_keep`], one by one, then removes
+/// the image builder VM. Never touches other tools' images (`is_zevbox_image`).
+/// Returns the deleted references; errors are logged, never fatal.
+pub async fn prune_images(paths: &Paths, cli: &crate::container::ContainerCli) -> Vec<String> {
+    let mut deleted = Vec::new();
+    let keep = images_to_keep(paths);
+    match cli.image_list().await {
+        Ok(images) => {
+            for reference in crate::container::stale_zevbox_images(&images, &keep) {
+                match cli.delete_zevbox_image(&reference).await {
+                    Ok(()) => deleted.push(reference),
+                    Err(e) => tracing::warn!("cannot delete image {reference}: {e}"),
+                }
+            }
+        }
+        Err(e) => tracing::warn!("cannot list images: {e}"),
+    }
+    if let Err(e) = cli.remove_builder().await {
+        tracing::info!("image builder not removed: {e}");
+    }
+    deleted
+}
+
 /// Pure: new `current`, old current becomes `previous`.
 pub fn promote(active: &mut ActiveReleases, agent: &str, release_id: &str) {
     let previous = active.get(agent).map(|e| e.current.clone());

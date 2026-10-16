@@ -3,7 +3,7 @@
 use crate::paths::Paths;
 use crate::supervisor::{EXIT_OK, EXIT_PRECONDITION};
 
-pub async fn run(_images: bool) -> anyhow::Result<u8> {
+pub async fn run(images: bool) -> anyhow::Result<u8> {
     let paths = Paths::from_env()?;
     if !paths.config_file().exists() {
         crate::ui::err(
@@ -36,6 +36,13 @@ pub async fn run(_images: bool) -> anyhow::Result<u8> {
     // 3. Prune old logs and backups
     let _ = crate::fsutil::prune_oldest(&paths.logs_dir(), ".log", 30);
     let _ = crate::fsutil::prune_oldest(&paths.backups_dir(), ".json", 30);
+
+    // 4. Old release images and the image builder VM (DECISIONS G1)
+    if images {
+        for reference in crate::release::prune_images(&paths, &cli).await {
+            crate::ui::out(&format!("removed old image {reference}"));
+        }
+    }
 
     Ok(EXIT_OK)
 }

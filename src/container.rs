@@ -227,6 +227,37 @@ pub fn image_matches(reference: &str, wanted: &str) -> bool {
     norm(reference) == norm(wanted)
 }
 
+/// Repository prefix of every image zevbox builds (`zevbox/<agent>:<release>`).
+const ZEVBOX_IMAGE_REPO: &str = "zevbox/";
+
+/// True if `reference` is an image zevbox built, in either form shown by the CLI
+/// (`zevbox/claude:t` or `docker.io/zevbox/claude:t`). Images of other tools
+/// (kiac, the builder, base images) are never zevbox's to delete.
+pub fn is_zevbox_image(reference: &str) -> bool {
+    let bare = reference.strip_prefix("docker.io/").unwrap_or(reference);
+    bare.strip_prefix(ZEVBOX_IMAGE_REPO)
+        .is_some_and(|rest| rest.contains(':') && !rest.contains('/'))
+}
+
+/// Disk cleanup (DECISIONS G1): zevbox images present in `images` that match
+/// none of `keep` (images of the current and previous releases, and of running
+/// instances). Pure; deletion is `ContainerCli::delete_zevbox_image`.
+pub fn stale_zevbox_images(images: &[ImageInfo], keep: &[String]) -> Vec<String> {
+    images
+        .iter()
+        .map(|i| i.reference.clone())
+        .filter(|r| is_zevbox_image(r) && !keep.iter().any(|k| image_matches(r, k)))
+        .collect()
+}
+
+/// `container system df --format json` → bytes used by all images (zevbox's and others').
+pub fn parse_images_bytes(text: &str) -> Option<u64> {
+    serde_json::from_str::<Value>(text)
+        .ok()?
+        .pointer("/images/sizeInBytes")?
+        .as_u64()
+}
+
 /// 8 lowercase hex characters from a UUID v4.
 pub fn new_instance_id() -> String {
     let mut id = uuid::Uuid::new_v4().simple().to_string();
@@ -316,6 +347,32 @@ impl ContainerCli {
         self.exec(&["delete", "--force", name]).await.map(|_| ())
     }
 
+    /// `container image delete <reference>`, only for an image zevbox built
+    /// (never `--all`, never another tool's image).
+    pub async fn delete_zevbox_image(&self, reference: &str) -> Result<(), ContainerError> {
+        if !is_zevbox_image(reference) {
+            return Err(ContainerError::Refused(reference.to_string()));
+        }
+        self.exec(&["image", "delete", reference]).await.map(|_| ())
+    }
+
+    /// Stops then deletes the image builder VM (`container builder`), which keeps
+    /// a disk that never shrinks between builds. Recreated by the next build.
+    pub async fn remove_builder(&self) -> Result<(), ContainerError> {
+        let _ = self.exec(&["builder", "stop"]).await;
+        self.exec(&["builder", "delete"]).await.map(|_| ())
+    }
+
+    /// Bytes used by all images (`container system df`), if the CLI reports it.
+    pub async fn images_bytes(&self) -> Option<u64> {
+        parse_images_bytes(
+            &self
+                .exec(&["system", "df", "--format", "json"])
+                .await
+                .ok()?,
+        )
+    }
+
     /// Looks the container up with `list_all`, then stops and deletes it only if
     /// `may_target` is true. Ok(false) if it does not exist.
     pub async fn stop_and_delete_verified(&self, name: &str) -> Result<bool, ContainerError> {
@@ -397,5 +454,67 @@ mod launch_args_tests {
         let a = launch_args(&spec(), true);
         assert_eq!(a.iter().filter(|x| *x == "--mount").count(), 2, "I1");
         assert_eq!(a.len(), run_args(&spec()).len() + 4);
+    }
+}
+
+#[cfg(test)]
+mod image_cleanup_tests {
+    use super::*;
+
+    fn imgs(refs: &[&str]) -> Vec<ImageInfo> {
+        refs.iter()
+            .map(|r| ImageInfo {
+                reference: r.to_string(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn only_zevbox_images_qualify() {
+        assert!(is_zevbox_image("zevbox/claude:claude-1"));
+        assert!(is_zevbox_image("docker.io/zevbox/antigravity:a-2"));
+        assert!(!is_zevbox_image("docker.io/library/debian:bookworm-slim"));
+        assert!(!is_zevbox_image(
+            "ghcr.io/apple/container-builder-shim/builder:0.13.1"
+        ));
+        assert!(!is_zevbox_image("docker.io/rancher/k3s@sha256:abc"));
+        assert!(!is_zevbox_image("evil/zevbox/claude:x"));
+        assert!(!is_zevbox_image("zevbox/claude"), "no tag");
+    }
+
+    #[test]
+    fn keeps_current_previous_and_running_images() {
+        let images = imgs(&[
+            "docker.io/zevbox/claude:c-1",
+            "docker.io/zevbox/claude:c-2",
+            "docker.io/zevbox/claude:c-3",
+            "docker.io/zevbox/antigravity:a-1",
+            "docker.io/zevbox/antigravity:a-2",
+            "docker.io/library/debian:bookworm-slim",
+            "docker.io/rancher/k3s:v1",
+        ]);
+        let keep: Vec<String> = [
+            "zevbox/claude:c-3",
+            "zevbox/claude:c-2",
+            "zevbox/antigravity:a-2",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        assert_eq!(
+            stale_zevbox_images(&images, &keep),
+            vec![
+                "docker.io/zevbox/claude:c-1".to_string(),
+                "docker.io/zevbox/antigravity:a-1".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_system_df() {
+        let j = r#"{"containers":{"sizeInBytes":1},"images":{"active":3,"sizeInBytes":61615472640,"total":30}}"#;
+        assert_eq!(parse_images_bytes(j), Some(61_615_472_640));
+        assert_eq!(parse_images_bytes("{}"), None);
+        assert_eq!(parse_images_bytes("not json"), None);
     }
 }

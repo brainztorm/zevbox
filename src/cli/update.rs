@@ -30,6 +30,8 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
     };
 
     let mut active = load_active(&paths)?;
+    // A build happened: old images and the builder VM can be reclaimed (G1).
+    let mut built = false;
 
     for agent_spec in target_agents {
         let (url, sha, text) = match fetch_manifest(agent_spec.registry_id) {
@@ -114,6 +116,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
             "{}: preparing release for version {}...",
             agent_spec.display, version
         ));
+        built = true;
         let now = chrono::Utc::now();
         let release_id = new_release_id(agent_spec.id, now);
         let image = format!("zevbox/{}:{release_id}", agent_spec.id);
@@ -197,10 +200,18 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
             }
             Err(e) => {
                 crate::ui::err(&format!("{}: smoke test failed: {e}", agent_spec.display));
-                let _ = std::process::Command::new(&config.container_binary)
-                    .args(["image", "delete", &image])
-                    .status();
+                let cli = crate::container::ContainerCli::new(config.container_binary.clone());
+                if let Err(e) = cli.delete_zevbox_image(&image).await {
+                    tracing::warn!("cannot delete failed image {image}: {e}");
+                }
             }
+        }
+    }
+
+    if built {
+        let cli = crate::container::ContainerCli::new(config.container_binary.clone());
+        for reference in crate::release::prune_images(&paths, &cli).await {
+            crate::ui::out(&format!("removed old image {reference}"));
         }
     }
 

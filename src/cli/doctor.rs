@@ -127,7 +127,19 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
         }
     }
 
-    // 6. Permissions 0700 on stateRoot
+    // 6. Disk used by zevbox images (DECISIONS G1)
+    if let Ok(images) = cli.image_list().await {
+        let zevbox = images
+            .iter()
+            .filter(|i| crate::container::is_zevbox_image(&i.reference))
+            .count();
+        let keep = crate::release::images_to_keep(&paths);
+        let stale = crate::container::stale_zevbox_images(&images, &keep).len();
+        let (status, message) = disk_message(zevbox, stale, cli.images_bytes().await);
+        checks.push(("disk".to_string(), status.to_string(), message));
+    }
+
+    // 7. Permissions 0700 on stateRoot
     match std::fs::metadata(&paths.state_root) {
         Ok(m) => {
             use std::os::unix::fs::PermissionsExt;
@@ -156,6 +168,26 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
     }
 
     finish(json_output, &checks)
+}
+
+/// Pure text of the disk check: WARN when old release images can be reclaimed.
+fn disk_message(zevbox: usize, stale: usize, images_bytes: Option<u64>) -> (&'static str, String) {
+    let total = images_bytes
+        .map(|b| format!("; all container images use {:.1} GB", b as f64 / 1e9))
+        .unwrap_or_default();
+    if stale == 0 {
+        (
+            "OK",
+            format!("{zevbox} zevbox image(s), none from old releases{total}"),
+        )
+    } else {
+        (
+            "WARN",
+            format!(
+                "{zevbox} zevbox image(s), {stale} from old releases{total}. Fix: run 'zevbox clean --images'"
+            ),
+        )
+    }
 }
 
 /// True iff the container's Claude settings hold a `model` string (DECISIONS R8).
@@ -194,5 +226,26 @@ fn finish(json_output: bool, checks: &[(String, String, String)]) -> anyhow::Res
         Ok(EXIT_ERROR)
     } else {
         Ok(EXIT_OK)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::disk_message;
+
+    #[test]
+    fn disk_message_warns_only_with_old_images() {
+        let (status, msg) = disk_message(2, 0, Some(61_615_472_640));
+        assert_eq!(status, "OK");
+        assert!(
+            msg.contains("2 zevbox image(s)") && msg.contains("61.6 GB"),
+            "{msg}"
+        );
+        let (status, msg) = disk_message(5, 3, None);
+        assert_eq!(status, "WARN");
+        assert!(
+            msg.contains("3 from old releases") && msg.contains("zevbox clean --images"),
+            "{msg}"
+        );
     }
 }
