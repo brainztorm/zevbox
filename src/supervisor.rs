@@ -55,7 +55,7 @@ async fn check_preflight(
         }
     };
 
-    // 4. Active release & image present
+    // 4. Active release
     let lock = match crate::release::active_lock(paths, agent) {
         Ok(l) => l,
         Err(crate::release::ReleaseError::NoActiveRelease(_)) => {
@@ -70,6 +70,26 @@ async fn check_preflight(
     };
 
     let cli = crate::container::ContainerCli::new(config.container_binary.clone());
+    // 4. Runtime running, started if needed. Before anything that talks to the
+    // runtime: `image list` fails with an XPC error while it is stopped (e.g. Zed
+    // reopening a thread right after a reboot).
+    // `container system status` exits 1 with {"status":"unregistered"} while the
+    // service is stopped, so an error here means "not running", not "unknown".
+    let running = matches!(cli.system_status().await, Ok(s) if s.running);
+    if !running {
+        let _ = cli.system_start().await;
+        match cli.system_status().await {
+            Ok(s) if s.running => {}
+            _ => {
+                return Err(
+                    "Apple Container system is not running. Fix: run 'container system start'."
+                        .to_string(),
+                );
+            }
+        }
+    }
+
+    // 5. Image present
     let images = match cli.image_list().await {
         Ok(imgs) => imgs,
         Err(e) => {
@@ -84,29 +104,6 @@ async fn check_preflight(
             "no active {} image '{}'. Fix: run 'zevbox update --agent {agent}' in a macOS terminal.",
             agent_spec.display, lock.image
         ));
-    }
-
-    // 5. Runtime running
-    let status = match cli.system_status().await {
-        Ok(s) => s,
-        Err(e) => {
-            return Err(format!("cannot query Apple Container system status: {e}"));
-        }
-    };
-    if !status.running {
-        let _ = cli.system_start().await;
-        let status_after = match cli.system_status().await {
-            Ok(s) => s,
-            Err(e) => {
-                return Err(format!("cannot query Apple Container system status: {e}"));
-            }
-        };
-        if !status_after.running {
-            return Err(
-                "Apple Container system is not running. Fix: run 'container system start'."
-                    .to_string(),
-            );
-        }
     }
 
     // 6. Auth marker
@@ -137,7 +134,8 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
             let stdin = std::io::stdin();
             let mut handle = stdin.lock();
             let mut line = String::new();
-            while handle.read_line(&mut line).is_ok() {
+            // Ok(0) is end of input: stop, or this loop would spin forever.
+            while matches!(handle.read_line(&mut line), Ok(n) if n > 0) {
                 let trimmed = line.trim();
                 if trimmed.is_empty() {
                     line.clear();
