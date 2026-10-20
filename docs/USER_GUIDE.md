@@ -357,8 +357,8 @@ sequenceDiagram
   thread.
 
 ### Problem 4: Zed shows `Apple Container system is not running`
-- **Cause**: the Apple Container runtime is stopped.
-- **Fix**:
+- **Cause**: the Apple Container runtime is stopped (typically right after a reboot) and zevbox could not start it by itself. The message ends with a technical detail.
+- **Fix**: in a terminal, then start a **new** thread in Zed:
   ```bash
   container system start
   ```

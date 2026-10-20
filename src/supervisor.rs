@@ -77,24 +77,17 @@ async fn check_preflight(
     // service is stopped, so an error here means "not running", not "unknown".
     let running = matches!(cli.system_status().await, Ok(s) if s.running);
     if !running {
-        let _ = cli.system_start().await;
-        match cli.system_status().await {
-            Ok(s) if s.running => {}
-            _ => {
-                return Err(
-                    "Apple Container system is not running. Fix: run 'container system start'."
-                        .to_string(),
-                );
-            }
+        let start = cli.system_start().await;
+        if !matches!(cli.system_status().await, Ok(s) if s.running) {
+            return Err(runtime_down_message(start.err().map(|e| e.to_string())));
         }
     }
 
     // 5. Image present
     let images = match cli.image_list().await {
         Ok(imgs) => imgs,
-        Err(e) => {
-            return Err(format!("cannot list container images: {e}"));
-        }
+        // The runtime was up a moment ago: same advice, with the technical reason.
+        Err(e) => return Err(runtime_down_message(Some(e.to_string()))),
     };
     if !images
         .iter()
@@ -121,6 +114,18 @@ async fn check_preflight(
         canonical_project,
         cli,
     })
+}
+
+/// What Zed shows when the container service is down and zevbox could not
+/// start it (e.g. right after a reboot). Plain words first, the reason last.
+fn runtime_down_message(reason: Option<String>) -> String {
+    let mut msg = "Apple Container system is not running, and zevbox could not start it. \
+         Fix: open a macOS terminal, run 'container system start', then start a new thread in Zed."
+        .to_string();
+    if let Some(r) = reason {
+        msg.push_str(&format!(" (technical detail: {r})"));
+    }
+    msg
 }
 
 /// Full `launch` flow. Uses the process stdin/stdout for ACP. Returns the exit code.
@@ -391,4 +396,25 @@ pub async fn clean_orphans(paths: &Paths) -> Vec<String> {
         }
     }
     cleaned
+}
+
+#[cfg(test)]
+mod tests {
+    use super::runtime_down_message;
+
+    #[test]
+    fn runtime_message_is_actionable_and_keeps_the_reason_last() {
+        let m = runtime_down_message(Some("XPC connection error".into()));
+        assert!(
+            m.starts_with("Apple Container system is not running"),
+            "{m}"
+        );
+        assert!(m.contains("container system start"), "{m}");
+        assert!(m.contains("new thread in Zed"), "{m}");
+        assert!(
+            m.ends_with("(technical detail: XPC connection error)"),
+            "{m}"
+        );
+        assert!(!runtime_down_message(None).contains("technical detail"));
+    }
 }
