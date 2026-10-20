@@ -236,7 +236,7 @@ zevbox protège **votre Mac** de l'agent. Il ne protège **pas** le projet que v
 - **`Antigravity is not authenticated. Fix: run 'zevbox auth antigravity'`** — connectez-vous avec votre compte Google dans le navigateur.
 - **`zevbox: this agent is bound to <A>; this session asked for <B>. Open <A> in Zed, or open <B> in its own Zed window …`** — la session Zed demande un dossier différent de celui où l'agent a été lancé, typiquement un espace de travail multi-racines. Ouvrez un seul dossier racine par fenêtre Zed.
 - **`Auto mode unavailable: the selected model does not support Auto mode`** — le modèle par défaut de Claude dans la VM est Haiku 4.5. `zevbox doctor` signale `no default model` ; lancez `zevbox auth claude` (écrit `state/claude/.claude/settings.json`) ou écrivez-y `{"model": "fable"}`, puis ouvrez un nouveau thread Zed.
-- **`Apple Container system is not running. Fix: run 'container system start'`** — démarrez le runtime.
+- **`Apple Container system is not running, and zevbox could not start it. Fix: … run 'container system start' …`** — zevbox démarre normalement le runtime seul (p. ex. après un redémarrage) ; sinon, lancez cette commande dans un terminal puis ouvrez un nouveau thread dans Zed.
 
 ---
 

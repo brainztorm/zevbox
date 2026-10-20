@@ -334,8 +334,8 @@ sequenceDiagram
 ---
 
 ### Problème 4 : Zed affiche `Apple Container system is not running`
-- **Cause** : Le service de virtualisation Apple Container est arrêté sur votre Mac.
-- **Solution** : Démarrez-le avec la commande native :
+- **Cause** : Le service Apple Container est arrêté (typiquement juste après un redémarrage) et zevbox n'a pas réussi à le démarrer seul. Le message se termine par un détail technique.
+- **Solution** : Dans un terminal, démarrez-le, puis ouvrez un **nouveau** thread dans Zed :
   ```bash
   container system start
   ```
