@@ -121,6 +121,33 @@ async fn check_preflight(
     })
 }
 
+/// Sends `tracing` events to the instance's `logs/<id>.log` (plan §4 step 5, I6: never
+/// stdout). Level `info`, or `RUST_LOG`. I9: events carry names, paths, ids and sizes,
+/// never message content. Best effort: a missing subscriber must not stop a launch.
+fn init_launch_logging(log_file: &std::fs::File) {
+    let Ok(file) = log_file.try_clone() else {
+        return;
+    };
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_writer(std::sync::Mutex::new(file))
+        .with_ansi(false)
+        .with_target(false)
+        .try_init();
+}
+
+/// Name of how the relay ended, without any payload (I9).
+fn relay_end_name(end: &crate::relay::RelayEnd) -> &'static str {
+    match end {
+        crate::relay::RelayEnd::ClientEof => "client_eof",
+        crate::relay::RelayEnd::AgentEof => "agent_eof",
+        crate::relay::RelayEnd::Shutdown => "shutdown",
+        crate::relay::RelayEnd::Fatal(_) => "fatal",
+    }
+}
+
 /// What Zed shows when the container service is down and zevbox could not
 /// start it (e.g. right after a reboot). Plain words first, the reason last.
 fn runtime_down_message(reason: Option<String>) -> String {
@@ -229,6 +256,13 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
             return EXIT_ERROR;
         }
     };
+
+    init_launch_logging(&log_file);
+    tracing::info!(
+        "launch agent={agent} release={} container={container_name} project={}",
+        lock.release_id,
+        canonical_project.display()
+    );
 
     let mut cmd = tokio::process::Command::new(&config.container_binary);
     cmd.args(&run_args)
@@ -363,6 +397,10 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
     }
     drop(guard);
 
+    tracing::info!(
+        "shutdown relay_end={} container_gone={gone}",
+        relay_end_name(&relay_end)
+    );
     let is_error = matches!(relay_end, crate::relay::RelayEnd::Fatal(_)) || !gone;
     if is_error {
         EXIT_ERROR

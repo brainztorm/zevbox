@@ -26,6 +26,26 @@ pub enum RelayEnd {
     Fatal(String),
 }
 
+/// Method name safe to put in a log line (I9: a name, never content): at most 80
+/// characters, only `[A-Za-z0-9_./:-]`, anything else shown as `?`.
+fn loggable_method(msg: &Value) -> String {
+    msg.get("method")
+        .and_then(Value::as_str)
+        .map(|m| {
+            m.chars()
+                .take(80)
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '/' | ':' | '-') {
+                        c
+                    } else {
+                        '?'
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_else(|| "-".to_string())
+}
+
 /// Serializes `msg` as a single-line JSON string followed by `\n` and flushes (F4, §7.1).
 async fn send_json<W>(writer: &mut W, msg: &Value) -> Result<(), std::io::Error>
 where
@@ -110,6 +130,7 @@ where
                                 ));
                             }
                         };
+                        let method = loggable_method(&msg);
                         match decide(&policy, &mut state, Direction::ClientToAgent, msg) {
                             Verdict::Forward(val) => {
                                 if let Err(e) = send_json(&mut agent_in, &val).await {
@@ -118,13 +139,14 @@ where
                                 }
                             }
                             Verdict::ReplyToSender(val) => {
+                                tracing::info!("blocked method={method} dir=client_to_agent");
                                 if let Err(e) = send_json(&mut client_out, &val).await {
                                     tracing::warn!("failed to send reply to client: {e}");
                                     return RelayEnd::ClientEof;
                                 }
                             }
                             Verdict::Drop { reason } => {
-                                tracing::debug!(reason, "dropped message from client");
+                                tracing::info!("blocked method={method} dir=client_to_agent (ignored: {reason})");
                             }
                             Verdict::Fatal { reason } => {
                                 tracing::warn!(reason, "fatal violation from client");
@@ -168,6 +190,7 @@ where
                                 ));
                             }
                         };
+                        let method = loggable_method(&msg);
                         match decide(&policy, &mut state, Direction::AgentToClient, msg) {
                             Verdict::Forward(val) => {
                                 if let Err(e) = send_json(&mut client_out, &val).await {
@@ -176,13 +199,14 @@ where
                                 }
                             }
                             Verdict::ReplyToSender(val) => {
+                                tracing::info!("blocked method={method} dir=agent_to_client");
                                 if let Err(e) = send_json(&mut agent_in, &val).await {
                                     tracing::warn!("failed to send reply to agent: {e}");
                                     return RelayEnd::AgentEof;
                                 }
                             }
                             Verdict::Drop { reason } => {
-                                tracing::debug!(reason, "dropped message from agent");
+                                tracing::info!("blocked method={method} dir=agent_to_client (ignored: {reason})");
                             }
                             Verdict::Fatal { reason } => {
                                 tracing::warn!(reason, "fatal violation from agent");
@@ -193,5 +217,24 @@ where
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod log_tests {
+    use super::loggable_method;
+    use serde_json::json;
+
+    #[test]
+    fn method_is_sanitized_and_bounded() {
+        assert_eq!(
+            loggable_method(&json!({"method": "fs/read_text_file"})),
+            "fs/read_text_file"
+        );
+        assert_eq!(loggable_method(&json!({"id": 1})), "-");
+        assert_eq!(loggable_method(&json!({"method": "a b\nc"})), "a?b?c");
+        let long = "x".repeat(500);
+        assert_eq!(loggable_method(&json!({ "method": long })).len(), 80);
+        assert_eq!(loggable_method(&json!({"method": 42})), "-");
     }
 }

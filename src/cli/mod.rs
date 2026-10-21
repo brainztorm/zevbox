@@ -153,6 +153,16 @@ pub enum ToolsAction {
 /// Entry point used by `main`. Returns the process exit code.
 pub fn run() -> u8 {
     let cli = Cli::parse();
+    // Opt-in diagnostics for every command except `launch` (which logs to its own
+    // file: stdout carries JSON-RPC only and stderr belongs to Zed, I6).
+    if std::env::var_os("RUST_LOG").is_some() && !matches!(cli.command, Command::Launch { .. }) {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_writer(std::io::stderr)
+            .with_ansi(false)
+            .with_target(false)
+            .try_init();
+    }
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
