@@ -225,6 +225,10 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
         }
     }
 
+    if !check {
+        super::clean::prune_release_files(&paths);
+    }
+
     if failures > 0 {
         crate::ui::err(&format!(
             "zevbox: {failures} agent update(s) failed (see above); nothing was changed for them."
