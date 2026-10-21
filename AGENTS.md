@@ -4,6 +4,21 @@ zevbox runs ACP agents (Claude, Antigravity) for the Zed editor inside Apple
 Container micro-VMs, with a filtering ACP relay so the agent can never use Zed
 to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
 
+## Absolute rules (the human's orders; no exception, no « later »)
+
+1. **Documentation is always up to date with the change.** Every change that
+   alters behaviour, a command, an option, a message, an invariant, a path or
+   a limit updates **in the same commit** every document that mentions it:
+   `zevbox_plan_V2.md` (the contract), `README.md`, `docs/USER_GUIDE.md`,
+   `docs/ARCHITECTURE.md`, their French twins in `docs/fr/`, this file, and
+   `docs/DECISIONS.md` (decision + date). Before committing, search the docs
+   for the old wording (`grep -rn "<old command|message|number>" README.md docs
+   zevbox_plan_V2.md AGENTS.md`) and fix every hit, including diagrams, sample
+   outputs, counts (« 13 invariants », « 15 commands ») and error texts. A
+   change with stale docs is not finished.
+2. **Protected files** (below): never edited without the human's explicit
+   « 👤 » for that change; show the `git diff` first.
+
 ## Before anything
 
 1. Read `zevbox_plan_V2.md` entirely (it is the contract; `zevbox_plan_V1.md` is history only), then `docs/PROGRESS.md`
