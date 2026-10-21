@@ -209,7 +209,7 @@ never weakened to make a test pass:
 - **I10 — No network or build in `launch`**: launching uses the active release only.
 - **I11 — No panics in production**: zero `unwrap()`, `expect()`, `panic!()` in `src/` (Clippy `deny`).
 - **I12 — zevbox is out of reach**: its binary, configuration and releases are never mounted into a container.
-- **I13 — Project files the Mac would run**: in the VM, the project's `.zed` folder is masked (the agent's edits stay in VM memory) and an existing `.git` is read-only. During the session zevbox watches the project and stops the agent if a `.git` appears or changes anywhere else. Reason: Zed runs programs named in `.zed/settings.json` and in git settings by itself ([EXP-01](docs/experiments/EXP-01-resultats.md)).
+- **I13 — Project files the Mac would run**: in the VM, the project's `.zed` folder is masked (the agent's edits stay in VM memory) and an existing `.git` is read-only. The watch starts before the VM does, and a `.zed` that is a file or a link is refused at launch. During the session zevbox stops the agent if a `.git` appears or changes anywhere else. Reason: Zed runs programs named in `.zed/settings.json` and in git settings by itself ([EXP-01](docs/experiments/EXP-01-resultats.md)).
 
 ### Threat model and known limits
 
@@ -227,6 +227,7 @@ zevbox protects **your Mac** from the agent. It does **not** protect the project
 
 - **`zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init'`** — run `zevbox setup` in a terminal.
 - **`<path> is not an allowed project: <reason>. Fix: open a folder inside your home folder …`** — the folder open in Zed is outside the allowed zones (I2), for example a hidden `~/.…` folder or a system folder. Move the project or open another folder.
+- **`<project>/.zed is a file or a link, so zevbox cannot mask it safely (I13). Fix: …`** — rename or remove that `.zed` (a regular folder is fine), then start a new thread.
 - **`zevbox: stopped the agent: it created or changed git metadata at <path>`** — the agent created a git repository (or changed one) inside the project (I13). Review that path and delete it before using git or reopening the project in Zed.
 - **`no active Claude release. Fix: run 'zevbox update --agent claude'`** — the agent image has not been built yet.
 - **`Claude is not authenticated. Fix: run 'zevbox auth claude'`** — sign in from a terminal.

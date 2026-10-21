@@ -341,6 +341,10 @@ sequenceDiagram
 - **Fix**: move the project into your home folder (e.g. `~/code/…`) or onto an external disk,
   or open the right folder in Zed.
 
+### Problem 2c: Zed shows `<project>/.zed is a file or a link, so zevbox cannot mask it safely`
+- **Cause**: the project's `.zed` is a plain file or a symbolic link (I13).
+- **Fix**: rename or remove it (a regular `.zed` folder is fine), then start a new thread.
+
 ### Problem 2b: Zed shows `zevbox: stopped the agent: it created or changed git metadata at <path>`
 - **Cause**: the agent created (or changed) a git repository inside the project. Git settings can
   make Zed or git run programs on your Mac, so zevbox stopped the agent (I13).

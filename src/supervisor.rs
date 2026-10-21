@@ -47,6 +47,11 @@ async fn check_preflight(
         Err(e) => return Err(e.to_string()),
     };
 
+    // I13 preconditions: a `.zed` that is a file or a link cannot be masked safely.
+    if let Some(problem) = crate::guard::project_files_problem(&canonical_project) {
+        return Err(problem);
+    }
+
     // 3. Known agent
     let agent_spec = match crate::agents::find(agent) {
         Some(a) => a,
@@ -213,6 +218,18 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
         }
     };
 
+    // I13: watch the project BEFORE the container starts, so nothing the agent does
+    // in its first moments can slip past the watcher. Fail closed.
+    let shutdown = tokio_util::sync::CancellationToken::new();
+    let sig_token = shutdown.clone();
+    let guard = match crate::guard::start(&canonical_project, root_git_existed, shutdown.clone()) {
+        Ok(g) => g,
+        Err(e) => {
+            crate::ui::err(&format!("zevbox: cannot watch the project folder: {e}"));
+            return EXIT_ERROR;
+        }
+    };
+
     let mut cmd = tokio::process::Command::new(&config.container_binary);
     cmd.args(&run_args)
         .stdin(std::process::Stdio::piped())
@@ -245,20 +262,6 @@ pub async fn launch(paths: &Paths, agent: &str, project: &Path) -> u8 {
         tracing::warn!("failed to write instance record: {e}");
     }
 
-    let shutdown = tokio_util::sync::CancellationToken::new();
-    let sig_token = shutdown.clone();
-    // Fail closed: without the guard, a new .git in the project goes unnoticed.
-    let guard = match crate::guard::start(&canonical_project, root_git_existed, shutdown.clone()) {
-        Ok(g) => g,
-        Err(e) => {
-            crate::ui::err(&format!("zevbox: cannot watch the project folder: {e}"));
-            let _ = child.start_kill();
-            let _ = tokio::time::timeout(Duration::from_secs(3), child.wait()).await;
-            let _ = cli.stop_and_delete_verified(&container_name).await;
-            let _ = crate::instances::remove(paths, &id);
-            return EXIT_ERROR;
-        }
-    };
     let mut sigterm =
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).ok();
     let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()).ok();

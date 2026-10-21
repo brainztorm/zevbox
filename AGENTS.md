@@ -75,7 +75,7 @@ ways, responses routed by pending id · I5 `cwd` == project root, no extra dirs,
 I8 stop/delete one verified `zevbox-*` + label container, never `--all` ·
 I9 no message content/tokens in logs · I10 no network/build in `launch` ·
 I11 no unwrap/expect/panic in `src/` · I12 zevbox files never mounted ·
-I13 `.zed` masked, existing `.git` read-only in the ACP container, project guard stops the agent on a new `.git` (`guard.rs`).
+I13 `.zed` masked, existing `.git` read-only in the ACP container, project guard (started before the container) stops the agent on a new `.git`, `.zed` must not be a file or link (`guard.rs`).
 
 ## Common changes
 

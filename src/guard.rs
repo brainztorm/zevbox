@@ -30,6 +30,22 @@ pub fn is_guarded_path(project: &Path, root_git_existed: bool, path: &Path) -> b
     }
 }
 
+/// I13 precondition checked at launch. `<project>/.zed` is masked by a tmpfs: that only
+/// works, and only protects, when it is absent or a real folder. As a file the
+/// container cannot start (opaque error); as a link to a folder of the project the
+/// agent would write through it (EXP-01 follow-up, ARGON review 2.1). `None` = fine.
+pub fn project_files_problem(project: &Path) -> Option<String> {
+    let zed = project.join(".zed");
+    match std::fs::symlink_metadata(&zed) {
+        Ok(m) if !m.is_dir() => Some(format!(
+            "{} is a file or a link, so zevbox cannot mask it safely (I13). \
+             Fix: rename or remove it (a regular .zed folder is fine), then start a new thread.",
+            zed.display()
+        )),
+        _ => None,
+    }
+}
+
 /// Live watcher; dropping it stops the watch.
 pub struct Guard {
     _watcher: notify::RecommendedWatcher,
@@ -136,6 +152,25 @@ mod tests {
             hit.display()
         );
         Ok(())
+    }
+
+    #[test]
+    fn zed_must_be_absent_or_a_real_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        assert!(project_files_problem(p).is_none(), "absent");
+        std::fs::create_dir(p.join(".zed")).unwrap();
+        assert!(project_files_problem(p).is_none(), "real folder");
+        std::fs::remove_dir(p.join(".zed")).unwrap();
+        std::fs::write(p.join(".zed"), "x").unwrap();
+        assert!(project_files_problem(p).unwrap().contains("file or a link"));
+        std::fs::remove_file(p.join(".zed")).unwrap();
+        std::fs::create_dir(p.join("real")).unwrap();
+        std::os::unix::fs::symlink("real", p.join(".zed")).unwrap();
+        assert!(project_files_problem(p).is_some(), "link to a folder");
+        std::fs::remove_file(p.join(".zed")).unwrap();
+        std::os::unix::fs::symlink("nowhere", p.join(".zed")).unwrap();
+        assert!(project_files_problem(p).is_some(), "dangling link");
     }
 
     #[test]
