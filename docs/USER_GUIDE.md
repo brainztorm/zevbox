@@ -225,6 +225,7 @@ zevbox shell claude
 You should see the banner:
 ```text
 zevbox Linux shell — agent=claude project=~/code/zevbox release=claude-... (changes outside the project are discarded on exit)
+(.zed is masked and .git is read-only in this shell, as for the agent)
 ```
 
 In that Linux shell, run:

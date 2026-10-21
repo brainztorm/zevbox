@@ -60,6 +60,15 @@ pub async fn run(agent: super::AgentArg, project: Option<PathBuf>) -> anyhow::Re
         lock.release_id
     ));
 
+    // Same project-file protections as the agent's VM (I13): `.zed` masked, an existing
+    // `.git` read-only. Same precondition: `.zed` must not be a file or a link.
+    if let Some(problem) = crate::guard::project_files_problem(&target_project) {
+        crate::ui::err(&format!("zevbox: {problem}"));
+        return Ok(EXIT_PRECONDITION);
+    }
+    let git_exists = std::fs::symlink_metadata(target_project.join(".git")).is_ok();
+    crate::ui::out("(.zed is masked and .git is read-only in this shell, as for the agent)");
+
     crate::fsutil::ensure_private_dir(&paths.state_dir(agent.id()))?;
 
     let id8 = crate::container::new_instance_id();
@@ -80,7 +89,7 @@ pub async fn run(agent: super::AgentArg, project: Option<PathBuf>) -> anyhow::Re
         interactive: true,
     };
 
-    let args = crate::container::run_args(&spec);
+    let args = crate::container::launch_args(&spec, git_exists);
     let mut cmd = std::process::Command::new(&config.container_binary);
     cmd.args(&args);
     cmd.stdin(std::process::Stdio::inherit());
