@@ -153,7 +153,7 @@ Documentation in English: **[README.md](../../README.md)**.
 
 | Commande | Ce qu'elle fait |
 |---|---|
-| `zevbox setup` | Mise en place guidée et idempotente : écrit la configuration, construit les releases manquantes (`update`), propose `auth` pour chaque agent non authentifié (terminal uniquement), configure Zed, lance `doctor` et affiche un résumé par agent. |
+| `zevbox setup` | Mise en place guidée et idempotente : écrit la configuration, construit les releases manquantes (`update`), propose `auth` pour chaque agent non authentifié (terminal uniquement), configure Zed, lance `doctor` et affiche un résumé par agent. L'échec de construction d'un agent ne bloque pas l'autre ; le code de sortie est 1 si un agent n'a toujours pas de release à la fin. |
 | `zevbox init` | Crée les répertoires d'état (`~/.local/share/zevbox` ou Application Support) en mode `0700`, plus `config.json` et `tools.json`. |
 | `zevbox doctor [--json]` | Contrôle complet : `container` ≥ 1.5.0, runtime actif, arm64, releases présentes, espace des images zevbox (WARN quand d'anciennes images sont récupérables), droits `0700`. |
 | `zevbox zed install [--dry-run]` | Insère sans rien casser les entrées gérées `zevbox · …` dans `~/.config/zed/settings.json`, en préservant commentaires et mise en forme (édition CST). Sauvegarde automatique dans `backups/`. |
@@ -165,8 +165,8 @@ Documentation in English: **[README.md](../../README.md)**.
 | `zevbox clean [--images]` | Supprime les conteneurs orphelins vérifiés et les enregistrements obsolètes, purge les vieux journaux (>30) et sauvegardes (>20). Avec `--images`, supprime les images zevbox des releases ni courantes ni précédentes (jamais les images d'autres outils) et la VM de construction d'images, dont le disque ne rétrécit jamais. |
 | `zevbox shell <agent> [--project <chemin>]` | Bash interactif dans une VM jetable identique à celle de l'agent. Sans `--project`, le dossier courant doit être dans une zone autorisée (sinon code 3). |
 | `zevbox logs [ID] [--path]` | Affiche les 200 dernières lignes du journal de la session la plus récente, ou de l'ID donné. `--path` affiche le chemin du fichier. |
-| `zevbox update [--check] [--agent <agent>]` | Vérifie ou construit une nouvelle release depuis le registre ACP officiel, exécute le smoke test et la promeut. Après une construction, fait le même ménage d'images que `clean --images`. |
-| `zevbox rollback [--agent <agent>]` | Permute la release active (`current`) avec la précédente. |
+| `zevbox update [--check] [--agent <agent>]` | Vérifie ou construit une nouvelle release depuis le registre ACP officiel, exécute le smoke test et la promeut. Sort avec le code 1 si la mise à jour d'un agent a échoué (rien n'est alors changé pour cet agent). Après une construction, fait le même ménage d'images que `clean --images`. |
+| `zevbox rollback [--agent <agent>]` | Permute la release active (`current`) avec la précédente ; refuse, avec la commande à lancer, si l'image de la release précédente n'existe plus. |
 | `zevbox tools list` / `add <paquets…>` / `remove <paquets…>` | Gère les paquets Debian additionnels (`tools.json`) et reconstruit les images actives. |
 
 ---

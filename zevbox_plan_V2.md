@@ -405,7 +405,7 @@ Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manq
 
 | Commande | Effet |
 |---|---|
-| `zevbox setup` (conforme depuis R3, 2026-10-14 ; `--project` retiré le 2026-10-16) | Assistant idempotent : `init` → écrit `inventory-preexisting.json` s'il manque (noms des conteneurs non-zevbox) → `doctor` → `update` (les deux agents ; l'échec de l'un ne bloque pas l'autre) → `auth claude` → `auth antigravity` (chacune peut être passée en répondant `n`) → résumé final avec l'état de chaque agent et la prochaine action. |
+| `zevbox setup` (conforme depuis R3, 2026-10-14 ; `--project` retiré le 2026-10-16) | Assistant idempotent : `init` → écrit `inventory-preexisting.json` s'il manque (noms des conteneurs non-zevbox) → `doctor` → `update` (les deux agents ; l'échec de l'un ne bloque pas l'autre) → `auth claude` → `auth antigravity` (chacune peut être passée en répondant `n`) → résumé final ; **code 1 si un agent n'a toujours pas de release** (amendement 2026-10-21) avec l'état de chaque agent et la prochaine action. |
 | `zevbox init` | Crée `stateRoot` (0700) et ses sous-dossiers, `config.json` et `tools.json` s'ils manquent. Ne remplace jamais un fichier existant. Si le CLI `container` est introuvable, écrit `/opt/homebrew/bin/container` (et `doctor` le signale). |
 | `zevbox doctor [--json]` | Liste de contrôles `OK/WARN/FAIL` + action corrective pour chacun (§8.6). Sortie 1 si au moins un `FAIL`. |
 | ~~`zevbox project add PATH [--no-zed]` / `remove PATH` / `list`~~ | **Supprimées le 2026-10-16** (DECISIONS F1) : le projet est celui ouvert dans Zed, contrôlé par les zones I2. |
@@ -417,8 +417,8 @@ Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manq
 | `zevbox clean [--images]` | Supprime les orphelins vérifiés (I8), les enregistrements obsolètes, les journaux au-delà de 30 et les sauvegardes au-delà de 20. `--images` : supprime une par une les images `zevbox/*` qui ne sont ni `current` ni `previous` ni utilisées par une instance enregistrée, puis arrête et supprime la VM `container builder` (amendement 2026-10-16, DECISIONS G1 ; `update` fait de même après une construction ; `doctor` ajoute le contrôle `disk`). Ne touche jamais `state/`, `config.json` ni les projets. |
 | `zevbox shell <agent> [--project PATH]` | Shell `bash` interactif (`-it`) dans un conteneur jetable identique à celui de l'agent. `--project` par défaut = dossier courant s'il est autorisé, sinon erreur code 3 (amendement R3 : plus de repli sur le premier projet). Bannière : `zevbox Linux shell — agent=<a> project=<p> release=<r> (changes outside the project are discarded on exit)`. |
 | `zevbox logs [ID] [--path]` | Affiche les 200 dernières lignes du journal de l'instance (par défaut la plus récente) ; `--path` affiche seulement le chemin. |
-| `zevbox update [--check] [--agent A]` | `--check` : compare la release active aux registres et n'écrit rien. Sans `--check` : candidate → build → smoke test → promotion (§8.7). |
-| `zevbox rollback [--agent A]` | Échange `current` et `previous` (vérifie que l'image `previous` existe). |
+| `zevbox update [--check] [--agent A]` | `--check` : compare la release active aux registres et n'écrit rien. Sans `--check` : candidate → build → smoke test → promotion (§8.7). **Code 1 si la mise à jour d'au moins un agent échoue** (les autres agents sont quand même traités ; amendement 2026-10-21, revue ARGON 3.3). |
+| `zevbox rollback [--agent A]` | Échange `current` et `previous` ; **refuse (code 1) si l'image `previous` n'existe plus**, avec « Fix: run 'zevbox update --agent A' » (implémenté le 2026-10-21, revue ARGON 3.2). |
 | `zevbox tools list` / `tools add <paquet-apt>…` / `tools remove <paquet>…` | Modifie `tools.json` puis reconstruit les agents (candidate → tests → promotion). |
 
 `--agent` accepte `claude` ou `antigravity` ; sans option, la commande s'applique aux deux.

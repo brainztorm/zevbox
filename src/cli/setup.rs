@@ -25,10 +25,9 @@ pub async fn run() -> anyhow::Result<u8> {
         .any(|a| crate::release::active_lock(&paths, a.id).is_err());
     if missing_release {
         crate::ui::out("building agent releases (network, 1-3 min per agent)...");
-        let code = crate::cli::update::run_update(false, None).await?;
-        if code != EXIT_OK {
-            return Ok(code);
-        }
+        // §8.1: one agent failing to build does not block the other; the summary
+        // below and the exit code say what is missing.
+        let _ = crate::cli::update::run_update(false, None).await?;
     } else {
         crate::ui::out("releases: up to date");
     }
@@ -69,6 +68,15 @@ pub async fn run() -> anyhow::Result<u8> {
                 "not authenticated"
             }
         ));
+    }
+    let incomplete = crate::agents::AGENTS
+        .iter()
+        .any(|a| crate::release::active_lock(&paths, a.id).is_err());
+    if incomplete {
+        crate::ui::err(
+            "zevbox: setup incomplete: an agent has no release. Fix: run 'zevbox update' (network needed) and read the errors above.",
+        );
+        return Ok(EXIT_ERROR);
     }
     crate::ui::out("next: open a project in Zed, then choose a zevbox agent with '+'");
     Ok(EXIT_OK)
