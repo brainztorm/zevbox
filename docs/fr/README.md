@@ -212,7 +212,7 @@ affaiblis pour faire passer un test :
 - **I10 — Ni réseau ni build dans `launch`** : le lancement n'utilise que la release active.
 - **I11 — Pas de panic en production** : zéro `unwrap()`, `expect()`, `panic!()` dans `src/` (Clippy `deny`).
 - **I12 — zevbox hors de portée** : son binaire, sa configuration et ses releases ne sont jamais montés dans un conteneur.
-- **I13 — Fichiers du projet que le Mac exécuterait** : dans la VM, le dossier `.zed` du projet est masqué (les écritures de l'agent restent dans la mémoire de la VM) et un `.git` existant est en lecture seule. Pendant la session, zevbox surveille le projet et arrête l'agent si un `.git` apparaît ou change ailleurs. Motif : Zed lance tout seul des programmes indiqués dans `.zed/settings.json` et dans les réglages git ([EXP-01](../experiments/EXP-01-resultats.md)).
+- **I13 — Fichiers du projet que le Mac exécuterait** : dans la VM, le dossier `.zed` du projet est masqué (les écritures de l'agent restent dans la mémoire de la VM) et un `.git` existant est en lecture seule. La surveillance démarre avant la VM, et un `.zed` qui est un fichier ou un lien est refusé au lancement. Pendant la session, zevbox arrête l'agent si un `.git` apparaît ou change ailleurs. Motif : Zed lance tout seul des programmes indiqués dans `.zed/settings.json` et dans les réglages git ([EXP-01](../experiments/EXP-01-resultats.md)).
 
 ### Modèle de menace et limites connues
 
@@ -230,6 +230,7 @@ zevbox protège **votre Mac** de l'agent. Il ne protège **pas** le projet que v
 
 - **`zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init'`** — lancez `zevbox setup` dans un terminal.
 - **`<chemin> is not an allowed project: <raison>. Fix: open a folder inside your home folder …`** — le dossier ouvert dans Zed est hors des zones autorisées (I2), par exemple un dossier caché `~/.…` ou un dossier système. Déplacez le projet ou ouvrez un autre dossier.
+- **`<projet>/.zed is a file or a link, so zevbox cannot mask it safely (I13). Fix: …`** — renommez ou supprimez ce `.zed` (un dossier normal convient), puis ouvrez un nouveau thread.
 - **`zevbox: stopped the agent: it created or changed git metadata at <chemin>`** — l'agent a créé (ou modifié) un dépôt git dans le projet (I13). Vérifiez ce chemin et supprimez-le avant d'utiliser git ou de rouvrir le projet dans Zed.
 - **`no active Claude release. Fix: run 'zevbox update --agent claude'`** — l'image de l'agent n'a pas encore été construite.
 - **`Claude is not authenticated. Fix: run 'zevbox auth claude'`** — connectez-vous depuis un terminal.

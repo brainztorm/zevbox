@@ -318,6 +318,10 @@ sequenceDiagram
 - **Cause** : Le dossier ouvert dans Zed est hors des zones autorisées (I2) : dossier caché `~/.…`, `~/Library`, votre dossier personnel lui-même, dossier système…
 - **Solution** : Déplacez le projet dans votre dossier personnel (p. ex. `~/code/…`) ou sur un disque externe, ou ouvrez le bon dossier dans Zed.
 
+### Problème 2c : Zed affiche `<projet>/.zed is a file or a link, so zevbox cannot mask it safely`
+- **Cause** : le `.zed` du projet est un simple fichier ou un lien symbolique (I13).
+- **Solution** : renommez-le ou supprimez-le (un vrai dossier `.zed` convient), puis ouvrez un nouveau thread.
+
 ### Problème 2b : Zed affiche `zevbox: stopped the agent: it created or changed git metadata at <chemin>`
 - **Cause** : L'agent a créé (ou modifié) un dépôt git dans le projet. Les réglages git peuvent faire lancer des programmes à Zed ou à git sur votre Mac : zevbox a donc arrêté l'agent (I13).
 - **Solution** : Vérifiez ce chemin et supprimez-le avant d'utiliser git ou de rouvrir le projet dans Zed.
