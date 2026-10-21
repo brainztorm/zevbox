@@ -142,7 +142,7 @@ flowchart TD
 
 ## 4. Le Cœur de Sécurité : La Politique du Relais
 
-Le protocole ACP permet théoriquement à l'agent de demander à l'éditeur d'exécuter des actions sur la machine (par exemple `fs/readTextFile`, `terminal/create`).
+Le protocole ACP permet théoriquement à l'agent de demander à l'éditeur d'exécuter des actions sur la machine (par exemple `fs/read_text_file`, `terminal/create`).
 
 Dans `zevbox`, la politique de sécurité neutralise totalement cette surface d'attaque :
 
@@ -171,9 +171,9 @@ sequenceDiagram
     Agent->>Relay: session/new result
 
     Note over Zed,Agent: Tentative d'accès non autorisé
-    Agent-->>Relay: fs/readTextFile { path: "~/.ssh/id_rsa" }
+    Agent-->>Relay: fs/read_text_file { path: "~/.ssh/id_rsa" }
     Note over Relay: INTERCEPTION IMMÉDIATE (Invariant I3)
-    Relay-->>Agent: error { code: -32601, message: "Method not allowed by zevbox policy" }
+    Relay-->>Agent: error { code: -32601, message: "zevbox: 'fs/read_text_file' is blocked by zevbox strict mode (the agent runs in an isolated Linux VM)." }
     Note over Zed: Zed n'a jamais vu la requête
 ```
 
@@ -183,7 +183,7 @@ sequenceDiagram
 |---|---|---|---|
 | **Client → Agent** | `initialize` | **Réécrit** | Désactive toutes les capacités hôtes (`fs=false`, `terminal=false`). |
 | **Client → Agent** | `session/new` | **Réécrit** | Force le `cwd` sur la racine du projet, vide `mcpServers`. |
-| **Agent → Client** | `fs/readTextFile`, `fs/writeTextFile` | **Bloqué** (erreur -32601) | Interdit à l'agent de lire/écrire sur le Mac via Zed. |
+| **Agent → Client** | `fs/read_text_file`, `fs/write_text_file` | **Bloqué** (erreur -32601) | Interdit à l'agent de lire/écrire sur le Mac via Zed. |
 | **Agent → Client** | `terminal/create`, `terminal/exec` | **Bloqué** (erreur -32601) | Interdit à l'agent d'ouvrir un terminal sur le Mac. |
 | **Agent → Client** | `authenticate` (terminal) | **Bloqué** | Empêche d'exécuter du code d'authentification sur l'hôte. |
 | **Agent → Client** | `session/update`, `notifications` | **Transféré** | Permet à l'agent de renvoyer ses réponses et son streaming à Zed. |
@@ -277,7 +277,7 @@ zevbox exécute donc le flux OAuth 2.0 **PKCE d'Antigravity sur l'hôte** (`zevb
 
 ---
 
-## 8. Les 12 Invariants de Sécurité
+## 8. Les 13 Invariants de Sécurité
 
 Ces règles sont testées automatiquement à chaque compilation (`scripts/check-invariants.sh`) et ne peuvent jamais être relâchées :
 

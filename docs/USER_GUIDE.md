@@ -72,7 +72,7 @@ make install
 ```bash
 zevbox --help
 ```
-*You should see the list of the 16 commands.*
+*You should see the list of the 14 commands (plus `help`).*
 
 ---
 
@@ -104,9 +104,8 @@ flowchart LR
 2. `update` builds one image per agent (about 1–3 minutes each, network required) and promotes
    it as the active release. Run it again whenever `zevbox update --check` reports a new version.
 
-> **Note**: `zevbox setup` does not register any project unless you pass a path. Step 5 does
-> that. You can also do everything at once with `zevbox setup /path/to/project` (missing images
-> are built by `setup`).
+> **Note**: `zevbox setup` takes no argument and registers nothing: projects need no
+> registration (Step 5). It builds the missing images, offers sign-in and configures Zed.
 
 ---
 

@@ -77,7 +77,7 @@ make install
 ```bash
 zevbox --help
 ```
-*Vous devez voir s'afficher la liste des 16 commandes du projet.*
+*Vous devez voir s'afficher la liste des 14 commandes du projet (plus `help`).*
 
 ---
 
@@ -102,7 +102,7 @@ flowchart LR
 1. `setup` crée les répertoires d'état sécurisés (`0700`) et `config.json`, construit les releases manquantes (comme `update`), propose l'authentification de chaque agent non connecté (uniquement dans un terminal ; sinon elle affiche la commande `zevbox auth <agent>`), démarre le runtime Apple Container s'il est arrêté, exécute `doctor` et affiche un résumé par agent. Idempotente : relancée, elle ne reconstruit rien.
 2. `update` construit une image par agent (≈ 1 à 3 minutes chacune, réseau requis) et la promeut en release active. À relancer quand `zevbox update --check` signale une nouvelle version.
 
-> **Remarque** : `zevbox setup` n'enregistre aucun projet si vous ne lui passez pas de chemin. C'est l'étape 5 qui le fait. Vous pouvez aussi tout faire d'un coup avec `zevbox setup /chemin/du/projet` (les images sont construites par `setup` si elles manquent).
+> **Remarque** : `zevbox setup` ne prend aucun argument et n'enregistre rien : les projets n'ont pas besoin d'être déclarés (étape 5). Il construit les images manquantes, propose la connexion et configure Zed.
 
 ---
 
