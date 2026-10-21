@@ -161,7 +161,54 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
         checks.push(instances_check(&paths, &containers));
     }
 
+    // 10. ACP methods refused recently, read from the instance logs (plan §7.3, §8.6)
+    checks.push(blocked_methods_check(&paths));
+
     finish(json_output, &checks)
+}
+
+/// Counts `blocked method=<m> dir=<d>` lines (written by the relay, I4) per method.
+fn count_blocked_methods(logs: &[String]) -> std::collections::BTreeMap<String, usize> {
+    let mut counts = std::collections::BTreeMap::new();
+    for text in logs {
+        for line in text.lines() {
+            let Some(rest) = line.split("blocked method=").nth(1) else {
+                continue;
+            };
+            let method = rest.split_whitespace().next().unwrap_or("-");
+            *counts.entry(method.to_string()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn blocked_methods_check(paths: &Paths) -> (String, String, String) {
+    let logs: Vec<String> = std::fs::read_dir(paths.logs_dir())
+        .map(|dir| {
+            dir.filter_map(Result::ok)
+                .filter(|e| e.path().extension().is_some_and(|x| x == "log"))
+                .filter_map(|e| std::fs::read_to_string(e.path()).ok())
+                .collect()
+        })
+        .unwrap_or_default();
+    let counts = count_blocked_methods(&logs);
+    if counts.is_empty() {
+        return (
+            "blocked_methods".to_string(),
+            "OK".to_string(),
+            "no ACP method refused in the recent logs".to_string(),
+        );
+    }
+    let list = counts
+        .iter()
+        .map(|(m, n)| format!("{m} ({n}x)"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    (
+        "blocked_methods".to_string(),
+        "WARN".to_string(),
+        format!("refused in recent sessions: {list}. If one looks legitimate, audit it before allowing it (AGENTS.md, plan §7.3); see 'zevbox logs'"),
+    )
 }
 
 /// Pure text of the disk check: WARN when old release images can be reclaimed.
@@ -389,7 +436,20 @@ fn finish(json_output: bool, checks: &[(String, String, String)]) -> anyhow::Res
 
 #[cfg(test)]
 mod tests {
-    use super::{agent_check, disk_message};
+    use super::{agent_check, count_blocked_methods, disk_message};
+
+    #[test]
+    fn counts_blocked_methods_from_log_lines() {
+        let log = "2026-10-21T08:00:00Z  INFO launch agent=claude\n\
+                   2026-10-21T08:00:01Z  INFO blocked method=fs/read_text_file dir=agent_to_client\n\
+                   2026-10-21T08:00:02Z  INFO blocked method=fs/read_text_file dir=agent_to_client\n\
+                   2026-10-21T08:00:03Z  INFO blocked method=terminal/create dir=agent_to_client (ignored: x)\n";
+        let counts = count_blocked_methods(&[log.to_string()]);
+        assert_eq!(counts.get("fs/read_text_file"), Some(&2));
+        assert_eq!(counts.get("terminal/create"), Some(&1));
+        assert_eq!(counts.len(), 2);
+        assert!(count_blocked_methods(&["nothing here".to_string()]).is_empty());
+    }
 
     #[test]
     fn agent_line_priorities() {
