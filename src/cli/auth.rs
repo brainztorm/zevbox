@@ -34,15 +34,8 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
         }
     };
 
-    let marker_path = paths.state_dir(agent.id()).join(&lock.auth_marker);
-
     if status {
-        let authenticated = if agent.id() == "antigravity" {
-            has_refresh_token(&marker_path)
-        } else {
-            marker_path.exists()
-        };
-        if authenticated {
+        if is_authenticated(&paths, agent.id(), &lock.auth_marker) {
             crate::ui::out("authenticated");
         } else {
             crate::ui::out("not authenticated");
@@ -275,7 +268,7 @@ async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {
     let start = std::time::Instant::now();
     let timeout = std::time::Duration::from_secs(300);
 
-    use std::io::{Read, Write};
+    use std::io::Write;
     // Browsers also ask for /favicon.ico and the like: answer 404 and keep
     // waiting for the real callback (`GET /?…`).
     let (mut stream, req) = loop {
@@ -283,9 +276,7 @@ async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {
             Ok((mut stream, _)) => {
                 stream.set_nonblocking(false)?;
                 stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
-                let mut buf = [0u8; 4096];
-                let n = stream.read(&mut buf).unwrap_or(0);
-                let req = String::from_utf8_lossy(&buf[..n]).into_owned();
+                let req = read_request_head(&mut stream);
                 if is_callback_request(&req) {
                     break (stream, req);
                 }
@@ -318,7 +309,7 @@ async fn auth_antigravity(paths: &Paths) -> anyhow::Result<u8> {
         }
     };
 
-    let response = b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n<!DOCTYPE html><html><body style=\"font-family: sans-serif; text-align: center; padding-top: 50px;\"><h2>Authentification Google r&eacute;ussie !</h2><p>Vous pouvez fermer cet onglet et retourner dans votre terminal.</p></body></html>";
+    let response = b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n<!DOCTYPE html><html><body style=\"font-family: sans-serif; text-align: center; padding-top: 50px;\"><h2>Google authentication successful!</h2><p>You can close this tab and return to your terminal.</p></body></html>";
     let _ = stream.write_all(response);
     let _ = stream.flush();
 
@@ -435,6 +426,39 @@ fn callback_is_valid(req: &str, expected_state: &str) -> Result<String, String> 
     extract_query_param(req, "code").ok_or_else(|| {
         extract_query_param(req, "error").unwrap_or_else(|| "missing code parameter".to_string())
     })
+}
+
+/// Reads the HTTP request head from the browser's connection: loops until the first
+/// line is complete (a browser may write it in several segments or pre-connect first),
+/// capped at 4096 bytes; the 5 s read timeout set on the stream bounds the wait.
+fn read_request_head(stream: &mut std::net::TcpStream) -> String {
+    use std::io::Read;
+    let mut buf = [0u8; 4096];
+    let mut len = 0;
+    while len < buf.len() {
+        match stream.read(&mut buf[len..]) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => {
+                len += n;
+                if buf[..len].contains(&b'\n') {
+                    break;
+                }
+            }
+        }
+    }
+    String::from_utf8_lossy(&buf[..len]).into_owned()
+}
+
+/// The one definition of « authenticated », shared by `auth --status`, `setup` and
+/// `doctor`. Claude: the credentials file exists. Antigravity: `acp_token.json`
+/// holds a non-empty `refresh_token` (DECISIONS R5).
+pub fn is_authenticated(paths: &Paths, agent: &str, auth_marker: &str) -> bool {
+    let marker = paths.state_dir(agent).join(auth_marker);
+    if agent == "antigravity" {
+        has_refresh_token(&marker)
+    } else {
+        marker.exists()
+    }
 }
 
 /// `acp_token.json` counts as authenticated only with a non-empty `refresh_token`.
@@ -571,6 +595,31 @@ mod tests {
     #[test]
     fn only_get_root_query_is_a_callback() {
         assert!(is_callback_request("GET /?code=c&state=s HTTP/1.1\r\n"));
+    }
+
+    #[test]
+    fn request_head_survives_a_fragmented_write() {
+        use std::io::Write;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let writer = std::thread::spawn(move || {
+            let mut c = std::net::TcpStream::connect(addr).unwrap();
+            c.write_all(b"GET /?code=abc&sta").unwrap();
+            c.flush().unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            c.write_all(b"te=xyz HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
+        });
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .unwrap();
+        let head = read_request_head(&mut stream);
+        writer.join().unwrap();
+        assert!(
+            head.starts_with("GET /?code=abc&state=xyz HTTP/1.1\r\n"),
+            "{head}"
+        );
+        assert!(is_callback_request(&head));
         assert!(!is_callback_request("GET /favicon.ico HTTP/1.1\r\n"));
         assert!(!is_callback_request("POST /?code=c HTTP/1.1\r\n"));
         assert!(!is_callback_request(""));

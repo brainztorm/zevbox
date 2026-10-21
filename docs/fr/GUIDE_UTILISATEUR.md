@@ -172,16 +172,19 @@ zevbox doctor
 ```
 
 **Résultat attendu :**
-Tous les voyants doivent être à `[OK  ]` :
+Tous les voyants doivent être à `[OK  ]`. Une ligne `[WARN]` se termine toujours par la commande qui la corrige (par exemple `zevbox auth claude`, `zevbox zed install`, `zevbox clean --images`) ; un `[FAIL]` signifie que le lancement d'un agent échouerait (par exemple son image est absente : `zevbox update --agent <agent>`) :
 ```text
 [OK  ] config               — config.json is valid
 [OK  ] container_binary     — Apple Container 1.5.0 (arm64)
 [OK  ] system_status        — Apple Container runtime is running
 [OK  ] architecture         — host architecture is arm64
-[OK  ] project:...          — project directory exists
 [OK  ] agent:claude         — release claude-... (authenticated)
 [OK  ] agent:antigravity    — release antigravity-... (authenticated)
-[OK  ] permissions          — stateRoot is 0700
+[OK  ] disk                 — 4 zevbox image(s), none from old releases; all container images use … GB
+[OK  ] permissions          — stateRoot and state/* are 0700
+[OK  ] installed_binary     — /Users/<user>/.local/bin/zevbox exists
+[OK  ] zed_entries          — Zed entries match the agents with an active release
+[OK  ] instances            — … active instance(s), no orphan
 ```
 > Si tous les indicateurs sont à `[OK  ]`, votre installation est saine.
 

@@ -77,9 +77,6 @@ impl Paths {
     pub fn active_file(&self) -> PathBuf {
         self.releases_dir().join("active.json")
     }
-    pub fn inventory_file(&self) -> PathBuf {
-        self.state_root.join("inventory-preexisting.json")
-    }
     /// Directories created by `zevbox init`, all with mode 0700.
     pub fn all_dirs(&self) -> Vec<PathBuf> {
         vec![

@@ -86,7 +86,7 @@ pub async fn run() -> anyhow::Result<u8> {
 fn agent_state(paths: &Paths, agent: &str) -> (String, bool) {
     match crate::release::active_lock(paths, agent) {
         Ok(lock) => {
-            let authenticated = paths.state_dir(agent).join(&lock.auth_marker).exists();
+            let authenticated = crate::cli::auth::is_authenticated(paths, agent, &lock.auth_marker);
             (lock.release_id, authenticated)
         }
         Err(_) => ("none".to_string(), false),

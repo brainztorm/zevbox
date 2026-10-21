@@ -38,11 +38,27 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
     let cli = crate::container::ContainerCli::new(config.container_binary.clone());
     match cli.system_status().await {
         Ok(sys) => {
-            checks.push((
-                "container_binary".to_string(),
-                "OK".to_string(),
-                format!("Apple Container {} ({})", sys.version, sys.architecture),
-            ));
+            let (status, message) = match crate::container::version_at_least(
+                &sys.version,
+                crate::container::MIN_CONTAINER_VERSION,
+            ) {
+                Some(true) => (
+                    "OK",
+                    format!("Apple Container {} ({})", sys.version, sys.architecture),
+                ),
+                Some(false) => (
+                    "FAIL",
+                    format!(
+                        "Apple Container {} is older than the minimum 1.5.0. Fix: upgrade it (brew upgrade container)",
+                        sys.version
+                    ),
+                ),
+                None => (
+                    "WARN",
+                    format!("cannot read the Apple Container version ('{}')", sys.version),
+                ),
+            };
+            checks.push(("container_binary".to_string(), status.to_string(), message));
 
             // 2. system status running
             if sys.running {
@@ -83,48 +99,43 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
         }
     }
 
-    // 5. Active agents status
+    // 5. Active agents: release, image present, authentication (plan §8.6 point 5)
+    let images = cli.image_list().await.ok(); // None while the runtime is down
     let active = crate::release::load_active(&paths).unwrap_or_default();
     for spec in crate::agents::AGENTS {
-        if let Some(entry) = active.get(spec.id) {
-            match crate::release::load_lock(&paths, &entry.current) {
-                Ok(lock) => {
-                    let marker_path = paths.state_dir(spec.id).join(&lock.auth_marker);
-                    let auth_status = if marker_path.exists() {
-                        "authenticated"
-                    } else {
-                        "not authenticated"
-                    };
-                    let missing_model = spec.id == "claude" && !has_default_model(&paths);
-                    if missing_model {
-                        checks.push((
-                            format!("agent:{}", spec.id),
-                            "WARN".to_string(),
-                            "no default model in state/claude/.claude/settings.json (Auto mode falls back to Accept edits in Zed). Fix: run 'zevbox auth claude' or write {\"model\": \"fable\"} in that file".to_string(),
-                        ));
-                    } else {
-                        checks.push((
-                            format!("agent:{}", spec.id),
-                            "OK".to_string(),
-                            format!("release {} ({auth_status})", entry.current),
-                        ));
-                    }
-                }
-                Err(e) => {
-                    checks.push((
-                        format!("agent:{}", spec.id),
-                        "FAIL".to_string(),
-                        format!("corrupt lock for {}: {e}", entry.current),
-                    ));
-                }
-            }
-        } else {
+        let name = format!("agent:{}", spec.id);
+        let Some(entry) = active.get(spec.id) else {
             checks.push((
-                format!("agent:{}", spec.id),
+                name,
                 "WARN".to_string(),
                 "no active release installed".to_string(),
             ));
-        }
+            continue;
+        };
+        let lock = match crate::release::load_lock(&paths, &entry.current) {
+            Ok(l) => l,
+            Err(e) => {
+                checks.push((
+                    name,
+                    "FAIL".to_string(),
+                    format!("corrupt lock for {}: {e}", entry.current),
+                ));
+                continue;
+            }
+        };
+        let image_present = images.as_ref().map(|list| {
+            list.iter()
+                .any(|i| crate::container::image_matches(&i.reference, &lock.image))
+        });
+        let authenticated = crate::cli::auth::is_authenticated(&paths, spec.id, &lock.auth_marker);
+        let (status, message) = agent_check(
+            spec.id,
+            &entry.current,
+            image_present,
+            authenticated,
+            spec.id == "claude" && !has_default_model(&paths),
+        );
+        checks.push((name, status.to_string(), message));
     }
 
     // 6. Disk used by zevbox images (DECISIONS G1)
@@ -139,32 +150,15 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
         checks.push(("disk".to_string(), status.to_string(), message));
     }
 
-    // 7. Permissions 0700 on stateRoot
-    match std::fs::metadata(&paths.state_root) {
-        Ok(m) => {
-            use std::os::unix::fs::PermissionsExt;
-            let perm = m.permissions().mode() & 0o777;
-            if perm == 0o700 {
-                checks.push((
-                    "permissions".to_string(),
-                    "OK".to_string(),
-                    "stateRoot is 0700".to_string(),
-                ));
-            } else {
-                checks.push((
-                    "permissions".to_string(),
-                    "WARN".to_string(),
-                    format!("stateRoot mode is 0o{perm:o}, expected 0700"),
-                ));
-            }
-        }
-        Err(e) => {
-            checks.push((
-                "permissions".to_string(),
-                "FAIL".to_string(),
-                format!("cannot check stateRoot: {e}"),
-            ));
-        }
+    // 7. Permissions 0700 on stateRoot and state/<agent> (plan §8.6 point 6)
+    checks.push(permissions_check(&paths));
+
+    // 8. Installed binary and Zed entries (plan §8.6 points 7 and 8)
+    checks.extend(zed_checks(&paths));
+
+    // 9. Orphan or unregistered instances (plan §8.6 point 9)
+    if let Ok(containers) = cli.list_all().await {
+        checks.push(instances_check(&paths, &containers));
     }
 
     finish(json_output, &checks)
@@ -186,6 +180,170 @@ fn disk_message(zevbox: usize, stale: usize, images_bytes: Option<u64>) -> (&'st
             format!(
                 "{zevbox} zevbox image(s), {stale} from old releases{total}. Fix: run 'zevbox clean --images'"
             ),
+        )
+    }
+}
+
+/// Pure text of one agent line. `image_present` is `None` when the runtime could not be
+/// asked. FAIL when launch would fail (no image); WARN when the user must act (sign in,
+/// choose a default model).
+fn agent_check(
+    agent: &str,
+    release: &str,
+    image_present: Option<bool>,
+    authenticated: bool,
+    missing_model: bool,
+) -> (&'static str, String) {
+    let auth = if authenticated {
+        "authenticated"
+    } else {
+        "not authenticated"
+    };
+    let head = format!("release {release} ({auth})");
+    if image_present == Some(false) {
+        return (
+            "FAIL",
+            format!("{head}, but its image is missing. Fix: run 'zevbox update --agent {agent}'"),
+        );
+    }
+    if !authenticated {
+        return (
+            "WARN",
+            format!("{head}. Fix: run 'zevbox auth {agent}' in a macOS terminal"),
+        );
+    }
+    if missing_model {
+        return (
+            "WARN",
+            format!("{head}; no default model in state/claude/.claude/settings.json (Auto mode falls back to Accept edits in Zed). Fix: run 'zevbox auth claude' or write {{\"model\": \"fable\"}} in that file"),
+        );
+    }
+    ("OK", head)
+}
+
+fn permissions_check(paths: &Paths) -> (String, String, String) {
+    use std::os::unix::fs::PermissionsExt;
+    let mut wrong = Vec::new();
+    let mut dirs = vec![paths.state_root.clone()];
+    dirs.extend(crate::agents::AGENTS.iter().map(|a| paths.state_dir(a.id)));
+    for dir in dirs {
+        match std::fs::metadata(&dir) {
+            Ok(m) => {
+                let mode = m.permissions().mode() & 0o777;
+                if mode != 0o700 {
+                    wrong.push(format!("{} is 0o{mode:o}", dir.display()));
+                }
+            }
+            Err(e) => wrong.push(format!("{}: {e}", dir.display())),
+        }
+    }
+    if wrong.is_empty() {
+        (
+            "permissions".to_string(),
+            "OK".to_string(),
+            "stateRoot and state/* are 0700".to_string(),
+        )
+    } else {
+        (
+            "permissions".to_string(),
+            "WARN".to_string(),
+            format!(
+                "{}, expected 0700. Fix: run 'zevbox init' or chmod 700",
+                wrong.join("; ")
+            ),
+        )
+    }
+}
+
+/// Installed binary exists, and the managed Zed entries are in sync with the agents
+/// that have an active release (amendment 2026-10-14: no per-project entries).
+fn zed_checks(paths: &Paths) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
+    let Ok(binary) = crate::paths::installed_binary() else {
+        return out;
+    };
+    if binary.exists() {
+        out.push((
+            "installed_binary".to_string(),
+            "OK".to_string(),
+            format!("{} exists", binary.display()),
+        ));
+    } else {
+        out.push((
+            "installed_binary".to_string(),
+            "WARN".to_string(),
+            format!(
+                "{} is missing. Fix: run 'make install' in the zevbox source folder",
+                binary.display()
+            ),
+        ));
+    }
+    let Ok(settings) = crate::paths::zed_settings_file() else {
+        return out;
+    };
+    let Ok(original) = std::fs::read_to_string(&settings) else {
+        out.push((
+            "zed_entries".to_string(),
+            "WARN".to_string(),
+            format!(
+                "{} not found. Fix: run 'zevbox zed install' (once Zed has created its settings)",
+                settings.display()
+            ),
+        ));
+        return out;
+    };
+    let active: Vec<_> = crate::agents::AGENTS
+        .iter()
+        .filter(|a| crate::release::active_lock(paths, a.id).is_ok())
+        .copied()
+        .collect();
+    let entries = crate::zed_settings::entries_for(&active, &binary.to_string_lossy());
+    match crate::zed_settings::apply_entries(&original, &entries) {
+        Ok(updated) if updated == original => out.push((
+            "zed_entries".to_string(),
+            "OK".to_string(),
+            "Zed entries match the agents with an active release".to_string(),
+        )),
+        Ok(_) => out.push((
+            "zed_entries".to_string(),
+            "WARN".to_string(),
+            "Zed entries are missing or stale. Fix: run 'zevbox zed install'".to_string(),
+        )),
+        Err(e) => out.push((
+            "zed_entries".to_string(),
+            "WARN".to_string(),
+            format!("cannot read Zed settings: {e}"),
+        )),
+    }
+    out
+}
+
+fn instances_check(
+    paths: &Paths,
+    containers: &[crate::container::ContainerInfo],
+) -> (String, String, String) {
+    let records = crate::instances::list(paths).unwrap_or_default();
+    let orphans = records
+        .iter()
+        .filter(|r| crate::instances::is_orphan(r))
+        .count();
+    let unregistered = containers
+        .iter()
+        .filter(|c| {
+            crate::container::may_target(c) && !records.iter().any(|r| r.container_name == c.name)
+        })
+        .count();
+    if orphans == 0 && unregistered == 0 {
+        (
+            "instances".to_string(),
+            "OK".to_string(),
+            format!("{} active instance(s), no orphan", records.len()),
+        )
+    } else {
+        (
+            "instances".to_string(),
+            "WARN".to_string(),
+            format!("{orphans} orphan record(s), {unregistered} unregistered container(s). Fix: run 'zevbox clean'"),
         )
     }
 }
@@ -231,7 +389,33 @@ fn finish(json_output: bool, checks: &[(String, String, String)]) -> anyhow::Res
 
 #[cfg(test)]
 mod tests {
-    use super::disk_message;
+    use super::{agent_check, disk_message};
+
+    #[test]
+    fn agent_line_priorities() {
+        // Missing image: launch would fail → FAIL, even if signed in.
+        assert_eq!(
+            agent_check("claude", "r1", Some(false), true, false).0,
+            "FAIL"
+        );
+        // Not signed in → WARN with the fix, and the release is still shown.
+        let (s, m) = agent_check("antigravity", "r2", Some(true), false, false);
+        assert_eq!(s, "WARN");
+        assert!(
+            m.contains("release r2 (not authenticated)") && m.contains("zevbox auth antigravity"),
+            "{m}"
+        );
+        // Missing model keeps release and auth state in the message.
+        let (s, m) = agent_check("claude", "r3", Some(true), true, true);
+        assert_eq!(s, "WARN");
+        assert!(
+            m.contains("release r3 (authenticated)") && m.contains("no default model"),
+            "{m}"
+        );
+        // Runtime down (image unknown) does not fail the agent.
+        assert_eq!(agent_check("claude", "r4", None, true, false).0, "OK");
+        assert_eq!(agent_check("claude", "r5", Some(true), true, false).0, "OK");
+    }
 
     #[test]
     fn disk_message_warns_only_with_old_images() {
