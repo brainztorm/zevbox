@@ -42,7 +42,23 @@ pub async fn run(images: bool) -> anyhow::Result<u8> {
         for reference in crate::release::prune_images(&paths, &cli).await {
             crate::ui::out(&format!("removed old image {reference}"));
         }
+        prune_release_files(&paths);
     }
 
     Ok(EXIT_OK)
+}
+
+/// Old release folders and build archives (DECISIONS R4), with a line per result.
+/// Also used by `update` after every run.
+pub fn prune_release_files(paths: &Paths) {
+    let (deleted, freed) = crate::release::prune_release_dirs(paths);
+    for name in deleted {
+        crate::ui::out(&format!("removed old release folder {name}"));
+    }
+    if freed > 0 {
+        crate::ui::out(&format!(
+            "freed {:.0} MB of build archives",
+            freed as f64 / 1e6
+        ));
+    }
 }

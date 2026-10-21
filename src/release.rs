@@ -300,6 +300,79 @@ pub async fn prune_images(paths: &Paths, cli: &crate::container::ContainerCli) -
     deleted
 }
 
+/// Release folders that must stay: `current` and `previous` of every agent, and the
+/// release of every recorded instance (same rule as [`images_to_keep`]).
+pub fn releases_to_keep(paths: &Paths) -> Vec<String> {
+    let mut keep = Vec::new();
+    for (_, entry) in load_active(paths).unwrap_or_default() {
+        keep.push(entry.current);
+        keep.extend(entry.previous);
+    }
+    for record in crate::instances::list(paths).unwrap_or_default() {
+        keep.push(record.release);
+    }
+    keep
+}
+
+/// Pure: folder names of `existing` that are not in `keep`.
+pub fn stale_release_dirs(existing: &[String], keep: &[String]) -> Vec<String> {
+    existing
+        .iter()
+        .filter(|name| !keep.contains(name))
+        .cloned()
+        .collect()
+}
+
+/// Antigravity's build context holds the vendor archive (~300 MB). It is only needed
+/// to build: the URL and SHA-256 stay in `lock.json`. Returns the bytes freed.
+pub fn drop_build_archive(release_dir: &Path) -> u64 {
+    let archive = release_dir.join("context").join("agy.zip");
+    let size = std::fs::symlink_metadata(&archive)
+        .map(|m| m.len())
+        .unwrap_or(0);
+    match std::fs::remove_file(&archive) {
+        Ok(()) => size,
+        Err(_) => 0,
+    }
+}
+
+/// Disk cleanup of `releases/` (DECISIONS R4, extending G1): drops the build archive
+/// of every release, then deletes the folders of releases that are neither kept nor
+/// unfinished (no `lock.json`: a failed build keeps its `build.log` for diagnosis).
+/// Only real folders directly inside `releases/` are touched, never links.
+/// Returns (deleted folder names, bytes freed by archives).
+pub fn prune_release_dirs(paths: &Paths) -> (Vec<String>, u64) {
+    let root = paths.releases_dir();
+    let Ok(read) = std::fs::read_dir(&root) else {
+        return (Vec::new(), 0);
+    };
+    let mut names = Vec::new();
+    for entry in read.filter_map(Result::ok) {
+        let is_real_dir = entry
+            .file_type()
+            .map(|t| t.is_dir() && !t.is_symlink())
+            .unwrap_or(false);
+        if is_real_dir {
+            if let Some(name) = entry.file_name().to_str() {
+                names.push(name.to_string());
+            }
+        }
+    }
+    let mut freed = 0;
+    for name in &names {
+        freed += drop_build_archive(&root.join(name));
+    }
+    let keep = releases_to_keep(paths);
+    let mut deleted = Vec::new();
+    for name in stale_release_dirs(&names, &keep) {
+        let dir = root.join(&name);
+        if dir.join("lock.json").exists() && std::fs::remove_dir_all(&dir).is_ok() {
+            deleted.push(name);
+        }
+    }
+    (deleted, freed)
+}
+
 /// Pure: new `current`, old current becomes `previous`.
 pub fn promote(active: &mut ActiveReleases, agent: &str, release_id: &str) {
     let previous = active.get(agent).map(|e| e.current.clone());
@@ -562,4 +635,55 @@ pub fn run_smoke_test(lock: &ReleaseLock, container_bin: &Path) -> Result<SmokeT
         at: chrono::Utc::now().to_rfc3339(),
         details: "uname, packages and release-id verified".to_string(),
     })
+}
+
+#[cfg(test)]
+mod release_dirs_tests {
+    use super::*;
+
+    fn names(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn stale_dirs_are_those_not_kept() {
+        let existing = names(&["a-1", "a-2", "a-3", "c-1"]);
+        let keep = names(&["a-3", "a-2", "c-1"]);
+        assert_eq!(stale_release_dirs(&existing, &keep), names(&["a-1"]));
+    }
+
+    #[test]
+    fn prune_drops_archives_everywhere_and_old_finished_releases_only() {
+        let tmp = tempfile::tempdir().unwrap();
+        let paths = Paths::new(tmp.path());
+        let rel = paths.releases_dir();
+        let mk = |id: &str, lock: bool| {
+            let dir = rel.join(id);
+            std::fs::create_dir_all(dir.join("context")).unwrap();
+            std::fs::write(dir.join("context/agy.zip"), vec![0u8; 1000]).unwrap();
+            std::fs::write(dir.join("context/Containerfile"), "FROM x").unwrap();
+            if lock {
+                std::fs::write(dir.join("lock.json"), "{}").unwrap();
+            }
+        };
+        mk("antigravity-old", true);
+        mk("antigravity-prev", true);
+        mk("antigravity-cur", true);
+        mk("antigravity-failed", false);
+        std::fs::write(
+            paths.active_file(),
+            r#"{"antigravity":{"current":"antigravity-cur","previous":"antigravity-prev"}}"#,
+        )
+        .unwrap();
+        let (deleted, freed) = prune_release_dirs(&paths);
+        assert_eq!(deleted, names(&["antigravity-old"]));
+        assert_eq!(freed, 4000, "all four archives dropped before deletion");
+        assert!(!rel.join("antigravity-old").exists());
+        // Kept and unfinished releases stay, minus their archive.
+        for id in ["antigravity-prev", "antigravity-cur", "antigravity-failed"] {
+            assert!(rel.join(id).join("context/Containerfile").exists(), "{id}");
+            assert!(!rel.join(id).join("context/agy.zip").exists(), "{id}");
+        }
+        assert!(paths.active_file().exists(), "active.json untouched");
+    }
 }
