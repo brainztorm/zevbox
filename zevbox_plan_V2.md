@@ -171,7 +171,7 @@ stateRoot/
 ├── backups/zed-settings-<horodatage>-<sha8>.json   # garder les 20 plus récents
 ├── releases/<release-id>/      # lock.json, contexte de build, résultat des tests
 ├── releases/active.json        # {"claude": {"current": "<id>", "previous": "<id>|null"}, "antigravity": {...}}
-└── inventory-preexisting.json  # conteneurs présents avant zevbox (écrit par `setup` à la 1re exécution) — pour vérifier qu'ils restent intacts
+└── ~~inventory-preexisting.json~~  # supprimé le 2026-10-21 (décision 👤 R5) : jamais écrit ni lu
 ```
 
 Binaire installé : `~/.local/bin/zevbox` (copié par `make install`, hors de tout montage). Zed pointe sur ce chemin absolu, **pas** sur `target/release/` (un `cargo build` pendant une session remplacerait le binaire en cours d'utilisation).
@@ -405,11 +405,11 @@ Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manq
 
 | Commande | Effet |
 |---|---|
-| `zevbox setup` (conforme depuis R3, 2026-10-14 ; `--project` retiré le 2026-10-16) | Assistant idempotent : `init` → écrit `inventory-preexisting.json` s'il manque (noms des conteneurs non-zevbox) → `doctor` → `update` (les deux agents ; l'échec de l'un ne bloque pas l'autre) → `auth claude` → `auth antigravity` (chacune peut être passée en répondant `n`) → résumé final ; **code 1 si un agent n'a toujours pas de release** (amendement 2026-10-21) avec l'état de chaque agent et la prochaine action. |
+| `zevbox setup` (conforme depuis R3, 2026-10-14 ; `--project` retiré le 2026-10-16) | Assistant idempotent : `init` → `doctor` → `update` (les deux agents ; l'échec de l'un ne bloque pas l'autre) → `auth claude` → `auth antigravity` (chacune peut être passée en répondant `n`) → résumé final ; **code 1 si un agent n'a toujours pas de release** (amendement 2026-10-21) avec l'état de chaque agent et la prochaine action. |
 | `zevbox init` | Crée `stateRoot` (0700) et ses sous-dossiers, `config.json` et `tools.json` s'ils manquent. Ne remplace jamais un fichier existant. Si le CLI `container` est introuvable, écrit `/opt/homebrew/bin/container` (et `doctor` le signale). |
 | `zevbox doctor [--json]` | Liste de contrôles `OK/WARN/FAIL` + action corrective pour chacun (§8.6). Sortie 1 si au moins un `FAIL`. |
 | ~~`zevbox project add PATH [--no-zed]` / `remove PATH` / `list`~~ | **Supprimées le 2026-10-16** (DECISIONS F1) : le projet est celui ouvert dans Zed, contrôlé par les zones I2. |
-| `zevbox zed install [--settings PATH] [--dry-run]` / `zed uninstall` | Synchronise les entrées `zevbox · …` des réglages Zed : ~~`config.projects` ×~~ une par agent ayant une release active (§8.9, amendement 2026-10-14). `--dry-run` affiche le texte avant/après des entrées concernées. |
+| `zevbox zed install [--settings PATH] [--dry-run]` / `zed uninstall` (affichent « already up to date » ou « updated (backup: …) » ; `--dry-run` liste les entrées qui seraient écrites — implémenté le 2026-10-21, revue ARGON 3.6) | Synchronise les entrées `zevbox · …` des réglages Zed : ~~`config.projects` ×~~ une par agent ayant une release active (§8.9, amendement 2026-10-14). `--dry-run` affiche le texte avant/après des entrées concernées. |
 | `zevbox auth <agent> [--status]` | Session interactive d'authentification dans le conteneur (§8.2). *Amendement 2026-10-14 (R2) : hors `--status`, fait d'abord `init` si `config.json` manque, démarre le runtime s'il est arrêté, et `update --agent <a>` si la release ou son image manque ; idempotent.* `--status` : `authenticated`/`not authenticated`/`unknown`. |
 | `zevbox launch <agent> [--project PATH]` | Appelé par Zed. Ne jamais l'appeler à la main sauf pour tester. Sans `--project` (amendement 2026-10-14) : projet = répertoire de travail, que Zed fixe au premier worktree du projet ; toujours contrôlé par I2. |
 | `zevbox status [--json]` | **Lecture seule.** Tableau : id, agent, projet, release, état (`running`/`orphan`/`unregistered`). Croise les enregistrements et `container list --all --format json`. `--json` : tableau d'objets `{id, agent, project, release, containerName, state}` (`id`, `project`, `release` à `null` pour `unregistered`) ; `[]` si rien. |
@@ -490,17 +490,17 @@ VÉRIFIER à l'étape 16 (👤) comment Zed affiche ce message, et le consigner 
 
 ### 8.6 `doctor` — contrôles
 
-1. `containerBinary` exécutable ; version ≥ 1.5.0.
+1. `containerBinary` exécutable ; version ≥ 1.5.0 (`FAIL` sinon ; `container::version_at_least`).
 2. `container system status` = running (sinon `WARN` + `container system start`).
 3. Architecture `arm64`.
-4. `config.json` valide ; chaque projet existe et est canonique.
-5. Pour chaque agent : release active, image présente, témoin d'auth (`--status`).
+4. `config.json` valide. ~~Chaque projet existe et est canonique~~ (supprimé le 2026-10-16 avec la liste des projets, F1).
+5. Pour chaque agent : release active, image présente (`FAIL` + `zevbox update --agent A` sinon), témoin d'auth identique à `auth --status` (`auth::is_authenticated`, jeton de rafraîchissement pour Antigravity ; `WARN` + `zevbox auth A` sinon) ; la release et l'état d'auth restent affichés même avec un autre avertissement (implémenté le 2026-10-21, revue ARGON 3.4/3.5).
 6. Droits `0700` sur `stateRoot` et `state/*`.
 7. `~/.local/bin/zevbox` existe ; c'est le binaire référencé par les entrées Zed.
 8. Les entrées Zed `zevbox · …` correspondent ~~à `config.projects`~~ aux agents ayant une release active (amendement 2026-10-14 ; sinon `WARN` → `zevbox zed install`).
 9. Instances orphelines ou non enregistrées.
 10. Méthodes ACP refusées récemment (lues dans les journaux).
-11. Les conteneurs de `inventory-preexisting.json` existent toujours (sinon `WARN`, information seulement).
+11. ~~Les conteneurs de `inventory-preexisting.json` existent toujours~~ — **supprimé le 2026-10-21** (décision 👤 R5) : fichier jamais écrit ni lu ; le ciblage des conteneurs repose sur le nom `zevbox-*` **et** le label (I8). Ajouts de la même date : un contrôle `disk` (images zevbox anciennes, G1) et la vérification des droits `0700` de `state/<agent>`.
 
 ### 8.7 Releases, mises à jour, retour arrière (`release.rs`)
 
@@ -732,7 +732,7 @@ Limite connue : deux instances du même agent partagent `state/<agent>` (même c
 - [ ] Mise à jour ratée (release active inchangée), mise à jour réussie, `rollback` : testés.
 - [ ] `tools add` : reconstruction testée, aucun nouveau montage.
 - [ ] Réglages Zed : sauvegarde présente, `claude-acp` et tous les commentaires intacts, réinstallation idempotente.
-- [ ] Conteneurs préexistants de l'utilisateur intacts (comparaison avec `inventory-preexisting.json`).
+- [ ] Conteneurs préexistants de l'utilisateur intacts (vérifier avec `container list --all` avant/après : seuls les conteneurs `zevbox-*` à label zevbox changent, I8).
 - [ ] `zevbox setup` sur une installation existante ne change rien et le dit.
 - [ ] README et AGENTS.md à jour avec les commandes réellement implémentées et les comportements réellement observés.
 

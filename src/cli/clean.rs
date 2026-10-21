@@ -35,7 +35,7 @@ pub async fn run(images: bool) -> anyhow::Result<u8> {
 
     // 3. Prune old logs and backups
     let _ = crate::fsutil::prune_oldest(&paths.logs_dir(), ".log", 30);
-    let _ = crate::fsutil::prune_oldest(&paths.backups_dir(), ".json", 30);
+    let _ = crate::fsutil::prune_oldest(&paths.backups_dir(), ".json", 20);
 
     // 4. Old release images and the image builder VM (DECISIONS G1)
     if images {

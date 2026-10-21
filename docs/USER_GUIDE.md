@@ -198,16 +198,19 @@ Before opening Zed, run these three quick checks.
 zevbox doctor
 ```
 
-**Expected:** every line `[OK  ]`:
+**Expected:** every line `[OK  ]`. A `[WARN]` line always ends with the command that fixes it (for example `zevbox auth claude`, `zevbox zed install`, `zevbox clean --images`); a `[FAIL]` means launching an agent would fail (for example its image is missing: `zevbox update --agent <agent>`):
 ```text
 [OK  ] config               — config.json is valid
 [OK  ] container_binary     — Apple Container 1.5.0 (arm64)
 [OK  ] system_status        — Apple Container runtime is running
 [OK  ] architecture         — host architecture is arm64
-[OK  ] project:...          — project directory exists
 [OK  ] agent:claude         — release claude-... (authenticated)
 [OK  ] agent:antigravity    — release antigravity-... (authenticated)
-[OK  ] permissions          — stateRoot is 0700
+[OK  ] disk                 — 4 zevbox image(s), none from old releases; all container images use … GB
+[OK  ] permissions          — stateRoot and state/* are 0700
+[OK  ] installed_binary     — /Users/<user>/.local/bin/zevbox exists
+[OK  ] zed_entries          — Zed entries match the agents with an active release
+[OK  ] instances            — … active instance(s), no orphan
 ```
 
 ---

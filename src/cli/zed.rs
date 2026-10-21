@@ -38,14 +38,40 @@ pub async fn run(action: super::ZedAction) -> anyhow::Result<u8> {
                         return Ok(EXIT_ERROR);
                     }
                 };
-                if let Err(e) = crate::zed_settings::apply_entries(&original, &entries) {
-                    crate::ui::err(&format!("zevbox: {e}"));
-                    return Ok(EXIT_ERROR);
+                match crate::zed_settings::apply_entries(&original, &entries) {
+                    Err(e) => {
+                        crate::ui::err(&format!("zevbox: {e}"));
+                        return Ok(EXIT_ERROR);
+                    }
+                    Ok(updated) if updated == original => {
+                        crate::ui::out(
+                            "zed settings: already up to date (dry run, nothing written)",
+                        );
+                    }
+                    Ok(_) => {
+                        crate::ui::out(&format!(
+                            "zed settings: would write {} managed entr{} in {} (dry run, nothing written):",
+                            entries.len(),
+                            if entries.len() == 1 { "y" } else { "ies" },
+                            settings_path.display()
+                        ));
+                        for e in &entries {
+                            crate::ui::out(&format!(
+                                "  {} -> {} {}",
+                                e.name,
+                                e.command,
+                                e.args.join(" ")
+                            ));
+                        }
+                    }
                 }
                 return Ok(EXIT_OK);
             }
             match crate::zed_settings::install(&settings_path, &paths.backups_dir(), &entries) {
-                Ok(_) => Ok(EXIT_OK),
+                Ok(outcome) => {
+                    report_install(&outcome);
+                    Ok(EXIT_OK)
+                }
                 Err(e) => {
                     crate::ui::err(&format!("zevbox: {e}"));
                     Ok(EXIT_ERROR)
@@ -58,12 +84,30 @@ pub async fn run(action: super::ZedAction) -> anyhow::Result<u8> {
                 None => crate::paths::zed_settings_file()?,
             };
             match crate::zed_settings::install(&settings_path, &paths.backups_dir(), &[]) {
-                Ok(_) => Ok(EXIT_OK),
+                Ok(outcome) => {
+                    report_install(&outcome);
+                    Ok(EXIT_OK)
+                }
                 Err(e) => {
                     crate::ui::err(&format!("zevbox: {e}"));
                     Ok(EXIT_ERROR)
                 }
             }
+        }
+    }
+}
+
+/// What `zed install` / `uninstall` did, in one line (plan §8.1).
+fn report_install(outcome: &crate::zed_settings::InstallOutcome) {
+    match outcome {
+        crate::zed_settings::InstallOutcome::Unchanged => {
+            crate::ui::out("zed settings: already up to date");
+        }
+        crate::zed_settings::InstallOutcome::Updated { backup } => {
+            crate::ui::out(&format!(
+                "zed settings: updated (backup: {})",
+                backup.display()
+            ));
         }
     }
 }

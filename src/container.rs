@@ -199,6 +199,23 @@ pub fn parse_system_status_json(text: &str) -> Result<SystemStatus, ContainerErr
     })
 }
 
+/// Minimum `container` version zevbox supports (plan §8.6, F8).
+pub const MIN_CONTAINER_VERSION: (u32, u32, u32) = (1, 5, 0);
+
+/// `Some(true)` if `version` ("1.5.0", "1.6.2-rc1"…) is at least `min`; `None` if it
+/// has no leading `major.minor[.patch]` numbers to compare.
+pub fn version_at_least(version: &str, min: (u32, u32, u32)) -> Option<bool> {
+    let mut parts = version
+        .trim()
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|p| !p.is_empty())
+        .map(|p| p.parse::<u32>().ok());
+    let major = parts.next()??;
+    let minor = parts.next().flatten().unwrap_or(0);
+    let patch = parts.next().flatten().unwrap_or(0);
+    Some((major, minor, patch) >= min)
+}
+
 /// Name starts with `zevbox-`, has more characters after it, and contains only
 /// `[a-z0-9-]`.
 pub fn is_zevbox_name(name: &str) -> bool {
@@ -516,5 +533,24 @@ mod image_cleanup_tests {
         assert_eq!(parse_images_bytes(j), Some(61_615_472_640));
         assert_eq!(parse_images_bytes("{}"), None);
         assert_eq!(parse_images_bytes("not json"), None);
+    }
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::*;
+
+    #[test]
+    fn compares_versions() {
+        let min = MIN_CONTAINER_VERSION;
+        assert_eq!(version_at_least("1.5.0", min), Some(true));
+        assert_eq!(version_at_least("1.5.3", min), Some(true));
+        assert_eq!(version_at_least("1.10.0", min), Some(true));
+        assert_eq!(version_at_least("2.0", min), Some(true));
+        assert_eq!(version_at_least("1.4.9", min), Some(false));
+        assert_eq!(version_at_least("0.9.0", min), Some(false));
+        assert_eq!(version_at_least("1.5.0-rc1", min), Some(true));
+        assert_eq!(version_at_least("", min), None);
+        assert_eq!(version_at_least("unknown", min), None);
     }
 }
