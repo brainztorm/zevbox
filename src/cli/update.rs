@@ -32,6 +32,8 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
     let mut active = load_active(&paths)?;
     // A build happened: old images and the builder VM can be reclaimed (G1).
     let mut built = false;
+    // Agents whose update failed: the exit code must say so (ARGON review 3.3).
+    let mut failures = 0u32;
 
     for agent_spec in target_agents {
         let (url, sha, text) = match fetch_manifest(agent_spec.registry_id) {
@@ -41,6 +43,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                     "{}: cannot fetch manifest: {e}",
                     agent_spec.display
                 ));
+                failures += 1;
                 continue;
             }
         };
@@ -51,6 +54,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                     Ok(c) => c,
                     Err(e) => {
                         crate::ui::err(&format!("{}: invalid manifest: {e}", agent_spec.display));
+                        failures += 1;
                         continue;
                     }
                 };
@@ -73,6 +77,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                     Ok(a) => a,
                     Err(e) => {
                         crate::ui::err(&format!("{}: invalid manifest: {e}", agent_spec.display));
+                        failures += 1;
                         continue;
                     }
                 };
@@ -116,7 +121,6 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
             "{}: preparing release for version {}...",
             agent_spec.display, version
         ));
-        built = true;
         let now = chrono::Utc::now();
         let release_id = new_release_id(agent_spec.id, now);
         let image = format!("zevbox/{}:{release_id}", agent_spec.id);
@@ -148,6 +152,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                 "{}: prepare context failed: {e}",
                 agent_spec.display
             ));
+            failures += 1;
             continue;
         }
 
@@ -173,8 +178,10 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
             config.host_gid,
         ) {
             crate::ui::err(&format!("{}: build failed: {e}", agent_spec.display));
+            failures += 1;
             continue;
         }
+        built = true; // an image now exists: old ones can be reclaimed
 
         crate::ui::out(&format!("{}: running smoke test...", agent_spec.display));
         match run_smoke_test(&lock, &config.container_binary) {
@@ -182,6 +189,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                 lock.smoke_test = Some(smoke);
                 if let Err(e) = save_lock(&paths, &release_id, &lock) {
                     crate::ui::err(&format!("{}: cannot save lock: {e}", agent_spec.display));
+                    failures += 1;
                     continue;
                 }
                 promote(&mut active, agent_spec.id, &release_id);
@@ -190,6 +198,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                         "{}: cannot save active release: {e}",
                         agent_spec.display
                     ));
+                    failures += 1;
                     continue;
                 }
                 crate::ui::out(&format!(
@@ -200,6 +209,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
             }
             Err(e) => {
                 crate::ui::err(&format!("{}: smoke test failed: {e}", agent_spec.display));
+                failures += 1;
                 let cli = crate::container::ContainerCli::new(config.container_binary.clone());
                 if let Err(e) = cli.delete_zevbox_image(&image).await {
                     tracing::warn!("cannot delete failed image {image}: {e}");
@@ -215,6 +225,12 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
         }
     }
 
+    if failures > 0 {
+        crate::ui::err(&format!(
+            "zevbox: {failures} agent update(s) failed (see above); nothing was changed for them."
+        ));
+        return Ok(EXIT_ERROR);
+    }
     Ok(EXIT_OK)
 }
 
@@ -231,7 +247,38 @@ pub async fn run_rollback(agent_arg: Option<AgentArg>) -> anyhow::Result<u8> {
         return Ok(EXIT_USAGE);
     };
 
+    let config = crate::config::load(&paths.config_file())?;
     let mut active = load_active(&paths)?;
+
+    // §8.1: refuse if the image of `previous` is gone (it would break every launch).
+    if let Some(previous) = active.get(agent_arg.id()).and_then(|e| e.previous.clone()) {
+        let image = match crate::release::load_lock(&paths, &previous) {
+            Ok(lock) => lock.image,
+            Err(_) => format!("zevbox/{}:{previous}", agent_arg.id()),
+        };
+        let cli = crate::container::ContainerCli::new(config.container_binary.clone());
+        match cli.image_list().await {
+            Ok(images)
+                if images
+                    .iter()
+                    .any(|i| crate::container::image_matches(&i.reference, &image)) => {}
+            Ok(_) => {
+                crate::ui::err(&format!(
+                    "zevbox: cannot roll back {}: the image '{image}' of release {previous} no longer exists. Fix: run 'zevbox update --agent {}' to build a fresh release.",
+                    agent_arg.id(),
+                    agent_arg.id()
+                ));
+                return Ok(EXIT_ERROR);
+            }
+            Err(e) => {
+                crate::ui::err(&format!(
+                    "zevbox: cannot check the image of release {previous}: {e}. Fix: run 'container system start' in a macOS terminal."
+                ));
+                return Ok(EXIT_ERROR);
+            }
+        }
+    }
+
     if let Err(e) = rollback(&mut active, agent_arg.id()) {
         crate::ui::err(&format!("zevbox: {e}"));
         return Ok(EXIT_ERROR);
@@ -243,7 +290,6 @@ pub async fn run_rollback(agent_arg: Option<AgentArg>) -> anyhow::Result<u8> {
         .unwrap_or_default();
     crate::ui::out(&format!("{}: rolled back to {now_current}", agent_arg.id()));
 
-    let config = crate::config::load(&paths.config_file())?;
     let _ = crate::cli::zed::update_zed(&paths, &config);
 
     Ok(EXIT_OK)
