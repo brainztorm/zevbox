@@ -79,11 +79,22 @@ Ce qui suit est écrit pour être exécuté sans autre contexte que `AGENTS.md`,
 **Règles communes (obligatoires)**
 1. **Ordre d'exécution : (tous faits).** Un R à la fois. Ne pas commencer le suivant avant que le précédent soit commité.
 2. Avant de coder un R : lire les fichiers listés dans sa rubrique « Fichiers ». Copier le style des fichiers `WORKED EXAMPLE` (en-tête de fichier). Messages CLI en anglais, format `<problème>. Fix: <commande exacte>`.
-3. Interdits inchangés : `unwrap/expect/panic` dans `src/` (clippy les refuse), shell hôte (`sh -c`), montage de `$HOME`, `--all`, écriture dans un projet utilisateur, `-t` sur le conteneur ACP. Invariants I1–I12 du plan §3.
-4. **Fichiers protégés** (`tests/**` listés dans `tests/PROTECTED.sha256`, `scripts/**`, `clippy.toml`) : **ne pas les modifier**. Les nouveaux tests vont dans de **nouveaux fichiers** `tests/r<N>_<sujet>_test.rs` (ils peuvent faire `mod common;` et utiliser `common::TestEnv`, voir `tests/launch_cwd_test.rs` comme modèle) ou dans `#[cfg(test)]` du module. Si un R ne peut pas être fait sans toucher un test protégé : s'arrêter, écrire pourquoi dans `docs/PROGRESS.md`, demander au 👤.
+3. Interdits inchangés : `unwrap/expect/panic` dans `src/` (clippy les refuse), shell hôte (`sh -c`), montage de `$HOME`, `--all`, écriture dans un projet utilisateur, `-t` sur le conteneur ACP. Invariants I1–I13 du plan §3.
+4. **Fichiers protégés** (`tests/**` listés dans `tests/PROTECTED.sha256`, `scripts/**`, `clippy.toml`) : **ne pas les modifier sans 👤 explicite pour ce changement précis (montrer le `git diff`, puis resceller les empreintes)**. Les nouveaux tests vont dans de **nouveaux fichiers** `tests/r<N>_<sujet>_test.rs` (ils peuvent faire `mod common;` et utiliser `common::TestEnv`, voir `tests/launch_cwd_test.rs` comme modèle) ou dans `#[cfg(test)]` du module. Si un R ne peut pas être fait sans toucher un test protégé : s'arrêter, écrire pourquoi dans `docs/PROGRESS.md`, demander au 👤.
 5. Le faux `container` (`tests/fixtures/fake-container`) ne sait pas faire `build` ni accéder au réseau : tout ce qui construit une image ou appelle le registre se teste **à la main** (preuve à consigner dans `docs/PROGRESS.md`), pas en test automatique.
 6. Fin de chaque R : `make check` (fmt + clippy -D warnings + tests + invariants) puis `make verify STEP=17` doit afficher `STEP 17: OK` ; `make install` ; test manuel indiqué dans « Acceptation » ; ligne de journal dans `docs/PROGRESS.md` (`- <date> — R<N> : …`) ; déplacer le R dans « Fait depuis l'acceptation » ci-dessus (3 lignes max) ; `git commit -m "r<N>: <titre>"`.
 7. Les lignes de code citées (`fichier:ligne`) datent du 2026-10-14 : vérifier avec `grep` avant d'éditer.
+
+## Backlog (état au 2026-10-21)
+
+Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (R1–R8 d'origine, EXP-01, P1/I13, D1/E1/F1/G1, revue ARGON R1/R2/R4/R5/R6). Reste :
+
+1. **R3 — `tools add/remove` sans réseau** (décision 👤 « à planifier ») : reconstruire l'image à partir du `lock.json` actif (mêmes versions) au lieu d'appeler `update`, qui re-résout le registre et peut mettre l'agent à jour par surprise (plan §8.7, revue ARGON 3.1). Chantier : fonction de reconstruction dans `release.rs`/`update.rs`, test manuel (le faux `container` ne construit pas).
+2. **Faille Zed (filtres git exécutés sans geste, même en Restricted Mode)** : signalée le 2026-10-21, **GHSA-fvw8-qqcg-f4rm**, état `triage`. À suivre ; dépôt `brainztorm/zevbox` **privé** jusqu'à leur correctif ou accord. Décider ensuite : republier le dépôt (éventuellement en réécrivant l'historique pour en retirer `docs/experiments/` et `ARGON_REVIEW.md` si besoin).
+3. **Essai réel dans Zed** du parcours « projet jamais ajouté → `+` → agent zevbox » (testé en ligne de commande, jamais dans Zed lui-même) et du message d'erreur quand le service Apple Container est arrêté.
+4. **Écarts mineurs assumés** de la revue ARGON, à trancher ou amender au plan : 4.1 `shutdown_background` au lieu de `shutdown_timeout(200 ms)` (§13.11) ; 4.2a collision d'identifiants `id8` non retestée (probabilité nulle en pratique) ; le contrôle d'authentification du `launch` (preflight) teste encore seulement l'existence du fichier pour Antigravity, alors que `auth --status` et `doctor` testent le jeton de rafraîchissement (le changer touche des tests protégés).
+5. **Risque accepté (P1)** : un sous-dépôt git créé par l'agent peut déclencher un premier effet côté Zed avant l'arrêt de l'agent par la surveillance (`guard.rs`).
+6. Contrôle `doctor` 10 (méthodes refusées) lit tous les journaux conservés (30) : une méthode refusée il y a longtemps reste signalée jusqu'à la purge.
 
 ## Idées reportées
 
