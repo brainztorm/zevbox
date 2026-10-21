@@ -166,7 +166,7 @@ flowchart TD
 
 ## 4. The security core: the relay policy
 
-ACP lets the agent ask the editor to act on the machine (for example `fs/readTextFile`,
+ACP lets the agent ask the editor to act on the machine (for example `fs/read_text_file`,
 `terminal/create`). zevbox's policy removes that attack surface entirely.
 
 ### What the relay does with each message
@@ -194,9 +194,9 @@ sequenceDiagram
     Agent->>Relay: session/new result
 
     Note over Zed,Agent: unauthorised access attempt
-    Agent-->>Relay: fs/readTextFile { path: "~/.ssh/id_rsa" }
+    Agent-->>Relay: fs/read_text_file { path: "~/.ssh/id_rsa" }
     Note over Relay: IMMEDIATE INTERCEPTION (invariant I3)
-    Relay-->>Agent: error { code: -32601, message: "Method not allowed by zevbox policy" }
+    Relay-->>Agent: error { code: -32601, message: "zevbox: 'fs/read_text_file' is blocked by zevbox strict mode (the agent runs in an isolated Linux VM)." }
     Note over Zed: Zed never saw the request
 ```
 
@@ -206,7 +206,7 @@ sequenceDiagram
 |---|---|---|---|
 | **Client → Agent** | `initialize` | **Rewritten** | disables every host capability (`fs=false`, `terminal=false`). |
 | **Client → Agent** | `session/new` | **Rewritten** | forces `cwd` to the project root, empties `mcpServers`. |
-| **Agent → Client** | `fs/readTextFile`, `fs/writeTextFile` | **Blocked** (error -32601) | the agent must not read/write the Mac through Zed. |
+| **Agent → Client** | `fs/read_text_file`, `fs/write_text_file` | **Blocked** (error -32601) | the agent must not read/write the Mac through Zed. |
 | **Agent → Client** | `terminal/create`, `terminal/exec` | **Blocked** (error -32601) | the agent must not open a terminal on the Mac. |
 | **Agent → Client** | `authenticate` (terminal) | **Blocked** | no authentication code runs on the host. |
 | **Agent → Client** | `session/update`, notifications | **Forwarded** | lets the agent stream its answers to Zed. |
@@ -306,7 +306,7 @@ published on the VM and the macOS keychain is never touched.
 
 ---
 
-## 8. The 12 security invariants
+## 8. The 13 security invariants
 
 Checked automatically on every build (`scripts/check-invariants.sh` and the test suite) and
 never relaxed:

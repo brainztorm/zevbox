@@ -74,9 +74,9 @@ sequenceDiagram
     Zed->>R: session/new { cwd, mcpServers: [...] }
     Note over R: cwd must be the allowed root · mcpServers emptied
     R->>A: session/new { cwd, mcpServers: [] }
-    A-->>R: fs/readTextFile { path: "~/.ssh/id_rsa" }
+    A-->>R: fs/read_text_file { path: "~/.ssh/id_rsa" }
     Note over R: blocked (I3)
-    R-->>A: error -32601 "Method not allowed by zevbox policy"
+    R-->>A: error -32601 "zevbox: 'fs/read_text_file' is blocked by zevbox strict mode (the agent runs in an isolated Linux VM)."
     A->>R: session/update (streamed answer)
     R->>Zed: session/update
 ```
