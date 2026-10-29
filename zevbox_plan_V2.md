@@ -372,7 +372,7 @@ pub fn decide(policy: &Policy, state: &mut RelayState, dir: Direction, msg: serd
 | `initialize` | Transmettre avec `params.clientCapabilities` **remplacé** par `{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false,"auth":{"terminal":false}}` + le champ `session` d'origine s'il existe (capacités d'affichage). Supprimer `elicitation`, `_meta`, tout le reste. Mémoriser l'`id` pour réécrire la réponse. |
 | *réponse à `initialize`* | Dans `result.authMethods` : garder uniquement les méthodes sans `type` ou avec `type == "agent"`, et supprimer leur `_meta`. Mémoriser les `id` des méthodes gardées. |
 | `authenticate` | Transmettre si `params.methodId` fait partie des méthodes gardées ; sinon `-32602`. |
-| `session/new`, `session/load`, `session/resume`, `session/fork` | Vérifier `cwd` (I5) ; `additionalDirectories` absent ou `[]`, sinon `-32602` ; remplacer `mcpServers` par `[]` (ou l'ajouter s'il manque pour `new`/`load`) ; supprimer `params._meta`. |
+| `session/new`, `session/load`, `session/resume`, `session/fork` | Vérifier `cwd` (I5) ; `additionalDirectories` absent ou `[]`, sinon `-32602` ; remplacer `mcpServers` par `[]` (ou l'ajouter s'il manque pour `new`/`load`) ; supprimer `params._meta` et `params.systemPrompt` (2026-10-29 : `claude-agent-acp` 0.99 remplace le prompt système de l'agent par ce champ ; Zed ne l'envoie pas). |
 | `session/prompt`, `session/set_mode`, `session/set_model`, `session/set_config_option`, `session/list`, `session/close`, `session/delete`, `logout` | Transmettre tel quel. |
 | toute autre (y compris préfixe `_`) | `ReplyToSender` avec `-32601`. |
 

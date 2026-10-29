@@ -182,7 +182,7 @@ sequenceDiagram
 | Direction | Méthode ACP | Action de zevbox | Raison de sécurité |
 |---|---|---|---|
 | **Client → Agent** | `initialize` | **Réécrit** | Désactive toutes les capacités hôtes (`fs=false`, `terminal=false`). |
-| **Client → Agent** | `session/new` | **Réécrit** | Force le `cwd` sur la racine du projet, vide `mcpServers`. |
+| **Client → Agent** | `session/new` | **Réécrit** | Force le `cwd` sur la racine du projet, vide `mcpServers`, supprime `_meta` et `systemPrompt`. |
 | **Agent → Client** | `fs/read_text_file`, `fs/write_text_file` | **Bloqué** (erreur -32601) | Interdit à l'agent de lire/écrire sur le Mac via Zed. |
 | **Agent → Client** | `terminal/create`, `terminal/exec` | **Bloqué** (erreur -32601) | Interdit à l'agent d'ouvrir un terminal sur le Mac. |
 | **Agent → Client** | `authenticate` (terminal) | **Bloqué** | Empêche d'exécuter du code d'authentification sur l'hôte. |
