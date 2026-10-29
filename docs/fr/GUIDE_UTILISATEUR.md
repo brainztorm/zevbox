@@ -135,10 +135,37 @@ zevbox auth antigravity
 3. Le navigateur affiche « Authentification Google réussie ! » ; le terminal affiche `Exchanging authorization code with Google...` puis `Google Antigravity authenticated successfully.`
 4. Les fichiers `settings.json` et `acp_token.json` sont écrits dans `state/antigravity/.gemini/antigravity-acp/` (`0600`). Le trousseau macOS n'est jamais sollicité.
 
+#### 4c. oMLX (optionnel : un serveur de modèles local sur votre réseau)
+
+Si un serveur [oMLX](https://github.com/jundot/omlx) tourne sur un autre Mac (par exemple un Mac
+Studio), zevbox peut le piloter avec l'adaptateur Claude Code, dans sa propre VM et son propre
+dossier d'état (votre abonnement Claude n'intervient pas) :
+
+```bash
+zevbox auth omlx --url http://192.168.1.8:8000
+```
+
+**Déroulement :**
+1. La première fois, zevbox construit l'image `zevbox/omlx` (même adaptateur que Claude, 1-3 min).
+2. Il demande la clé API du serveur (saisie masquée ; `echo "$CLE" | zevbox auth omlx --url …`
+   marche aussi) et liste les modèles du serveur **depuis le Mac**.
+3. Il écrit `state/omlx/.claude/settings.json` (`0600`) : l'URL et la clé, la liste des modèles
+   (le sélecteur de modèles de Zed les affiche), le modèle par défaut (`--model <id>`, sinon le
+   plus petit) et un hook qui décharge le modèle précédent sur le serveur quand vous changez de
+   modèle dans Zed. Le plus petit modèle n'est jamais déchargé : Claude Code s'en sert pour ses
+   petites requêtes de fond.
+4. Il vérifie qu'**une VM** joint le serveur : `omlx: the agent VM reaches the server (HTTP 401)`.
+   Les VM ne sortent que par le réseau principal du Mac (l'interface de la route par défaut) :
+   une adresse jointe par un câble direct vers le serveur ne marche pas depuis une VM ; donnez
+   l'adresse du serveur sur le réseau principal.
+
+Relancez-la pour changer l'URL, la clé ou le modèle par défaut ; `Entrée` garde la clé actuelle.
+
 **Vérification immédiate :**
 ```bash
 zevbox auth claude --status
 zevbox auth antigravity --status
+zevbox auth omlx --status      # si vous utilisez oMLX
 ```
 *Chaque commande doit renvoyer exactement :*
 ```text
@@ -180,6 +207,7 @@ Tous les voyants doivent être à `[OK  ]`. Une ligne `[WARN]` se termine toujou
 [OK  ] architecture         — host architecture is arm64
 [OK  ] agent:claude         — release claude-... (authenticated)
 [OK  ] agent:antigravity    — release antigravity-... (authenticated)
+[OK  ] agent:omlx           — optional, not installed (to use it: 'zevbox auth omlx')
 [OK  ] disk                 — 4 zevbox image(s), none from old releases; all container images use … GB
 [OK  ] permissions          — stateRoot and state/* are 0700
 [OK  ] installed_binary     — /Users/<user>/.local/bin/zevbox exists
@@ -238,7 +266,7 @@ grep -C 4 "zevbox · " ~/.config/zed/settings.json
 ```
 
 **Résultat attendu :**
-Exactement deux blocs, quel que soit le nombre de projets :
+Un bloc par agent installé (deux, ou trois avec oMLX), quel que soit le nombre de projets :
 ```json
     "zevbox · Claude": {
       "type": "custom",
@@ -288,7 +316,7 @@ sequenceDiagram
    - Raccourci clavier : `Cmd + Shift + A` (ou menu *View > Toggle Assistant Panel*).
 3. **Sélectionnez le serveur d'agent** :
    - En haut du panneau, menu « New Thread » / choix de l'agent.
-   - Choisissez **`zevbox · Claude`** ou **`zevbox · Antigravity`** : ce sont les deux seules entrées zevbox, elles s'appliquent au projet ouvert.
+   - Choisissez **`zevbox · Claude`**, **`zevbox · Antigravity`** ou **`zevbox · oMLX`** (si vous l'avez installé) : ce sont les seules entrées zevbox, elles s'appliquent au projet ouvert.
 4. **Faites un test dans le chat de Zed** :
    - Tapez ce prompt de validation :
      > *"Peux-tu me dire quel est ton système d'exploitation et lister les fichiers du dossier courant ?"*
@@ -314,6 +342,13 @@ sequenceDiagram
 - **Solution** : Ouvrez un terminal et lancez `zevbox auth claude` (ou `zevbox auth antigravity`), puis vérifiez avec `zevbox auth <agent> --status`.
 
 ---
+
+### Problème 1b : `zevbox auth omlx` dit `the Mac reaches <url> but the agent VM does not`
+- **Cause** : les VM ne sortent que par le réseau principal du Mac ; le serveur a été donné par
+  une adresse jointe autrement (typiquement un câble Ethernet direct). `zevbox doctor` le signale
+  aussi : `omlx:server … not reachable from the agent VM`.
+- **Correction** : donnez l'adresse du serveur sur le réseau principal (Wi-Fi ou l'Ethernet qui
+  porte la route par défaut) : `zevbox auth omlx --url http://<adresse>:<port>`.
 
 ### Problème 2 : Zed affiche `... is not an allowed project: <raison>`
 - **Cause** : Le dossier ouvert dans Zed est hors des zones autorisées (I2) : dossier caché `~/.…`, `~/Library`, votre dossier personnel lui-même, dossier système…
@@ -366,6 +401,7 @@ sequenceDiagram
 | Diagnostiquer l'état du système | `zevbox doctor` |
 | Construire / mettre à jour les images des agents | `zevbox update` |
 | Se connecter à Claude / à Google (Antigravity) | `zevbox auth claude` / `zevbox auth antigravity` |
+| Brancher un serveur oMLX local | `zevbox auth omlx --url http://<adresse>:<port>` |
 | Vérifier le statut de connexion | `zevbox auth claude --status` / `zevbox auth antigravity --status` |
 | Ouvrir un shell Linux de test | `zevbox shell claude` |
 | Ajouter un outil Linux dans la VM | `zevbox tools add ripgrep` |

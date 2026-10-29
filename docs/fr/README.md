@@ -2,8 +2,10 @@
 
 [English](../../README.md) · **Français**
 
-**zevbox** permet d'utiliser des agents ACP (**Claude Code**, **Google Antigravity**) depuis
-l'éditeur [Zed](https://zed.dev) sans jamais les laisser toucher à votre Mac. Chaque agent
+**zevbox** permet d'utiliser des agents ACP (**Claude Code**, **Google Antigravity** et, en
+option, **oMLX** — Claude Code piloté par un modèle servi par [oMLX](https://github.com/jundot/omlx)
+sur votre réseau local) depuis l'éditeur [Zed](https://zed.dev) sans jamais les laisser toucher à
+votre Mac. Chaque agent
 s'exécute dans une **micro-VM Apple Container** Linux jetable — une vraie machine virtuelle
 isolée par le matériel, pas un conteneur à noyau partagé — et dialogue avec Zed à travers un
 **relais ACP filtrant** qui supprime toute requête qui permettrait à l'agent de lire, écrire ou
@@ -45,7 +47,7 @@ flowchart LR
         Secrets["~/.ssh · ~/.aws · trousseau\nautres projets · $HOME"]
     end
     subgraph VM ["Micro-VM Apple Container jetable (Linux arm64)"]
-        Agent["Agent ACP\nClaude Code / Antigravity"]
+        Agent["Agent ACP\nClaude Code / Antigravity / oMLX"]
     end
 
     Zed <-->|"ACP · JSON-RPC\nstdin/stdout"| Relay
@@ -108,6 +110,7 @@ make install
 #    initialise aussi zevbox et construit l'image de l'agent (réseau, 1-3 min) ; ensuite, rien n'est reconstruit.
 zevbox auth claude        # compte Claude (Pro/Max) — dans un conteneur interactif
 zevbox auth antigravity   # compte Google (AI Pro / One AI Premium) — OAuth PKCE sur le Mac
+zevbox auth omlx          # optionnel : votre serveur oMLX (URL + clé API), p. ex. un Mac Studio
 ```
 
 ```mermaid
@@ -117,7 +120,8 @@ flowchart LR
     D --> E(["l'agent tourne dans une micro-VM"])
 ```
 
-Zed affiche alors deux serveurs d'agent, **`zevbox · Claude`** et **`zevbox · Antigravity`**.
+Zed affiche alors deux serveurs d'agent, **`zevbox · Claude`** et **`zevbox · Antigravity`**
+(et **`zevbox · oMLX`** une fois `zevbox auth omlx` lancé).
 Ouvrez un projet dans Zed et choisissez-en un avec **+** : ce choix vaut consentement, il n'y a
 aucune liste de projets à tenir. Le projet doit être un dossier de votre dossier personnel (hors
 `~/Library` et hors dossier caché `~/.…`) ou d'un disque externe ; ailleurs, l'agent répond
@@ -136,12 +140,15 @@ Documentation in English: **[README.md](../../README.md)**.
 
 ## Usage quotidien
 
-- **Dans Zed** : ouvrez un projet, ouvrez le panneau agent, choisissez **zevbox · Claude** ou
-  **zevbox · Antigravity** avec **+**. Le projet est celui ouvert dans Zed (son premier dossier
+- **Dans Zed** : ouvrez un projet, ouvrez le panneau agent, choisissez **zevbox · Claude**,
+  **zevbox · Antigravity** ou **zevbox · oMLX** avec **+**. Le projet est celui ouvert dans Zed (son premier dossier
   racine). L'agent tourne dans une VM Linux temporaire dédiée, avec votre code monté sous votre
   propre UID/GID ; ses modifications apparaissent aussitôt dans votre dossier.
 - **Committez vous-même le travail de l'agent** (ou avec un outil hors zevbox) : dans la VM, le
   `.git` du projet est en lecture seule ; l'agent lit l'historique mais ne committe pas (I13).
+- **Modèles locaux (oMLX)** : le sélecteur de modèles de Zed liste ceux du serveur ; le modèle
+  par défaut est le plus petit. Changer de modèle décharge le précédent sur le serveur, sauf ce
+  plus petit modèle, que Claude Code garde pour ses petites requêtes de fond.
 - **Shell interactif dans la VM de l'agent** : `zevbox shell claude`
 - **Outils Linux supplémentaires (paquets apt) dans les VM** : `zevbox tools add ripgrep clang`
 - **Vérifier et diagnostiquer** : `zevbox status` · `zevbox doctor`
@@ -153,19 +160,19 @@ Documentation in English: **[README.md](../../README.md)**.
 
 | Commande | Ce qu'elle fait |
 |---|---|
-| `zevbox setup` | Mise en place guidée et idempotente : écrit la configuration, construit les releases manquantes (`update`), propose `auth` pour chaque agent non authentifié (terminal uniquement), configure Zed, lance `doctor` et affiche un résumé par agent. L'échec de construction d'un agent ne bloque pas l'autre ; le code de sortie est 1 si un agent n'a toujours pas de release à la fin. |
+| `zevbox setup` | Mise en place guidée et idempotente : écrit la configuration, construit les releases manquantes (`update`), propose `auth` pour chaque agent non authentifié (terminal uniquement), configure Zed, lance `doctor` et affiche un résumé par agent. L'échec de construction d'un agent ne bloque pas l'autre ; le code de sortie est 1 si un agent n'a toujours pas de release à la fin. L'agent optionnel oMLX n'est jamais construit par `setup` (utilisez `zevbox auth omlx`). |
 | `zevbox init` | Crée les répertoires d'état (`~/.local/share/zevbox` ou Application Support) en mode `0700`, plus `config.json` et `tools.json`. |
-| `zevbox doctor [--json]` | Contrôle complet : `container` ≥ 1.5.0, runtime actif, arm64, par agent : release, image présente et connexion (même test que `auth --status`), espace des images zevbox (WARN quand d'anciennes images sont récupérables), droits `0700` sur les dossiers d'état, binaire installé, entrées Zed à jour, instances orphelines. Code de sortie 1 seulement sur `FAIL`. |
+| `zevbox doctor [--json]` | Contrôle complet : `container` ≥ 1.5.0, runtime actif, arm64, par agent : release, image présente et connexion (même test que `auth --status` ; oMLX : `optional, not installed`, ou le serveur testé depuis une VM), espace des images zevbox (WARN quand d'anciennes images sont récupérables), droits `0700` sur les dossiers d'état, binaire installé, entrées Zed à jour, instances orphelines. Code de sortie 1 seulement sur `FAIL`. |
 | `zevbox zed install [--dry-run]` | Insère sans rien casser les entrées gérées `zevbox · …` dans `~/.config/zed/settings.json`, en préservant commentaires et mise en forme (édition CST). Sauvegarde automatique dans `backups/` (les 20 plus récentes sont gardées). Affiche ce qu'elle a fait (`already up to date` ou `updated (backup: …)`) ; `--dry-run` affiche les entrées qu'elle écrirait et ne change rien. |
 | `zevbox zed uninstall` | Retire toutes les entrées gérées de Zed et restaure les réglages à l'octet près. |
-| `zevbox auth <agent> [--status]` | Claude : connexion interactive dans un conteneur `-it`. Antigravity : flux Google OAuth 2.0 PKCE **sur le Mac** (serveur HTTP éphémère `127.0.0.1:<port aléatoire>`, aucun port publié sur la VM, aucun accès au trousseau), écrit `state/antigravity/.gemini/antigravity-acp/{settings.json,acp_token.json}` en `0600`. `--status` affiche `authenticated`, `not authenticated` ou `unknown`. |
+| `zevbox auth <agent> [--status]` | Claude : connexion interactive dans un conteneur `-it`. Antigravity : flux Google OAuth 2.0 PKCE **sur le Mac** (serveur HTTP éphémère `127.0.0.1:<port aléatoire>`, aucun port publié sur la VM, aucun accès au trousseau), écrit `state/antigravity/.gemini/antigravity-acp/{settings.json,acp_token.json}` en `0600`. oMLX (`zevbox auth omlx [--url <url>] [--model <id>]`, sur le Mac) : demande l'URL du serveur et la clé API (saisie masquée, ou lue sur stdin), liste les modèles du serveur, écrit `state/omlx/.claude/settings.json` (`0600` : URL, clé, modèles, défaut = `--model` ou le plus petit, hook de déchargement) et vérifie qu'une VM joint le serveur. `--status` affiche `authenticated`, `not authenticated` ou `unknown`. |
 | `zevbox launch <agent> [--project <chemin>]` | Appelée par Zed : contrôle le projet (zones I2), démarre la micro-VM, relaie ACP sur stdin/stdout avec filtrage strict et surveille le projet (I13). Sans `--project`, le projet est le répertoire courant (Zed lance l'agent dans le premier dossier racine). |
 | `zevbox status [--json]` | Affiche les instances actives, orphelines ou non enregistrées. |
 | `zevbox stop [ID \| --project <chemin>]` | Arrête proprement les instances données, ou toutes les instances zevbox actives (jamais avec `--all`), et affiche une ligne par instance arrêtée. Un processus enregistré n'est signalé que s'il est toujours le même relais (jamais un processus qui réutilise simplement son numéro après un redémarrage) ; un relais qui ne répond pas sous 10 s voit son conteneur arrêté directement. |
 | `zevbox clean [--images]` | Supprime les conteneurs orphelins vérifiés et les enregistrements obsolètes, purge les vieux journaux (>30) et sauvegardes (>20). Avec `--images`, supprime les images zevbox des releases ni courantes ni précédentes (jamais les images d'autres outils) et la VM de construction d'images, dont le disque ne rétrécit jamais. Elle supprime aussi les dossiers `releases/<id>/` des releases terminées ni courantes ni précédentes, et l'archive de construction d'Antigravity (~300 Mo) de chaque release (utile seulement pour construire ; son URL et son SHA-256 restent dans `lock.json`). |
 | `zevbox shell <agent> [--project <chemin>]` | Bash interactif dans une VM jetable identique à celle de l'agent, protections I13 comprises (`.zed` masqué, `.git` existant en lecture seule). Sans `--project`, le dossier courant doit être dans une zone autorisée (sinon code 3). |
 | `zevbox logs [ID] [--path]` | Affiche les 200 dernières lignes du journal de la session la plus récente, ou de l'ID donné. `--path` affiche le chemin du fichier. Chaque lancement y écrit son journal : stderr du conteneur plus les événements de zevbox (`launch agent=… container=…`, `blocked method=<m> dir=<d>` pour chaque méthode ACP refusée, `shutdown …`) au niveau `info` (`RUST_LOG=debug` pour plus ; pour les autres commandes, `RUST_LOG` écrit sur stderr). Uniquement des noms, chemins et identifiants : jamais un prompt, le contenu d'un fichier ni un jeton (I9). `zevbox doctor` liste les méthodes refusées trouvées dans les journaux récents. |
-| `zevbox update [--check] [--agent <agent>]` | Vérifie ou construit une nouvelle release depuis le registre ACP officiel, exécute le smoke test et la promeut. Sort avec le code 1 si la mise à jour d'un agent a échoué (rien n'est alors changé pour cet agent). Après une construction, fait le même ménage d'images que `clean --images`, et range toujours les dossiers et archives de releases. |
+| `zevbox update [--check] [--agent <agent>]` | Vérifie ou construit une nouvelle release depuis le registre ACP officiel, exécute le smoke test et la promeut. Sans `--agent` : Claude et Antigravity, plus oMLX s'il est installé. Sort avec le code 1 si la mise à jour d'un agent a échoué (rien n'est alors changé pour cet agent). Après une construction, fait le même ménage d'images que `clean --images`, et range toujours les dossiers et archives de releases. |
 | `zevbox rollback [--agent <agent>]` | Permute la release active (`current`) avec la précédente ; refuse, avec la commande à lancer, si l'image de la release précédente n'existe plus. |
 | `zevbox tools list` / `add <paquets…>` / `remove <paquets…>` | Gère les paquets Debian additionnels (`tools.json`) et reconstruit les images actives. |
 
@@ -220,7 +227,8 @@ zevbox protège **votre Mac** de l'agent. Il ne protège **pas** le projet que v
 
 - l'agent peut modifier ou supprimer tout le projet monté ;
 - l'agent a accès au réseau, il peut donc exfiltrer le contenu du projet ;
-- l'agent a accès à ses propres identifiants (c'est le rôle du montage d'état) ;
+- l'agent a accès à ses propres identifiants (c'est le rôle du montage d'état) — pour oMLX,
+  l'URL et la clé API du serveur, en clair dans `state/omlx/.claude/settings.json` ;
 - tout ce que vous envoyez volontairement depuis Zed (fichiers joints, texte collé) lui parvient ;
 - aucune défense contre une faille du runtime Apple Container ou du relais lui-même.
 
@@ -235,6 +243,8 @@ zevbox protège **votre Mac** de l'agent. Il ne protège **pas** le projet que v
 - **`no active Claude release. Fix: run 'zevbox update --agent claude'`** — l'image de l'agent n'a pas encore été construite.
 - **`Claude is not authenticated. Fix: run 'zevbox auth claude'`** — connectez-vous depuis un terminal.
 - **`Antigravity is not authenticated. Fix: run 'zevbox auth antigravity'`** — connectez-vous avec votre compte Google dans le navigateur.
+- **`oMLX is not authenticated. Fix: run 'zevbox auth omlx'`** — donnez à zevbox l'URL du serveur et la clé API.
+- **`the Mac reaches <url> but the agent VM does not …`** (par `zevbox auth omlx` ; `doctor` : `not reachable from the agent VM`) — les VM ne sortent que par le réseau principal du Mac (l'interface de la route par défaut), pas par un câble direct vers le serveur. Utilisez l'adresse du serveur sur le réseau principal : `zevbox auth omlx --url http://<adresse>:<port>`.
 - **`zevbox: this agent is bound to <A>; this session asked for <B>. Open <A> in Zed, or open <B> in its own Zed window …`** — la session Zed demande un dossier différent de celui où l'agent a été lancé, typiquement un espace de travail multi-racines. Ouvrez un seul dossier racine par fenêtre Zed.
 - **`Auto mode unavailable: the selected model does not support Auto mode`** — le modèle par défaut de Claude dans la VM est Haiku 4.5. `zevbox doctor` signale `no default model` ; lancez `zevbox auth claude` (écrit `state/claude/.claude/settings.json`) ou écrivez-y `{"model": "fable"}`, puis ouvrez un nouveau thread Zed.
 - **`Apple Container system is not running, and zevbox could not start it. Fix: … run 'container system start' …`** — zevbox démarre normalement le runtime seul (p. ex. après un redémarrage) ; sinon, lancez cette commande dans un terminal puis ouvrez un nouveau thread dans Zed.

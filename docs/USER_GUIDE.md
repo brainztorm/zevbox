@@ -152,10 +152,36 @@ zevbox auth antigravity
 4. `settings.json` and `acp_token.json` are written to
    `state/antigravity/.gemini/antigravity-acp/` (`0600`). The macOS keychain is never touched.
 
+#### 4c. oMLX (optional: a local model server on your network)
+
+If an [oMLX](https://github.com/jundot/omlx) server runs on another Mac (for example a Mac
+Studio), zevbox can drive it with the Claude Code adapter, in its own VM and state folder (your
+Claude subscription is not involved):
+
+```bash
+zevbox auth omlx --url http://192.168.1.8:8000
+```
+
+**What happens:**
+1. The first time, zevbox builds the `zevbox/omlx` image (same adapter as Claude, 1–3 min).
+2. It asks for the server's API key (hidden input; `echo "$KEY" | zevbox auth omlx --url …` also
+   works) and lists the server's models **from the Mac**.
+3. It writes `state/omlx/.claude/settings.json` (`0600`): the URL and key, the model list (the
+   Zed model picker shows them), the default model (`--model <id>`, else the smallest one) and a
+   hook that unloads the previous model on the server when you switch models in Zed. The
+   smallest model is never unloaded: Claude Code keeps using it for small background requests.
+4. It checks that **a VM** reaches the server: `omlx: the agent VM reaches the server (HTTP 401)`.
+   The VMs only go out through the Mac's main network (the interface with the default route),
+   so an address reached through a direct cable to the server does not work from a VM: use the
+   server's address on the main network.
+
+Run it again to change the URL, the key or the default model; `Enter` keeps the current key.
+
 **Check:**
 ```bash
 zevbox auth claude --status
 zevbox auth antigravity --status
+zevbox auth omlx --status      # if you use oMLX
 ```
 *Each must print exactly:*
 ```text
@@ -206,6 +232,7 @@ zevbox doctor
 [OK  ] architecture         — host architecture is arm64
 [OK  ] agent:claude         — release claude-... (authenticated)
 [OK  ] agent:antigravity    — release antigravity-... (authenticated)
+[OK  ] agent:omlx           — optional, not installed (to use it: 'zevbox auth omlx')
 [OK  ] disk                 — 4 zevbox image(s), none from old releases; all container images use … GB
 [OK  ] permissions          — stateRoot and state/* are 0700
 [OK  ] installed_binary     — /Users/<user>/.local/bin/zevbox exists
@@ -260,7 +287,8 @@ the project is gone.
 grep -C 4 "zevbox · " ~/.config/zed/settings.json
 ```
 
-**Expected:** exactly two blocks, however many projects you allowed:
+**Expected:** one block per installed agent (two, or three with oMLX), however many projects you
+open:
 ```json
     "zevbox · Claude": {
       "type": "custom",
@@ -308,7 +336,7 @@ sequenceDiagram
    ```
 2. **Open the agent panel**: `Cmd + Shift + A` (or *View > Toggle Assistant Panel*).
 3. **Pick the agent server**: at the top of the panel, in the "New Thread" / agent menu, choose
-   **`zevbox · Claude`** or **`zevbox · Antigravity`**. These are the only zevbox entries; they
+   **`zevbox · Claude`**, **`zevbox · Antigravity`** or **`zevbox · oMLX`**. These are the only zevbox entries; they
    apply to the open project.
 4. **Try it**:
    > *"Which operating system are you running on? List the files in the current directory."*
@@ -335,6 +363,13 @@ sequenceDiagram
 - **Cause**: the agent's token is not in its state directory yet.
 - **Fix**: in a terminal, run `zevbox auth claude` (or `zevbox auth antigravity`), then check with
   `zevbox auth <agent> --status`.
+
+### Problem 1b: `zevbox auth omlx` says `the Mac reaches <url> but the agent VM does not`
+- **Cause**: the VMs only go out through the Mac's main network; the server was given by an
+  address reached another way (typically a direct Ethernet cable). `zevbox doctor` reports the
+  same as `omlx:server … not reachable from the agent VM`.
+- **Fix**: use the server's address on the main network (Wi-Fi or the Ethernet that carries the
+  default route): `zevbox auth omlx --url http://<address>:<port>`.
 
 ### Problem 2: Zed shows `... is not an allowed project: <reason>`
 - **Cause**: the folder open in Zed is outside the allowed zones (I2): a hidden `~/.…` folder,
@@ -386,6 +421,7 @@ sequenceDiagram
 | Diagnose the system | `zevbox doctor` |
 | Build / update the agent images | `zevbox update` |
 | Sign in to Claude / Google (Antigravity) | `zevbox auth claude` / `zevbox auth antigravity` |
+| Connect a local oMLX server | `zevbox auth omlx --url http://<address>:<port>` |
 | Check sign-in status | `zevbox auth claude --status` / `zevbox auth antigravity --status` |
 | Open a Linux test shell | `zevbox shell claude` |
 | Add a Linux tool to the VM | `zevbox tools add ripgrep` |

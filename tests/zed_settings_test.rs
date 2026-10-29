@@ -65,7 +65,9 @@ const CLAUDE_ACP_BLOCK: &str = r#""claude-acp": {
 #[test]
 fn entries_for_builds_names_and_args() {
     let got = entries_for(&AGENTS, BIN);
-    assert_eq!(got, my_entries());
+    let mut expected = my_entries();
+    expected.push(entry("zevbox · oMLX", "omlx"));
+    assert_eq!(got, expected);
 }
 
 #[test]
@@ -82,7 +84,7 @@ fn one_entry_per_agent_without_project_suffix() {
 #[test]
 fn every_entry_name_has_managed_prefix() {
     let got = entries_for(&AGENTS, BIN);
-    assert_eq!(got.len(), 2);
+    assert_eq!(got.len(), 3);
     assert!(got.iter().all(|e| e.name.starts_with(MANAGED_PREFIX)));
 }
 

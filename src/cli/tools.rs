@@ -38,12 +38,7 @@ pub async fn run(action: super::ToolsAction) -> anyhow::Result<u8> {
 
             let active = crate::release::load_active(&paths)?;
             for agent_id in active.keys() {
-                let agent_arg = match agent_id.as_str() {
-                    "claude" => Some(super::AgentArg::Claude),
-                    "antigravity" => Some(super::AgentArg::Antigravity),
-                    _ => None,
-                };
-                if let Some(arg) = agent_arg {
+                if let Some(arg) = super::AgentArg::from_id(agent_id) {
                     let code = super::update::run_update(false, Some(arg)).await?;
                     if code != EXIT_OK {
                         return Ok(code);
@@ -64,12 +59,7 @@ pub async fn run(action: super::ToolsAction) -> anyhow::Result<u8> {
 
             let active = crate::release::load_active(&paths)?;
             for agent_id in active.keys() {
-                let agent_arg = match agent_id.as_str() {
-                    "claude" => Some(super::AgentArg::Claude),
-                    "antigravity" => Some(super::AgentArg::Antigravity),
-                    _ => None,
-                };
-                if let Some(arg) = agent_arg {
+                if let Some(arg) = super::AgentArg::from_id(agent_id) {
                     let code = super::update::run_update(false, Some(arg)).await?;
                     if code != EXIT_OK {
                         return Ok(code);

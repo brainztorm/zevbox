@@ -11,7 +11,7 @@ and how the ACP relay and the Apple Container micro-VMs work together.
 
 ### The problem with AI agents in the editor
 When an editor such as **Zed** integrates an AI agent through ACP (*Agent Client Protocol* —
-e.g. Claude Code or Google Antigravity), the agent normally runs directly on your Mac with all
+e.g. Claude Code or Google Antigravity; zevbox also offers oMLX, Claude Code on a local model server), the agent normally runs directly on your Mac with all
 of your user privileges. It can therefore:
 
 - read your SSH private keys (`~/.ssh/id_rsa`), cloud credentials (`~/.aws`,
@@ -36,7 +36,7 @@ flowchart LR
     end
 
     subgraph VM ["Apple Container micro-VM (Linux arm64)"]
-        Agent["ACP agent\n(Claude / Antigravity)"]
+        Agent["ACP agent\n(Claude / Antigravity / oMLX)"]
         VMFS["Ephemeral Linux filesystem\n(disposable overlay)"]
     end
 
@@ -303,6 +303,35 @@ published on the VM and the macOS keychain is never touched.
 | **Authentication** | interactive console CLI (`--cli auth login`) in the VM | OAuth 2.0 PKCE run by zevbox on the Mac |
 | **Works from a network-isolated VM** | **yes** (no local server needed) | **no** — hence the host-side flow |
 | **Token location (in the VM)** | `/home/agent/.claude/.credentials.json` | `/home/agent/.gemini/antigravity-acp/acp_token.json` |
+
+### 7b. oMLX: the Claude adapter on a local model server
+
+`zevbox · oMLX` (optional) is not a new adapter. It is **the Claude adapter**, built from the
+same Containerfile stage into its own image (`zevbox/omlx:<id>`), with its own state folder
+(`state/omlx`, mounted at `/home/agent`). Nothing is shared with the Claude agent and its
+subscription.
+
+```mermaid
+flowchart LR
+    Auth["zevbox auth omlx (on the Mac)\nURL + key → model list\n→ test from a VM"] --> Settings["state/omlx/.claude/settings.json (0600)\nenv: ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN\nmodel · availableModels · PostModelSwitch hook"]
+    Settings -.->|"mounted at /home/agent"| VM["oMLX VM\nclaude-agent-acp"]
+    VM -->|"Anthropic API /v1/messages\nthrough the Mac's main network"| Server["oMLX server\n(e.g. Mac Studio)"]
+    VM -->|"model switched in Zed:\nPOST /v1/models/<previous>/unload"| Server
+```
+
+- **Configuration**: Claude Code reads the server URL and key from the `env` block of its own
+  settings file, so no claude.ai sign-in happens. The key never appears on a command line, in a
+  `container run -e`, or in a log (I9); `zevbox auth omlx` passes it to `curl` on stdin.
+- **Models**: `availableModels` holds the server's model ids, which become the entries of
+  Zed's model picker. The default is the smallest model; the "haiku" slot (Claude Code's small
+  background requests) is always the smallest model too.
+- **Unloading**: a `PostModelSwitch` hook runs **inside the VM** and asks the server to unload
+  the model just left — except the smallest one, which the background requests would reload at
+  once. The relay is unchanged and `launch` still does no network access (I10).
+- **Network**: the VMs only go out through the Mac's main interface (the default route). A server
+  reached by a direct cable is invisible to them; `zevbox auth omlx` and `zevbox doctor` test the
+  server from a VM and say so.
+- **Opt-in**: `update` and `setup` without `--agent` leave oMLX alone until it is installed.
 
 ---
 

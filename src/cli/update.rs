@@ -21,15 +21,8 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
     let config = crate::config::load(&paths.config_file())?;
     let tools = crate::tools::load(&paths.tools_file()).unwrap_or_default();
 
-    let target_agents: Vec<&'static crate::agents::AgentSpec> = match agent_arg {
-        Some(a) => match crate::agents::find(a.id()) {
-            Some(spec) => vec![spec],
-            None => vec![],
-        },
-        None => crate::agents::AGENTS.iter().collect(),
-    };
-
     let mut active = load_active(&paths)?;
+    let target_agents = agents_to_update(agent_arg, &active);
     // A build happened: old images and the builder VM can be reclaimed (G1).
     let mut built = false;
     // Agents whose update failed: the exit code must say so (ARGON review 3.3).
@@ -49,7 +42,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
         };
 
         let (version, npm_pkg, archive_url, agent_cmd, auth_cmd, auth_marker) =
-            if agent_spec.id == "claude" {
+            if agent_spec.build_target == "claude" {
                 let c = match parse_claude_manifest(&text) {
                     Ok(c) => c,
                     Err(e) => {
@@ -58,20 +51,34 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                         continue;
                     }
                 };
-                (
-                    c.version,
-                    Some(c.npm_package),
-                    None,
-                    vec!["/opt/zevbox/claude/node_modules/.bin/claude-agent-acp".to_string()],
-                    vec![
-                        "/opt/zevbox/claude/node_modules/.bin/claude-agent-acp".to_string(),
-                        "--cli".to_string(),
-                        "auth".to_string(),
-                        "login".to_string(),
-                        "--claudeai".to_string(),
-                    ],
-                    ".claude/.credentials.json".to_string(),
-                )
+                let adapter = "/opt/zevbox/claude/node_modules/.bin/claude-agent-acp".to_string();
+                if agent_spec.id == "omlx" {
+                    // Same adapter, pointed at the user's server by `zevbox auth omlx`,
+                    // which runs on the Mac: no login command in the VM.
+                    (
+                        c.version,
+                        Some(c.npm_package),
+                        None,
+                        vec![adapter],
+                        Vec::new(),
+                        crate::omlx::AUTH_MARKER.to_string(),
+                    )
+                } else {
+                    (
+                        c.version,
+                        Some(c.npm_package),
+                        None,
+                        vec![adapter.clone()],
+                        vec![
+                            adapter,
+                            "--cli".to_string(),
+                            "auth".to_string(),
+                            "login".to_string(),
+                            "--claudeai".to_string(),
+                        ],
+                        ".claude/.credentials.json".to_string(),
+                    )
+                }
             } else {
                 let a = match parse_antigravity_manifest(&text) {
                     Ok(a) => a,
@@ -123,7 +130,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
         ));
         let now = chrono::Utc::now();
         let release_id = new_release_id(agent_spec.id, now);
-        let image = format!("zevbox/{}:{release_id}", agent_spec.id);
+        let image = format!("{}:{release_id}", agent_spec.image_repo);
         let context_dir = paths.release_dir(&release_id).join("context");
         let build_log = paths.release_dir(&release_id).join("build.log");
 
@@ -156,7 +163,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
             continue;
         }
 
-        if agent_spec.id == "antigravity" {
+        if agent_spec.build_target == "antigravity" {
             let agy_zip = context_dir.join("agy.zip");
             if agy_zip.exists() {
                 if let Ok(bytes) = std::fs::read(&agy_zip) {
@@ -238,6 +245,21 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
     Ok(EXIT_OK)
 }
 
+/// The agents `update` handles: the one named by `--agent`, else every agent
+/// except an opt-in one (oMLX) that is not installed yet.
+fn agents_to_update(
+    agent_arg: Option<AgentArg>,
+    active: &crate::release::ActiveReleases,
+) -> Vec<&'static crate::agents::AgentSpec> {
+    match agent_arg {
+        Some(a) => crate::agents::find(a.id()).into_iter().collect(),
+        None => crate::agents::AGENTS
+            .iter()
+            .filter(|a| !a.opt_in || active.contains_key(a.id))
+            .collect(),
+    }
+}
+
 pub async fn run_rollback(agent_arg: Option<AgentArg>) -> anyhow::Result<u8> {
     let paths = Paths::from_env()?;
     if !paths.config_file().exists() {
@@ -297,4 +319,38 @@ pub async fn run_rollback(agent_arg: Option<AgentArg>) -> anyhow::Result<u8> {
     let _ = crate::cli::zed::update_zed(&paths, &config);
 
     Ok(EXIT_OK)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::release::{ActiveEntry, ActiveReleases};
+
+    fn ids(v: Vec<&crate::agents::AgentSpec>) -> Vec<&str> {
+        v.into_iter().map(|a| a.id).collect()
+    }
+
+    #[test]
+    fn omlx_is_updated_only_once_installed_or_named() {
+        let mut active = ActiveReleases::new();
+        assert_eq!(
+            ids(agents_to_update(None, &active)),
+            ["claude", "antigravity"]
+        );
+        assert_eq!(
+            ids(agents_to_update(Some(AgentArg::Omlx), &active)),
+            ["omlx"]
+        );
+        active.insert(
+            "omlx".into(),
+            ActiveEntry {
+                current: "omlx-1".into(),
+                previous: None,
+            },
+        );
+        assert_eq!(
+            ids(agents_to_update(None, &active)),
+            ["claude", "antigravity", "omlx"]
+        );
+    }
 }

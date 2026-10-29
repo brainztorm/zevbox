@@ -450,7 +450,8 @@ pub fn prepare_context(
     write_atomic(&context_dir.join("zevbox-release.json"), &release_json)
         .map_err(|e| ReleaseError::Store(format!("failed to write zevbox-release.json: {e}")))?;
 
-    if lock.agent == "claude" {
+    let target = crate::agents::build_target(&lock.agent);
+    if target == "claude" {
         let npm_pkg = lock
             .npm_package
             .as_deref()
@@ -492,7 +493,7 @@ pub fn prepare_context(
                 String::from_utf8_lossy(&out.stderr)
             )));
         }
-    } else if lock.agent == "antigravity" {
+    } else if target == "antigravity" {
         let archive_url = lock
             .archive_url
             .as_deref()
@@ -539,7 +540,7 @@ pub fn build_image(
         "-f",
         &context_dir.join("Containerfile").to_string_lossy(),
         "--target",
-        &lock.agent,
+        crate::agents::build_target(&lock.agent),
         "--tag",
         &lock.image,
         "--build-arg",

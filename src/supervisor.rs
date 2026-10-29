@@ -106,7 +106,13 @@ async fn check_preflight(
 
     // 6. Auth marker
     let marker_path = paths.state_dir(agent).join(&lock.auth_marker);
-    if !marker_path.exists() {
+    // oMLX: the settings file must name a server and a key, not merely exist.
+    let ready = if agent == "omlx" {
+        crate::omlx::is_configured(&marker_path)
+    } else {
+        marker_path.exists()
+    };
+    if !ready {
         return Err(format!(
             "{} is not authenticated. Fix: run 'zevbox auth {agent}' in a macOS terminal.",
             agent_spec.display
