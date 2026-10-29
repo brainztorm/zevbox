@@ -483,7 +483,7 @@ Un conteneur `zevbox-*` **avec** label `zevbox.managed=1` mais **sans** enregist
 
 ### 8.5 Contrôles préalables de `launch` et erreurs visibles dans Zed
 
-Ordre : config présente (sinon `zevbox is not set up. Fix: run 'zevbox setup'`) et lisible → projet autorisé (I2) → agent connu → release active et image présente (`container image list --format json`, comparée avec `image_matches`, F14) → runtime en marche (`container system status` ; s'il est arrêté : `container system start`, puis revérifier une fois) → témoin d'authentification présent.
+Ordre : config présente (sinon `zevbox is not set up. Fix: run 'zevbox setup'`) et lisible → projet autorisé (I2) → agent connu → release active et image présente (`container image list --format json`, comparée avec `image_matches`, F14) → runtime en marche (`container system status` ; s'il est arrêté : `container system start`, puis revérifier une fois) → authentifié au sens de `auth --status` (`auth::is_authenticated` : témoin présent pour Claude, jeton de rafraîchissement non vide pour Antigravity, serveur + clé pour oMLX ; aligné le 2026-10-29, backlog 4).
 
 En cas d'échec, zevbox ne démarre pas de conteneur. Il lit la première ligne de Zed. Si c'est une requête, il répond `{"jsonrpc":"2.0","id":<id>,"error":{"code":-32000,"message":"zevbox: <problème>. Fix: <commande exacte>"}}`, puis il sort avec le code 3. Il écrit le même message sur stderr. Exemples :
 

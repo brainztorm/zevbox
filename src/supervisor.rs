@@ -104,15 +104,9 @@ async fn check_preflight(
         ));
     }
 
-    // 6. Auth marker
-    let marker_path = paths.state_dir(agent).join(&lock.auth_marker);
-    // oMLX: the settings file must name a server and a key, not merely exist.
-    let ready = if agent == "omlx" {
-        crate::omlx::is_configured(&marker_path)
-    } else {
-        marker_path.exists()
-    };
-    if !ready {
+    // 6. Auth marker: the same test as `auth --status` and `doctor` (Antigravity:
+    // a non-empty refresh token; oMLX: a server and a key), DECISIONS backlog 4.
+    if !crate::cli::auth::is_authenticated(paths, agent, &lock.auth_marker) {
         return Err(format!(
             "{} is not authenticated. Fix: run 'zevbox auth {agent}' in a macOS terminal.",
             agent_spec.display
