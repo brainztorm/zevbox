@@ -15,11 +15,11 @@ flowchart TD
     Start(["Start"]) --> Step1["Step 1: check the Mac prerequisites"]
     Step1 --> Step2["Step 2: build and install the binary\nmake install"]
     Step2 --> Step3["Step 3: initialise and build the images\nzevbox setup · zevbox update"]
-    Step3 --> Step4["Step 4: sign in to the agents\nzevbox auth claude · zevbox auth antigravity"]
+    Step3 --> Step4["Step 4: sign in to the agents\nzevbox auth claude · antigravity · omlx"]
     Step4 --> Step4b["Step 5: open a project in Zed\n(home folder or external disk)"]
     Step4b --> Step5{"Step 6: checks\nzevbox doctor & shell"}
 
-    Step5 -- "all good" --> Step6["Step 7: open Zed\npick zevbox · Claude\nor zevbox · Antigravity"]
+    Step5 -- "all good" --> Step6["Step 7: open Zed\npick zevbox · Claude,\nzevbox · Antigravity or zevbox · oMLX"]
     Step5 -- "something fails" --> Fix["see Troubleshooting"]
     Fix --> Step5
 
@@ -30,7 +30,8 @@ flowchart TD
 
 ## 2. Prerequisites
 
-1. **A Mac with Apple Silicon** (M1 or later) running macOS 13 or newer.
+1. **A Mac with Apple Silicon** (M1 or later) running a macOS version supported by Apple
+   Container.
 2. **Apple Container CLI** (`container` ≥ 1.5.0), installed and running:
    ```bash
    container system status
@@ -90,8 +91,9 @@ zevbox update
 ```mermaid
 flowchart LR
     SetupCmd["zevbox setup"] --> DirInit["creates the state directories\n(mode 0700) + config.json"]
+    SetupCmd --> ZedSet["adds the zevbox entries\nto Zed settings"]
     SetupCmd --> Doc["runs doctor"]
-    UpdateCmd["zevbox update"] --> Build["downloads Claude and Antigravity\nfrom the official ACP registry"]
+    UpdateCmd["zevbox update"] --> Build["downloads Claude and Antigravity\nfrom the official ACP registry\n(oMLX only once installed)"]
     Build --> Img["builds, smoke-tests and activates\nthe zevbox/claude and zevbox/antigravity images"]
 ```
 
@@ -102,7 +104,9 @@ flowchart LR
    Container runtime if it is stopped, runs `doctor` and prints a per-agent summary. It is
    idempotent: run again, it rebuilds nothing.
 2. `update` builds one image per agent (about 1–3 minutes each, network required) and promotes
-   it as the active release. Run it again whenever `zevbox update --check` reports a new version.
+   it as the active release. oMLX is optional: `update` and `setup` only handle it once
+   `zevbox auth omlx` has installed it (`zevbox update --agent omlx` builds it by hand). Run
+   `update` again whenever `zevbox update --check` reports a new version.
 
 > **Note**: `zevbox setup` takes no argument and registers nothing: projects need no
 > registration (Step 5). It builds the missing images, offers sign-in and configures Zed.
@@ -196,8 +200,8 @@ authenticated
 ---
 
 ### Step 5: know where your projects can be
-There is nothing to register: when you pick **`zevbox · Claude`** or **`zevbox · Antigravity`**
-with **+** in a Zed window, that choice is your consent, and zevbox uses the folder open in that
+There is nothing to register: when you pick **`zevbox · Claude`**, **`zevbox · Antigravity`** or
+**`zevbox · oMLX`** with **+** in a Zed window, that choice is your consent, and zevbox uses the folder open in that
 window (first root folder). It only checks that the folder is in an allowed zone (invariant I2):
 
 - **allowed**: any folder inside your home folder, e.g. `~/code/my-app`, or on an external disk,
@@ -210,7 +214,7 @@ window (first root folder). It only checks that the folder is in an allowed zone
 In a refused folder, Zed shows `… is not an allowed project: <reason>` (see Troubleshooting,
 problem 2).
 
-> **Why only two entries?** Zed's agent servers are a global setting, visible from every
+> **Why one entry per agent?** Zed's agent servers are a global setting, visible from every
 > project. The `zevbox · …` entries therefore carry no path: at launch, zevbox takes the folder
 > open in Zed.
 
@@ -229,7 +233,7 @@ Before opening Zed, run these three quick checks.
 zevbox doctor
 ```
 
-**Expected:** every line `[OK  ]`. A `[WARN]` line always ends with the command that fixes it (for example `zevbox auth claude`, `zevbox zed install`, `zevbox clean --images`); a `[FAIL]` means launching an agent would fail (for example its image is missing: `zevbox update --agent <agent>`):
+**Expected:** every line `[OK  ]`. A `[WARN]` line says what to do, usually with the command that fixes it (for example `zevbox auth claude`, `zevbox zed install`, `zevbox clean --images`); a `[FAIL]` means launching an agent would fail (for example its image is missing: `zevbox update --agent <agent>`):
 ```text
 [OK  ] config               — config.json is valid
 [OK  ] container_binary     — Apple Container 1.5.0 (arm64)
@@ -243,7 +247,11 @@ zevbox doctor
 [OK  ] installed_binary     — /Users/<user>/.local/bin/zevbox exists
 [OK  ] zed_entries          — Zed entries match the agents with an active release
 [OK  ] instances            — … active instance(s), no orphan
+[OK  ] blocked_methods      — no ACP method refused in the last 7 days
 ```
+With oMLX installed and signed in, an `omlx:server` line (the server as an agent VM sees it)
+follows the `agent:omlx` line. `blocked_methods` lists the ACP methods the relay refused in the
+instance logs of the last 7 days (see `zevbox logs`).
 
 ---
 
@@ -313,7 +321,7 @@ open:
 
 ## 5. Everyday use in Zed
 
-Everything is set up. The diagram shows Claude; Antigravity is identical:
+Everything is set up. The diagram shows Claude; Antigravity and oMLX are identical:
 
 ```mermaid
 sequenceDiagram
@@ -328,7 +336,7 @@ sequenceDiagram
     User->>Zed: 3. picks the "zevbox · Claude" agent
     User->>Zed: 4. asks a question in the chat
     Zed->>Zevbox: runs zevbox launch claude (cwd = open project)
-    Zevbox->>VM: starts the isolated Linux micro-VM (< 300 ms)
+    Zevbox->>VM: starts the isolated Linux micro-VM
     VM->>Zed: answers through the filtered ACP relay
     Zed->>User: shows the answer in Zed
 ```
@@ -356,7 +364,7 @@ sequenceDiagram
 | ✅ Do | ❌ Don't |
 |---|---|
 | **Keep your projects in your home folder or on an external disk**, and commit the agent's work yourself. | **Don't open `$HOME` itself, `/`, `~/Library`, hidden `~/.…` folders or system folders as a project** (rejected immediately by I2). |
-| **Use `zevbox tools add <package>`** to give the agent extra Linux tools (e.g. `ripgrep`, `clang`, `jq`). | **Don't `sudo apt install` inside a session** (the VM is ephemeral and capabilities are dropped). |
+| **Use `zevbox tools add <package>`** to give the agent extra Linux tools (e.g. `ripgrep`, `clang`, `tree`); it rebuilds the images of the installed agents (network required). | **Don't `sudo apt install` inside a session** (the VM is ephemeral and capabilities are dropped). |
 | **Run `zevbox stop`** at the end of the day to free background instances. | **Never run `container stop --all` by hand** (it would stop your own non-zevbox containers). |
 | **Run `zevbox doctor`** when something looks odd. | **Don't hand-edit the `zevbox · …` keys in Zed's settings** (use `zevbox zed install` / `zevbox zed uninstall`). |
 
@@ -364,9 +372,11 @@ sequenceDiagram
 
 ## 7. Troubleshooting
 
-### Problem 1: Zed shows `Claude is not authenticated` (or `Antigravity is not authenticated`)
-- **Cause**: the agent's token is not in its state directory yet.
-- **Fix**: in a terminal, run `zevbox auth claude` (or `zevbox auth antigravity`), then check with
+### Problem 1: Zed shows `Claude is not authenticated` (or `Antigravity` / `oMLX is not authenticated`)
+- **Cause**: the agent's token is not in its state directory yet. Launching applies the same test
+  as `zevbox auth <agent> --status` (and `doctor`): for Antigravity a non-empty refresh token, for
+  oMLX a server and a key in its settings.
+- **Fix**: in a terminal, run `zevbox auth claude` (or `antigravity`, `omlx`), then check with
   `zevbox auth <agent> --status`.
 
 ### Problem 1b: `zevbox auth omlx` says `the Mac reaches <url> but the agent VM does not`
@@ -435,7 +445,8 @@ sequenceDiagram
 | Build / update the agent images | `zevbox update` |
 | Sign in to Claude / Google (Antigravity) | `zevbox auth claude` / `zevbox auth antigravity` |
 | Connect a local oMLX server | `zevbox auth omlx --url http://<address>:<port>` |
-| Check sign-in status | `zevbox auth claude --status` / `zevbox auth antigravity --status` |
+| Check sign-in status | `zevbox auth claude --status` / `zevbox auth antigravity --status` / `zevbox auth omlx --status` |
+| Show the running instances | `zevbox status` |
 | Open a Linux test shell | `zevbox shell claude` |
 | Add a Linux tool to the VM | `zevbox tools add ripgrep` |
 | Read recent logs | `zevbox logs` |

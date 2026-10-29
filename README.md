@@ -126,7 +126,7 @@ project` (invariant I2 — folders whose files the Mac runs by itself are never 
 `zevbox setup` does all of the above in one go; `init`, `update` and `auth` stay available
 separately (see the command reference).
 
-> Both `auth` commands print the sign-in URL: if your browser does not open by itself, paste it.
+> The Claude and Antigravity sign-ins print the sign-in URL: if your browser does not open by itself, paste it.
 
 Full walkthrough with checks: **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
 How it works and why: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
@@ -159,17 +159,17 @@ Documentation en français : **[docs/fr/](docs/fr/README.md)**.
 | Command | What it does |
 |---|---|
 | `zevbox setup` | Guided, idempotent set-up: writes the configuration, builds missing releases (`update`), offers `auth` for each unauthenticated agent (terminal only), configures Zed, runs `doctor` and prints a per-agent summary. One agent failing to build does not block the other; the exit code is 1 if an agent still has no release at the end. The optional oMLX agent is never built by `setup` (use `zevbox auth omlx`). |
-| `zevbox init` | Creates the state directories (`~/.local/share/zevbox` or Application Support) with mode `0700`, plus `config.json` and `tools.json`. |
-| `zevbox doctor [--json]` | Full health check: `container` ≥ 1.5.0, runtime running, arm64, per agent: release, image present and sign-in (same test as `auth --status`; oMLX: `optional, not installed`, or the server tested from a VM), disk used by zevbox images (WARN when old ones can be reclaimed), `0700` permissions on the state folders, installed binary, Zed entries in sync, orphan instances. Exit code 1 only on `FAIL`. |
+| `zevbox init` | Creates the state directories (`~/.local/share/zevbox` or Application Support) with mode `0700`, plus `config.json` (including the size of each agent VM, `resources`: 4 CPUs and `4G` by default) and `tools.json`. |
+| `zevbox doctor [--json]` | Full health check: `container` ≥ 1.5.0, runtime running, arm64, per agent: release, image present and sign-in (same test as `auth --status`; oMLX: `optional, not installed`, or the server tested from a VM), disk used by zevbox images (WARN when old ones can be reclaimed), `0700` permissions on the state folders, installed binary, Zed entries in sync, orphan instances, ACP methods refused in the last 7 days (read from the journals). Exit code 1 only on `FAIL`. |
 | `zevbox zed install [--dry-run]` | Non-destructively inserts the managed `zevbox · …` entries into `~/.config/zed/settings.json`, preserving comments and formatting (CST edit). Automatic backup in `backups/` (the 20 most recent are kept). Prints what it did (`already up to date`, or `updated (backup: …)`); `--dry-run` prints the entries it would write and changes nothing. |
 | `zevbox zed uninstall` | Removes all managed entries from Zed and restores the settings byte for byte. |
 | `zevbox auth <agent> [--status]` | Claude: runs the interactive login in a `-it` container. Antigravity: runs the Google OAuth 2.0 PKCE flow **on the Mac** (ephemeral HTTP server on `127.0.0.1:<random port>`, no port published on the VM, no keychain access) and writes `state/antigravity/.gemini/antigravity-acp/{settings.json,acp_token.json}` with mode `0600`. oMLX (`zevbox auth omlx [--url <url>] [--model <id>]`, on the Mac): asks for the server URL and API key (hidden input, or read from stdin), lists the server's models, writes `state/omlx/.claude/settings.json` (`0600`: URL, key, models, default = `--model` or the smallest, unload hook) and checks that a VM reaches the server. `--status` prints `authenticated`, `not authenticated` or `unknown`. |
-| `zevbox launch <agent> [--project <path>]` | Called by Zed: checks the project against the allowed zones (I2), starts the micro-VM and relays ACP over stdin/stdout with strict filtering, and watches the project (I13). Without `--project`, the project is the current directory (Zed starts the agent in the first root folder). |
-| `zevbox status [--json]` | Shows active, orphaned and unregistered instances. |
+| `zevbox launch <agent> [--project <path>]` | Called by Zed: checks the project against the allowed zones (I2) and that the agent is signed in (same test as `auth --status`), starts the micro-VM and relays ACP over stdin/stdout with strict filtering, and watches the project (I13). Without `--project`, the project is the current directory (Zed starts the agent in the first root folder). |
+| `zevbox status [--json]` | Shows active, orphaned and unregistered instances (of this state folder only). |
 | `zevbox stop [ID \| --project <path>]` | Cleanly stops the given instances, or every active zevbox instance (never with the global `--all`), and prints one line per instance stopped. A recorded process is signalled only if it is still the same relay (never a process that merely reuses its number after a reboot); a relay that does not answer within 10 s has its container stopped directly. |
-| `zevbox clean [--images]` | Removes verified orphan containers and stale records, prunes old logs (>30) and backups (>20). With `--images`, deletes the zevbox images of releases that are neither current nor previous (never another tool's images) and removes the image builder VM, whose disk never shrinks. It also deletes the `releases/<id>/` folders of finished releases that are neither current nor previous, and the ~300 MB Antigravity build archive of every release (only needed to build; its URL and SHA-256 stay in `lock.json`). |
+| `zevbox clean [--images]` | Removes verified orphan containers and stale records, removes unregistered zevbox containers of this state folder only, prunes old logs (>30) and backups (>20). With `--images`, deletes the zevbox images of this state folder's releases that are neither current nor previous (never another tool's images, never another state folder's) and removes the image builder VM, whose disk never shrinks. It also deletes the `releases/<id>/` folders of finished releases that are neither current nor previous, and the ~300 MB Antigravity build archive of every release (only needed to build; its URL and SHA-256 stay in `lock.json`). |
 | `zevbox shell <agent> [--project <path>]` | Interactive Bash in a disposable VM identical to the agent's, including the I13 protections (`.zed` masked, an existing `.git` read-only). Without `--project`, the current directory must be in an allowed zone (exit code 3 otherwise). |
-| `zevbox logs [ID] [--path]` | Shows the last 200 lines of the most recent session log, or of the given ID. `--path` prints the log file path. Each launch writes its journal there: the container's stderr plus zevbox's own events (`launch agent=… container=…`, `blocked method=<m> dir=<d>` for every refused ACP method, `shutdown …`) at level `info` (`RUST_LOG=debug` for more; for the other commands `RUST_LOG` prints to stderr). Names, paths and ids only: never a prompt, a file's content or a token (I9). `zevbox doctor` lists the refused methods found in the recent journals. |
+| `zevbox logs [ID] [--path]` | Shows the last 200 lines of the most recent session log, or of the given ID. `--path` prints the log file path. Each launch writes its journal there: the container's stderr plus zevbox's own events (`launch agent=… container=…`, `blocked method=<m> dir=<d>` for every refused ACP method, `shutdown …`) at level `info` (`RUST_LOG=debug` for more; for the other commands `RUST_LOG` prints to stderr). Names, paths and ids only: never a prompt, a file's content or a token (I9). `zevbox doctor` lists the refused methods found in the journals of the last 7 days. |
 | `zevbox update [--check] [--agent <agent>]` | Checks for or builds a new agent release from the official ACP registry, runs the smoke test and promotes it. Without `--agent`: Claude and Antigravity, plus oMLX if it is installed. Exits with code 1 if any agent's update failed (it then changes nothing for that agent). After a build, the same image cleanup as `clean --images` runs, and the release folders/archives are always tidied. |
 | `zevbox rollback [--agent <agent>]` | Swaps the active release (`current`) with the previous one; refuses, with the fix to run, if the previous release's image no longer exists. |
 | `zevbox tools list` / `add <pkgs…>` / `remove <pkgs…>` | Manages extra Debian packages (`tools.json`) and rebuilds the active agent images. |
@@ -195,7 +195,7 @@ flowchart LR
 | **Project code** | Stays on the Mac (edits visible immediately, same UID/GID). |
 | **Agent credentials** | Persist in `state/<agent>` (mounted at `/home/agent` in the VM). |
 | **Temporary files outside the project** | Deleted with the container (`--rm`, disposable VM). |
-| **Session logs** | Persist in `logs/<instance_id>.log` (rotation at 30 files). |
+| **Session logs** | Persist in `logs/<instance_id>.log` (`zevbox clean` keeps the 30 most recent). |
 | **Instance record** | Removed from `instances/<instance_id>.json` on clean shutdown. |
 
 ---
@@ -209,7 +209,7 @@ never weakened to make a test pass:
 - **I2 — Projects in allowed zones**: a project is a canonical folder strictly inside your home folder (not `~/Library`, not a hidden `~/.…` folder) or on an external disk under `/Volumes`; `/`, system folders, `/Applications`, `/opt/homebrew` and zevbox's own folders are refused. Writing in those folders would let the Mac run the agent's code.
 - **I3 — No host access through Zed**: every ACP request asking the editor for filesystem (`fs/*`), terminal (`terminal/*`) or terminal-based authentication is intercepted and rejected.
 - **I4 — Allow-list both ways**: only known, safe ACP methods pass between Zed and the agent; responses are routed by pending request id.
-- **I5 — Confined `cwd`**: the working directory is always exactly the project root; `mcpServers` is emptied.
+- **I5 — Confined `cwd`**: the working directory is always exactly the project root; `mcpServers` is emptied and `_meta` and `systemPrompt` are removed.
 - **I6 — Pure JSON-RPC on stdout**: in `launch` mode stdout carries nothing but JSON-RPC, so Zed never sees garbage.
 - **I7 — No host shell**: zevbox never spawns `sh`, `bash` or `zsh` on the Mac.
 - **I8 — Surgical container targeting**: `container stop`/`delete` never use `--all` and only touch containers with the `zevbox-` prefix **and** the zevbox label; `clean` only removes unregistered containers of its own state root (their `/home/agent` mount is under it).
@@ -217,7 +217,7 @@ never weakened to make a test pass:
 - **I10 — No network or build in `launch`**: launching uses the active release only.
 - **I11 — No panics in production**: zero `unwrap()`, `expect()`, `panic!()` in `src/` (Clippy `deny`).
 - **I12 — zevbox is out of reach**: its binary, configuration and releases are never mounted into a container.
-- **I13 — Project files the Mac would run**: in the VM, the project's `.zed` folder is masked (the agent's edits stay in VM memory) and an existing `.git` is read-only. The watch starts before the VM does, and a `.zed` that is a file or a link is refused at launch. During the session zevbox stops the agent if a `.git` appears or changes anywhere else. Reason: Zed runs programs named in `.zed/settings.json` and in git settings by itself ([EXP-01](docs/experiments/EXP-01-resultats.md)).
+- **I13 — Project files the Mac would run**: in the VM, the project's `.zed` folder is masked (the agent's edits stay in VM memory) and an existing `.git` is read-only. The watch starts before the VM does, and a `.zed` that is a file or a link is refused at launch. During the session zevbox stops the agent if a `.git` appears or changes anywhere else. Reason: Zed runs programs named in `.zed/settings.json` and in git settings by itself (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 
 ### Threat model and known limits
 

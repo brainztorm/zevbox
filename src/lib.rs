@@ -1,6 +1,6 @@
 //! zevbox: run ACP agents for Zed inside Apple Container micro-VMs.
 //!
-//! The implementation contract is `zevbox_plan.md`. Section numbers (§) in doc
+//! The implementation contract is `zevbox_plan_V2.md`. Section numbers (§) in doc
 //! comments refer to that document.
 
 pub mod agents;

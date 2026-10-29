@@ -1,13 +1,13 @@
 # Spécification — `zevbox tools add/remove` reconstruit les images aux versions actuelles
 
-- **Backlog** : `docs/DECISIONS.md`, point 1 (« R3 — `tools add/remove` sans réseau », revue ARGON 3.1).
+- **Backlog** : `docs/DECISIONS.md`, point 1 (« R3 — `tools add/remove` sans résolution du registre », revue ARGON 3.1).
 - **Statut** : spécification du 2026-10-29, relue contre le code (revue adverse, 18 remarques
   intégrées). Pas encore implémentée.
 - **Contrat visé** : `zevbox_plan_V2.md` §8.7, qui dit déjà « Pipeline `update` (et `tools add/remove`,
   qui réutilisent les versions actuelles au lieu de résoudre) ». Le code ne le fait pas : cette
   spécification le met en conformité et précise ce que le plan laisse dans le vague.
 - **Lecteur visé** : l'agent qui implémentera, avec seulement `AGENTS.md`, le plan, ce fichier et le
-  code. Les références `fichier:ligne` datent du 2026-10-29 (HEAD `3effd7b`) : vérifier avec `grep`
+  code. Les références `fichier:ligne` datent du 2026-10-29 (HEAD `3effd7b`, lignes de `release.rs` mises à jour après le point 12) : vérifier avec `grep`
   avant d'éditer.
 
 « Doit » = exigence. Chaque exigence a un identifiant `T-xx`, repris par les preuves (§8).
@@ -18,7 +18,7 @@
 
 `zevbox tools add <paquets>` / `remove <paquets>` modifie `tools.json`, puis appelle
 `update::run_update(false, Some(agent))` pour chaque agent actif (`src/cli/tools.rs:42` et `:63`).
-Or `run_update` **re-résout le registre ACP** (`fetch_manifest`, `release.rs:407-433`, branche `main`
+Or `run_update` **re-résout le registre ACP** (`fetch_manifest`, `release.rs:427-453`, branche `main`
 de `agentclientprotocol/registry`) : ajouter un outil peut faire passer Claude de 0.99.0 à 0.100.0
 ou Antigravity de 1.4.4 à 1.5.0 sans que l'utilisateur l'ait demandé, avec de possibles nouvelles
 méthodes ACP non auditées (`relay/policy.rs`).
@@ -187,7 +187,7 @@ testée en unitaire.
 | Champ | Valeur |
 |---|---|
 | `schemaVersion` | `1` |
-| `releaseId` | `release::new_release_id(agent, Utc::now())` (`release.rs:402`, `<agent>-AAAAMMJJ-HHMMSS` UTC) |
+| `releaseId` | `release::new_release_id(agent, Utc::now())` (`release.rs:422`, `<agent>-AAAAMMJJ-HHMMSS` UTC) |
 | `agent` | celui du lock actif |
 | `createdAt` | maintenant (RFC 3339) |
 | `registryManifestUrl`, `registryManifestSha256` | **copiés** (provenance d'origine) |
@@ -207,7 +207,7 @@ l'identifiant, au plus 2 essais ; sinon échec de préparation `<Display>: relea
 
 ### 4.2 Préparation du contexte
 
-`prepare_context` (`release.rs:436-526`) fait aujourd'hui tout d'un bloc, et écrit toujours
+`prepare_context` (`release.rs:456-546`) fait aujourd'hui tout d'un bloc, et écrit toujours
 `package.json` avant de lancer npm. **Le découper** en trois fonctions, qu'`update` appelle dans le
 même ordre qu'aujourd'hui, avec les mêmes messages et le même résultat :
 
@@ -285,19 +285,14 @@ Pour une reconstruction, dans `releases/<nouvel id>/context/` :
 - Commande `zevbox tools rebuild` (non demandée ; T-07 couvre la réparation).
 - Test ACP `initialize` du plan §8.7 étape 5, marquage « failed » d'un lock, suppression des dossiers
   de releases en échec (sans `lock.json`) : non implémentés aujourd'hui, non traités ici.
-- **Nouveau point de backlog 12, trouvé pendant l'analyse** : `release::prune_images`
-  (`release.rs:283`) supprime toute image `zevbox/*` absente de **son** `active.json`. Lancé depuis un
-  état isolé (`ZEVBOX_STATE_ROOT` de test), `update` (et cette fonctionnalité) supprimerait les images de
-  la vraie installation, comme `clean` arrêtait ses conteneurs avant le point 10. **Conséquence : les
-  essais manuels de §8.2 se font sur l'état réel**, jamais dans un état isolé, tant que le point 12
-  n'est pas corrigé.
+- **Point de backlog 12, trouvé pendant l'analyse et corrigé le 2026-10-29** : `release::prune_images` supprimait toute image `zevbox/*` absente de **son** `active.json`, donc, depuis un état isolé, les images de la vraie installation. Depuis la correction (`release::stale_images_here`), une racine d'état ne supprime que les images de ses propres releases : les essais de §8.2 peuvent se faire dans un état isolé sans risque pour la vraie installation. L'essai sur l'état réel reste la preuve finale.
 
 ## 7. Fichiers touchés
 
 - `src/release.rs` : `rebuild_lock`, découpage de `prepare_context` (§4.2), réutilisation du verrou npm
   (T-29/T-30), contrôles d'archive (T-31 à T-33), preuve de version (T-36).
 - `src/cli/tools.rs` : déroulé §3 (mince).
-- `src/tools.rs` (WORKED EXAMPLE) : `load_or_default` (T-01), dans le style du fichier.
+- `src/tools.rs` : `load_or_default` (T-01), dans le style du fichier.
 - `src/cli/update.rs` : lecture de `tools.json` (T-01) et appels aux trois fonctions issues de
   `prepare_context` ; aucun autre changement de comportement ni de message.
 - `AGENTS.md` (module map) : `release.rs` « registry, locks, build, promote, rollback, **rebuild from lock** ».
@@ -316,7 +311,7 @@ Faits sur le faux `container` (`tests/fixtures/fake-container`, protégé) :
   jusqu'au bout avec le faux ;
 - `system status` répond toujours `running`.
 
-`curl` n'est pas appelé à travers le faux : il est lancé directement (`release.rs:411`, `:502`). Pour
+`curl` n'est pas appelé à travers le faux : il est lancé directement (`release.rs:431`, `:522`). Pour
 prouver « registre non contacté » et rester hors réseau, les tests de bout en bout construisent leur
 commande à la main (comme `launch_omlx` dans `tests/omlx_test.rs`) avec
 `PATH=<tmp>/fakebin:/usr/bin:/bin`, où `fakebin/curl` est un script qui ajoute ses arguments à
@@ -352,7 +347,7 @@ commande à la main (comme `launch_omlx` dans `tests/omlx_test.rs`) avec
    `tools add tree` → message T-07 « rebuilding it », tentative de `build` (qui échoue avec le faux),
    code 1, rien de modifié.
 
-### 8.2 Essai manuel (machine réelle, **état réel**, voir §6)
+### 8.2 Essai manuel (machine réelle ; preuve finale sur l'état réel, voir §6)
 
 À consigner dans `docs/PROGRESS.md`. Paquet d'essai : **`tree`**, absent de l'image (attention, `jq` est
 déjà dans l'image de base, `assets/Containerfile:11` : il ne prouve rien).

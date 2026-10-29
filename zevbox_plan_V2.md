@@ -2,9 +2,9 @@
 
 > Agents ACP (Claude, Antigravity, oMLX — amendement 2026-10-29) isolés dans des micro-VM Apple Container, utilisés depuis Zed.
 > Binaire hôte en Rust. Ce document est **le contrat complet** pour l'agent IA qui va construire le projet.
-> Il remplace `zevbox_plan.v1.md` (conservé pour l'historique ; ne pas l'utiliser).
+> Il remplace `zevbox_plan_V1.md` (conservé pour l'historique ; ne pas l'utiliser).
 > Faits vérifiés le 2026-10-13 sur la machine cible et dans les sources officielles (voir §16).
-> **Un harnais exécutable est fourni** : squelette compilable, 167 tests déjà écrits et protégés, faux CLI `container`, faux agent, portes de validation (`make verify STEP=N`). Tous les tests ont été validés contre une implémentation de référence : ils sont réalisables.
+> **Un harnais exécutable est fourni** : squelette compilable, 167 tests protégés à l'origine (d'autres ont été ajoutés depuis, §9), faux CLI `container`, faux agent, portes de validation (`make verify STEP=N`). Tous les tests ont été validés contre une implémentation de référence : ils sont réalisables.
 
 ---
 
@@ -51,7 +51,7 @@ Ces points corrigent le plan v1. Ils sont des exigences.
 | # | Fait | Conséquence obligatoire |
 |---|---|---|
 | F1 | ACP permet à l'agent de demander au **client (Zed)** de lire/écrire des fichiers (`fs/*`), de créer des terminaux (`terminal/*`), de lancer un programme d'authentification « terminal » (`AuthMethod.type = "terminal"` ou `_meta["terminal-auth"]`) et d'ouvrir des URL (`elicitation/create`). Tout cela s'exécute **sur le Mac**. | Relais filtrant obligatoire (§7). |
-| F2 | L'adaptateur Claude (`claude-agent-acp` 0.89.x) annonce, dans la réponse à `initialize`, des méthodes d'auth `type:"terminal"` et un `_meta["terminal-auth"]` contenant `command: process.execPath`. Zed exécuterait cette commande **sur le Mac**. Il active ces méthodes si `clientCapabilities.auth.terminal` ou `clientCapabilities._meta["terminal-auth"]` vaut `true`. | Le relais réécrit les capacités client et filtre `authMethods` (§7.3). |
+| F2 | L'adaptateur Claude (`claude-agent-acp` 0.89.x ; toujours vrai en 0.99.0, audit du 2026-10-29) annonce, dans la réponse à `initialize`, des méthodes d'auth `type:"terminal"` et un `_meta["terminal-auth"]` contenant `command: process.execPath`. Zed exécuterait cette commande **sur le Mac**. Il active ces méthodes si `clientCapabilities.auth.terminal` ou `clientCapabilities._meta["terminal-auth"]` vaut `true`. | Le relais réécrit les capacités client et filtre `authMethods` (§7.3). |
 | F3 | L'adaptateur Claude lit `session/new._meta.claudeCode.options` pour configurer le SDK. | Le relais supprime `_meta` des requêtes de session venant de Zed (§7.3). |
 | F4 | Transport ACP stdio : **un message JSON par ligne**, délimité par `\n`, sans retour à la ligne interne. stderr = journaux libres. | Codec ligne par ligne (§7.2). Rien d'autre que du JSON-RPC sur stdout. |
 | F5 | Sur macOS, Claude Code stocke ses identifiants dans le Trousseau ; sous Linux dans un fichier (`~/.claude/.credentials.json`, VÉRIFIER à l'étape 13). Monter `~/.claude` du Mac ne marche pas et serait dangereux. | État d'auth Linux dédié, monté en `$HOME` du conteneur. |
@@ -86,7 +86,7 @@ Chaque invariant est couvert par au moins un test (§9) ou une vérification (`m
 - **I10 — Pas de mise à jour pendant un lancement.** `launch` n'effectue aucun accès réseau de zevbox, aucun build et aucune résolution de version : il utilise la release active.
 - **I11 — Pas de panic en production.** Interdire `unwrap`, `expect`, `panic!`, `todo!` et `unimplemented!` hors tests (lints Clippy, §6.3).
 - **I12 — zevbox n'est pas modifiable par l'agent.** Binaire installé, configuration et releases sont hors des montages (conséquence de I1).
-- **I13 — Fichiers du projet exécutés par le Mac** (amendement 2026-10-16, EXP-01, décision P1). Dans le conteneur ACP, `<projet>/.zed` est masqué par un tmpfs et un `<projet>/.git` existant est en lecture seule (options `--tmpfs` / `--read-only-path`, qui ne sont pas des montages hôte : I1 inchangé). Pendant la session, `launch` surveille le projet — **surveillance démarrée avant le conteneur** (2026-10-21) — et arrête l'agent si un `.git` apparaît ou change ailleurs qu'à la racine existante. Précondition : `<projet>/.zed` doit être absent ou un vrai dossier ; fichier ou lien symbolique → lancement refusé avec message (`guard::project_files_problem`). Motif : Zed exécute sans geste les `lsp.*.binary.path` / `context_servers` du `.zed` racine (projet approuvé) et les filtres git de tout dépôt du projet (même en Restricted Mode).
+- **I13 — Fichiers du projet exécutés par le Mac** (amendement 2026-10-16, EXP-01 — rapports retirés du dépôt le 2026-10-29, voir DECISIONS —, décision P1). Dans le conteneur ACP, `<projet>/.zed` est masqué par un tmpfs et un `<projet>/.git` existant est en lecture seule (options `--tmpfs` / `--read-only-path`, qui ne sont pas des montages hôte : I1 inchangé). Pendant la session, `launch` surveille le projet — **surveillance démarrée avant le conteneur** (2026-10-21) — et arrête l'agent si un `.git` apparaît ou change ailleurs qu'à la racine existante. Précondition : `<projet>/.zed` doit être absent ou un vrai dossier ; fichier ou lien symbolique → lancement refusé avec message (`guard::project_files_problem`). Motif : Zed exécute sans geste les `lsp.*.binary.path` / `context_servers` du `.zed` racine (projet approuvé) et les filtres git de tout dépôt du projet (même en Restricted Mode).
 
 Limites assumées, à écrire telles quelles dans le README : l'agent peut modifier ou supprimer tout le projet monté ; il a accès au réseau, donc peut exfiltrer le code du projet ; il a accès à ses propres identifiants (pour oMLX : l'URL et la clé du serveur, en clair dans `state/omlx/.claude/settings.json`) ; le contenu volontairement envoyé depuis Zed (fichiers joints, texte collé) lui est transmis ; aucune garantie contre une faille du runtime Apple Container ou du relais.
 
@@ -102,7 +102,7 @@ zevbox launch  (processus hôte, Rust, tokio)
   ├─ 1. charge config + release active, vérifie projet (I2), runtime, image, auth
   │     └─ si échec : répond à la 1re requête de Zed par une erreur JSON-RPC lisible, puis sort (§8.5)
   ├─ 2. nettoie les instances orphelines (§8.4)
-  ├─ 3. démarre : container run -i --rm --init --name zevbox-claude-<id> --label … IMAGE CMD
+  ├─ 3. surveille le projet (guard.rs, I13) PUIS démarre : container run -i --rm --init --name zevbox-claude-<id> --label … IMAGE CMD
   ├─ 4. écrit instances/<id>.json
   ├─ 5. relaie stdin/stdout ⇄ conteneur avec la politique (§7) ; stderr du conteneur → logs/<id>.log
   └─ 6. à la fin (EOF, signal, erreur) : arrêt borné et vérifié du conteneur (§8.3), suppression de l'enregistrement
@@ -131,25 +131,25 @@ zevbox/
 ├── Cargo.toml / Cargo.lock / rustfmt.toml / .gitignore
 ├── clippy.toml 🔒                # autorise unwrap seulement dans les tests
 ├── Makefile                      # check, verify STEP=N, test-integration, install, protect-update (humain)
-├── zevbox_plan.md                # ce document
+├── zevbox_plan_V2.md             # ce document (zevbox_plan_V1.md = historique)
 ├── AGENTS.md / CLAUDE.md         # guide court pour agents IA (CLAUDE.md importe AGENTS.md)
-├── README.md                     # à écrire à l'étape 17 (français)
+├── README.md                     # anglais ; jumeau français docs/fr/README.md (DECISIONS 2026-10-14)
 ├── docs/PROGRESS.md              # avancement + preuves (tableau lu par la porte)
-├── docs/DECISIONS.md             # faits vérifiés, choix, idées reportées
+├── docs/DECISIONS.md             # faits vérifiés, choix, idées reportées (+ USER_GUIDE.md, ARCHITECTURE.md, SPEC_tools_rebuild.md, fr/)
 ├── assets/Containerfile ✳        # embarqué via include_str!
 ├── scripts/ 🔒
 │   ├── verify-step.sh            # porte cumulative d'une étape
 │   └── check-invariants.sh       # vérifications grep des invariants
 ├── src/ ✳
 │   ├── main.rs  lib.rs  ui.rs  paths.rs (complets)  agents.rs (complet)
-│   ├── cli/ (mod.rs complet : clap + dispatch ; un fichier par commande)
+│   ├── cli/ (mod.rs complet : clap + dispatch ; un fichier par commande, + auth_omlx.rs)
 │   ├── config.rs  fsutil.rs  tools.rs  instances.rs  container.rs
-│   ├── supervisor.rs  release.rs  zed_settings.rs
+│   ├── supervisor.rs  release.rs  zed_settings.rs  omlx.rs  guard.rs
 │   └── relay/ (mod.rs, policy.rs, jsonrpc.rs)
 └── tests/ 🔒
     ├── common/mod.rs             # TestEnv : état temporaire, lance le vrai binaire avec le faux container
     ├── config_test.rs  relay_policy_test.rs  relay_transport_test.rs  container_test.rs
-    ├── release_test.rs  zed_settings_test.rs  lifecycle_test.rs  cli_test.rs
+    ├── release_test.rs  zed_settings_test.rs  lifecycle_test.rs  cli_test.rs  (+ tests ajoutés depuis, hors manifeste)
     ├── integration_test.rs       # #[ignore] : vraie VM Apple Container (make test-integration)
     ├── PROTECTED.sha256
     └── fixtures/
@@ -160,7 +160,7 @@ zevbox/
 
 ### 5.2 Données d'exécution
 
-`stateRoot` = `~/Library/Application Support/zevbox` (droits `0700`). Le chemin contient une espace : vérifié le 2026-10-13, `--mount type=bind,source=<chemin avec espace>,…` fonctionne (F15).
+`stateRoot` = `~/Library/Application Support/zevbox` (droits `0700`). Le chemin contient une espace : vérifié le 2026-10-13, `--mount type=bind,source=<chemin avec espace>,…` fonctionne (F15). `stateRoot/tmp/auth-*` est le dossier vide jetable que `zevbox auth claude` monte à la place d'un projet (R3) ; il disparaît à la fin de la commande.
 
 ```text
 stateRoot/
@@ -173,7 +173,7 @@ stateRoot/
 ├── logs/<id>.log               # stderr du conteneur + journal du relais (garder les 30 plus récents)
 ├── backups/zed-settings-<horodatage>-<sha8>.json   # garder les 20 plus récents
 ├── releases/<release-id>/      # lock.json, contexte de build (sans `agy.zip` après coup), résultat des tests
-├── releases/active.json        # {"claude": {"current": "<id>", "previous": "<id>|null"}, "antigravity": {...}}
+├── releases/active.json        # {"claude": {"current": "<id>", "previous": "<id>|null"}, "antigravity": {...}, "omlx": {...}}
 └── ~~inventory-preexisting.json~~  # supprimé le 2026-10-21 (décision 👤 R5) : jamais écrit ni lu
 ```
 
@@ -187,7 +187,7 @@ Créé par `zevbox init`. Champs inconnus → erreur (`#[serde(deny_unknown_fiel
 {
   "schemaVersion": 1,
   "containerBinary": "/opt/homebrew/bin/container",
-  "projects": ["/Users/<user>/code/myproject"],
+  "projects": [],
   "resources": { "cpus": 4, "memory": "4G" },
   "relay": { "maxMessageBytes": 33554432 },
   "hostUid": 501,
@@ -197,7 +197,7 @@ Créé par `zevbox init`. Champs inconnus → erreur (`#[serde(deny_unknown_fiel
 
 - `containerBinary` : chemin absolu, détecté par `init` (recherche dans le PATH puis `/opt/homebrew/bin/container`, `/usr/local/bin/container`). Zed lance zevbox avec un PATH réduit : ne **jamais** compter sur le PATH au lancement.
 - `projects` : **héritage** (avant 2026-10-16) ; plus lu ni modifié par aucune commande, conservé pour que les `config.json` existants restent valides. Valeur initiale : liste vide.
-- `resources` : valeurs de départ par instance ; plusieurs instances s'additionnent.
+- `resources` : valeurs de départ par instance (défaut 4 CPU / `4G`, `cpus` ≥ 1, `memory` non vide, passés à `--cpus`/`--memory`) ; plusieurs instances s'additionnent ; modifiables à la main, prises en compte au prochain lancement (une VM déjà ouverte garde ses valeurs).
 - `maxMessageBytes` : 32 Mio par défaut (les images collées dans un prompt sont encodées en base64).
 - `hostUid/hostGid` : détectés par `init` (`nix::unistd::getuid/getgid`).
 - Pas de champ « security » : la politique stricte n'est **pas** configurable dans cette version (moins de risques d'erreur, moins de code).
@@ -250,7 +250,7 @@ sha2 = "0.10"
 hex = "0.4"
 nix = { version = "0.29", features = ["signal", "process", "user"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-
+notify = "8"   # guard.rs (I13), ajoutée le 2026-10-16 avec la protection P1
 [dev-dependencies]
 tempfile = "3"
 
@@ -285,7 +285,7 @@ allow-panic-in-tests = true
 1. Erreurs : `thiserror` pour les erreurs typées des modules `relay`, `container` et `config` ; `anyhow` (+ `.context("…")`) dans `cli/`. Chaque erreur montrée à l'utilisateur termine par une action (`→ lancez : zevbox auth claude`).
 2. Pas d'I/O bloquante dans la boucle du relais (`tokio::fs`, `tokio::process` seulement). Ailleurs (commandes humaines), `std::fs` est autorisé.
 3. Écritures de fichiers d'état : toujours atomiques (`tempfile::NamedTempFile::new_in(même_dossier)` → `write_all` → `sync_all` → `persist`), en conservant les droits d'origine si le fichier existait.
-4. Code, identifiants, commentaires et messages CLI en **anglais** ; README en **français**. Commentaires rares, réservés au « pourquoi » (notamment chaque règle de `policy.rs` : quel fait du §2 elle couvre).
+4. Code, identifiants, commentaires et messages CLI en **anglais** ; README et guides en **anglais** avec un jumeau français dans `docs/fr/` (DECISIONS 2026-10-14). Commentaires rares, réservés au « pourquoi » (notamment chaque règle de `policy.rs` : quel fait du §2 elle couvre).
 5. Pas de `async-trait`, de macros maison, de génériques au-delà de `run_relay` (§7.1), ni de modules de plus de ~400 lignes : au-delà, découper par responsabilité.
 6. Chaque fonction qui appelle `container` passe par `container.rs` (un seul endroit pour les arguments, le binaire et le parsing JSON).
 
@@ -301,7 +301,7 @@ allow-panic-in-tests = true
 
 Échoue si `src/` contient : un shell hôte (`Command::new("sh"|"bash"|"zsh")`, I7) ; `"--all"`/`"-a"` ailleurs que pour `container list` (I8) ; un accès à stdout hors `ui.rs` et `supervisor.rs` (I6) ; `-t`/`-it`/`--tty` hors `container.rs` ; une option `container` interdite (`--ssh`, `--publish`, `--volume`, `--detach`, `--privileged`, `--virtualization`, `--rosetta`) ; `ANTHROPIC_API_KEY` (F6) ; un dossier personnel comme source de montage (I1) ; un `allow(clippy::unwrap_used|expect_used|panic|print_*|…)` (I11) ; ou si les lints obligatoires ont disparu de `Cargo.toml`.
 
-### 6.5 `AGENTS.md` (mainteneurs IA, ≤ 80 lignes)
+### 6.5 `AGENTS.md` (mainteneurs IA, court : une centaine de lignes)
 
 Contient : but du projet en 3 lignes, carte des modules (1 ligne chacun), les invariants I1–I13 (renvoi à ce plan), « avant tout commit : `make check` », comment ajouter une méthode ACP à la liste blanche (modifier `policy.rs` + un test + une ligne dans le tableau §7.3 du plan), comment ajouter un agent.
 
@@ -318,9 +318,9 @@ pub async fn run_relay<CR, CW, AR, AW>(
     client_out: CW,  // stdout de zevbox (vers Zed)
     agent_out: AR,   // stdout du conteneur
     agent_in: AW,    // stdin du conteneur
-    policy: Policy,
+    policy: Policy, max_message_bytes: usize, // config.relay.maxMessageBytes
     shutdown: tokio_util::sync::CancellationToken, // ou un tokio::sync::watch
-) -> Result<RelayEnd, RelayError>
+) -> RelayEnd
 where CR: AsyncRead + Unpin, CW: AsyncWrite + Unpin, AR: AsyncRead + Unpin, AW: AsyncWrite + Unpin;
 
 pub enum RelayEnd { ClientEof, AgentEof, Shutdown, Fatal(String) }
@@ -347,8 +347,8 @@ pub enum RelayEnd { ClientEof, AgentEof, Shutdown, Fatal(String) }
 ### 7.3 Politique (`policy.rs`, fonctions pures)
 
 ```rust
-pub struct Policy { pub project_root: String /* canonique, sans '/' final */ }
-pub struct RelayState { pending_from_client: HashSet<IdKey>, pending_from_agent: HashSet<IdKey> }
+pub struct Policy { pub project_root: String /* canonique, sans '/' final */, pub agent: String /* pour les messages */ }
+pub struct RelayState { pending_from_client, pending_from_agent, initialize_ids, allowed_auth_methods /* HashSet */ }
 pub enum Direction { ClientToAgent, AgentToClient }
 pub enum Verdict {
     Forward(serde_json::Value),          // envoyer (éventuellement modifié) au destinataire
@@ -371,8 +371,8 @@ pub fn decide(policy: &Policy, state: &mut RelayState, dir: Direction, msg: serd
 |---|---|
 | `initialize` | Transmettre avec `params.clientCapabilities` **remplacé** par `{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false,"auth":{"terminal":false}}` + le champ `session` d'origine s'il existe (capacités d'affichage). Supprimer `elicitation`, `_meta`, tout le reste. Mémoriser l'`id` pour réécrire la réponse. |
 | *réponse à `initialize`* | Dans `result.authMethods` : garder uniquement les méthodes sans `type` ou avec `type == "agent"`, et supprimer leur `_meta`. Mémoriser les `id` des méthodes gardées. |
-| `authenticate` | Transmettre si `params.methodId` fait partie des méthodes gardées ; sinon `-32602`. |
-| `session/new`, `session/load`, `session/resume`, `session/fork` | Vérifier `cwd` (I5) ; `additionalDirectories` absent ou `[]`, sinon `-32602` ; remplacer `mcpServers` par `[]` (ou l'ajouter s'il manque pour `new`/`load`) ; supprimer `params._meta` et `params.systemPrompt` (2026-10-29 : `claude-agent-acp` 0.99 remplace le prompt système de l'agent par ce champ ; Zed ne l'envoie pas). |
+| `authenticate` | Transmettre si `params.methodId` fait partie des méthodes gardées ; sinon `-32602` (`zevbox: auth method '<id>' is not available in zevbox; run 'zevbox auth <agent>' in a macOS terminal.`). |
+| `session/new`, `session/load`, `session/resume`, `session/fork` | Vérifier `cwd` (I5) ; `additionalDirectories` absent ou `[]`, sinon `-32602` ; remplacer `mcpServers` par `[]` (l'ajouter s'il manque) ; supprimer `params._meta` et `params.systemPrompt` (2026-10-29 : `claude-agent-acp` 0.99 remplace le prompt système de l'agent par ce champ ; Zed ne l'envoie pas). |
 | `session/prompt`, `session/set_mode`, `session/set_model`, `session/set_config_option`, `session/list`, `session/close`, `session/delete`, `logout` | Transmettre tel quel. |
 | toute autre (y compris préfixe `_`) | `ReplyToSender` avec `-32601`. |
 
@@ -406,24 +406,24 @@ Quand une nouvelle version d'adaptateur utilise une méthode inconnue, elle sera
 
 ### 8.1 Référence CLI (contrat)
 
-Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manquant (non configuré, non authentifié, aucune release active). Toute commande sans `config.json` sort en `3` avec `zevbox is not set up. Fix: run 'zevbox setup'` sur stderr.
+Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manquant (non configuré, non authentifié, aucune release active). Toute commande sans `config.json` sort en `3` avec `zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init' in a macOS terminal.` sur stderr, sauf `init`, `setup` et `auth` (qui créent la configuration ; `auth --status` affiche alors `unknown`, code 0) ; `launch` fait la même réponse à Zed avec `… run 'zevbox setup' in a macOS terminal.` (§8.5).
 
 | Commande | Effet |
 |---|---|
-| `zevbox setup` (conforme depuis R3, 2026-10-14 ; `--project` retiré le 2026-10-16) | Assistant idempotent : `init` → `doctor` → `update` (les deux agents ; l'échec de l'un ne bloque pas l'autre) → `auth claude` → `auth antigravity` (chacune peut être passée en répondant `n`) → résumé final ; **code 1 si un agent n'a toujours pas de release** (amendement 2026-10-21) avec l'état de chaque agent et la prochaine action. oMLX (optionnel, 2026-10-29) : jamais construit par `setup`, compté seulement s'il est installé ; non installé, le résumé l'indique « optional, not installed ». |
+| `zevbox setup` (conforme depuis R3, 2026-10-14 ; `--project` retiré le 2026-10-16) | Assistant idempotent (ordre aligné sur le code le 2026-10-29) : `init` (si `config.json` manque) → `update` des agents non optionnels, seulement si l'un n'a pas de release (l'échec de l'un ne bloque pas l'autre) → `auth` de chaque agent non connecté (chacune peut être passée en répondant `n`) → `zed install` → démarrage du service Apple Container s'il est arrêté → `doctor` → résumé final ; **code 1 si un agent n'a toujours pas de release** (amendement 2026-10-21) avec l'état de chaque agent et la prochaine action. oMLX (optionnel, 2026-10-29) : jamais construit par `setup`, compté seulement s'il est installé ; non installé, le résumé l'indique « optional, not installed ». |
 | `zevbox init` | Crée `stateRoot` (0700) et ses sous-dossiers, `config.json` et `tools.json` s'ils manquent. Ne remplace jamais un fichier existant. Si le CLI `container` est introuvable, écrit `/opt/homebrew/bin/container` (et `doctor` le signale). |
 | `zevbox doctor [--json]` | Liste de contrôles `OK/WARN/FAIL` + action corrective pour chacun (§8.6). Sortie 1 si au moins un `FAIL`. |
 | ~~`zevbox project add PATH [--no-zed]` / `remove PATH` / `list`~~ | **Supprimées le 2026-10-16** (DECISIONS F1) : le projet est celui ouvert dans Zed, contrôlé par les zones I2. |
-| `zevbox zed install [--settings PATH] [--dry-run]` / `zed uninstall` (affichent « already up to date » ou « updated (backup: …) » ; `--dry-run` liste les entrées qui seraient écrites — implémenté le 2026-10-21, revue ARGON 3.6) | Synchronise les entrées `zevbox · …` des réglages Zed : ~~`config.projects` ×~~ une par agent ayant une release active (§8.9, amendement 2026-10-14). `--dry-run` affiche le texte avant/après des entrées concernées. |
-| `zevbox auth <agent> [--status]` (+ `--url U --model M` pour `omlx`, 2026-10-29) | Session interactive d'authentification dans le conteneur (§8.2). *oMLX (2026-10-29)* : sur le Mac, demande l'URL du serveur et la clé (saisie masquée ou stdin), liste les modèles (`/v1/models/status`, sinon `/v1/models`), écrit `state/omlx/.claude/settings.json` (`0600`) — `env` (URL, `ANTHROPIC_AUTH_TOKEN`, modèles ; jamais `ANTHROPIC_API_KEY`), `model` = `--model` ou le plus petit, `availableModels`, hook `PostModelSwitch` de déchargement du modèle quitté (sauf le plus petit, modèle auxiliaire) — puis vérifie que le serveur répond **depuis une VM** (code 1 sinon, avec la cause F16). `--url`/`--model` pour un autre agent → code 2. *Amendement 2026-10-14 (R2) : hors `--status`, fait d'abord `init` si `config.json` manque, démarre le runtime s'il est arrêté, et `update --agent <a>` si la release ou son image manque ; idempotent.* `--status` : `authenticated`/`not authenticated`/`unknown`. |
+| `zevbox zed install [--settings PATH] [--dry-run]` / `zed uninstall` (affichent « already up to date » ou « updated (backup: …) » ; `--dry-run` liste les entrées qui seraient écrites — implémenté le 2026-10-21, revue ARGON 3.6) | Synchronise les entrées `zevbox · …` des réglages Zed : ~~`config.projects` ×~~ une par agent ayant une release active (§8.9, amendement 2026-10-14). `--dry-run` n'écrit rien (ni sauvegarde) : il affiche `zed settings: would write N managed entries in <fichier> (dry run, nothing written):` suivi d'une ligne `nom -> commande args` par entrée, ou `zed settings: already up to date (dry run, nothing written)`. |
+| `zevbox auth <agent> [--status]` (+ `--url U --model M` pour `omlx`, 2026-10-29) | *Claude* : session interactive dans le conteneur (`authCommand`, §8.2), sur un dossier vide jetable ; la VM n'ouvre pas le navigateur du Mac (I3) : l'URL à copier est affichée ; si `state/claude/.claude/settings.json` manque, écrit `{"model": …}` (le `model` de `~/.claude/settings.json` de l'hôte, sinon `fable` ; DECISIONS R8). *Antigravity* (étape 14, 2026-10-14) : OAuth 2.0 PKCE exécuté **sur le Mac** (écouteur `127.0.0.1`, échange du code par `curl`, navigateur ouvert par `/usr/bin/open`), écrit `state/antigravity/.gemini/antigravity-acp/{settings.json,acp_token.json}` ; authentifié = `refresh_token` non vide. *oMLX (2026-10-29)* : sur le Mac, demande l'URL du serveur et la clé (saisie masquée ou stdin), liste les modèles (`/v1/models/status`, sinon `/v1/models`), écrit `state/omlx/.claude/settings.json` (`0600`, clés non gérées conservées) — `env` (URL, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_DEFAULT_MODEL` = `--model` ou le plus petit, `ANTHROPIC_SMALL_FAST_MODEL` = le plus petit, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` ; jamais `ANTHROPIC_API_KEY`, ni `ANTHROPIC_MODEL`, `model` ou cases opus/sonnet/haiku : backlog 9), `availableModels` et `modelPicker` (tous les modèles du serveur : changement de modèle sans l'essai de 15 s, backlog 11), `permissions.defaultMode` = `bypassPermissions` s'il est absent (décision 👤), hook `PostModelSwitch` de déchargement du modèle quitté (sauf le plus petit, modèle auxiliaire) — puis vérifie que le serveur répond **depuis une VM** (code 1 sinon, avec la cause F16). `--url`/`--model` pour un autre agent → code 2. *Amendement 2026-10-14 (R2) : hors `--status`, fait d'abord `init` si `config.json` manque, démarre le runtime s'il est arrêté, et `update --agent <a>` si la release ou son image manque ; idempotent.* `--status` : `authenticated`/`not authenticated`/`unknown`. |
 | `zevbox launch <agent> [--project PATH]` | Appelé par Zed. Ne jamais l'appeler à la main sauf pour tester. Sans `--project` (amendement 2026-10-14) : projet = répertoire de travail, que Zed fixe au premier worktree du projet ; toujours contrôlé par I2. |
-| `zevbox status [--json]` | **Lecture seule.** Tableau : id, agent, projet, release, état (`running`/`orphan`/`unregistered`). Croise les enregistrements et `container list --all --format json`. `--json` : tableau d'objets `{id, agent, project, release, containerName, state}` (`id`, `project`, `release` à `null` pour `unregistered`) ; `[]` si rien. |
+| `zevbox status [--json]` | **Lecture seule.** Tableau : `ID STATE AGENT CONTAINER PROJECT`, état `running`/`orphan`/`unregistered` (aligné sur le code le 2026-10-29). Croise les enregistrements et les conteneurs de cette racine d'état (§8.4). `--json` : tableau d'objets ; une instance enregistrée a `{id, state, agent, project, release, image, containerName, relayPid}` ; une `unregistered` a `{id, state, agent, containerName}` (`id` et `agent` lus dans les labels, `""` s'ils manquent ; pas de `project` ni de `release`) ; `[]` si rien. |
 | `zevbox stop [ID \| --project PATH]` | Sans argument : arrête **toutes les instances zevbox enregistrées**, une par une (jamais `--all`). Affiche ce qui a été arrêté (une ligne par instance). Contrôle d'orphelin **avant** tout signal (un `relayPid` réutilisé par un autre processus n'est jamais signalé) ; `SIGTERM` au relais vivant puis attente de 10 s au plus ; sans réponse, arrêt direct du conteneur vérifié (I8) (amendement 2026-10-21, revue ARGON 4.3). |
-| `zevbox clean [--images]` | Supprime les orphelins vérifiés (I8), les enregistrements obsolètes, les journaux au-delà de 30 et les sauvegardes au-delà de 20. `--images` : supprime une par une les images `zevbox/*` qui ne sont ni `current` ni `previous` ni utilisées par une instance enregistrée, puis arrête et supprime la VM `container builder` (amendement 2026-10-16, DECISIONS G1 ; `update` fait de même après une construction ; **dossiers `releases/<id>` (2026-10-21, décision 👤 R4)** : l'archive `context/agy.zip` (~300 Mo, seulement utile au build ; URL et sha256 restent dans `lock.json`) est supprimée de toutes les releases, et les dossiers des releases terminées (avec `lock.json`) ni `current` ni `previous` ni utilisées par une instance sont supprimés ; un build échoué garde son `build.log` ; `update` fait ce rangement à chaque exécution hors `--check` ; `doctor` ajoute le contrôle `disk`). Ne touche jamais `state/`, `config.json` ni les projets. |
-| `zevbox shell <agent> [--project PATH]` | Shell `bash` interactif (`-it`) dans un conteneur jetable identique à celui de l'agent. `--project` par défaut = dossier courant s'il est autorisé, sinon erreur code 3 (amendement R3 : plus de repli sur le premier projet). **Mêmes protections I13 que l'agent** (`.zed` masqué, `.git` existant en lecture seule, `.zed` fichier/lien refusé ; décision 👤 R2, 2026-10-21) ; une ligne l'indique après la bannière. Bannière : `zevbox Linux shell — agent=<a> project=<p> release=<r> (changes outside the project are discarded on exit)`. |
+| `zevbox clean [--images]` | Supprime les orphelins vérifiés (I8), les enregistrements obsolètes, les conteneurs `zevbox-*` non enregistrés **de cette racine d'état** (§8.4), les journaux au-delà de 30 et les sauvegardes au-delà de 20. `--images` : supprime une par une les images `zevbox/*` qui ne sont ni `current` ni `previous` ni utilisées par une instance enregistrée, **et dont la release a son dossier `releases/<id>` dans cette racine** (amendement 2026-10-29, backlog 12 : un état isolé ne touche pas aux images de la vraie installation ; une image dont le dossier a disparu reste, à supprimer à la main), puis arrête et supprime la VM `container builder` (amendement 2026-10-16, DECISIONS G1 ; `update` fait de même après une construction ; **dossiers `releases/<id>` (2026-10-21, décision 👤 R4)** : l'archive `context/agy.zip` (~300 Mo, seulement utile au build ; URL et sha256 restent dans `lock.json`) est supprimée de toutes les releases, et les dossiers des releases terminées (avec `lock.json`) ni `current` ni `previous` ni utilisées par une instance sont supprimés ; un build échoué garde son `build.log` ; `update` fait ce rangement à chaque exécution hors `--check` ; `doctor` ajoute le contrôle `disk`). Ne touche jamais `state/`, `config.json` ni les projets. |
+| `zevbox shell <agent> [--project PATH]` | Shell `bash` interactif (`-it`) dans un conteneur jetable identique à celui de l'agent. `--project` par défaut = dossier courant s'il est autorisé, sinon erreur code 3 (amendement R3 : plus de repli sur le premier projet) ; un `--project` explicite refusé donne le code 1. **Mêmes protections I13 que l'agent** (`.zed` masqué, `.git` existant en lecture seule, `.zed` fichier/lien refusé ; décision 👤 R2, 2026-10-21) ; une ligne l'indique après la bannière. Bannière : `zevbox Linux shell — agent=<a> project=<p> release=<r> (changes outside the project are discarded on exit)`. |
 | `zevbox logs [ID] [--path]` | Affiche les 200 dernières lignes du journal de l'instance (par défaut la plus récente) ; `--path` affiche seulement le chemin. **Journal implémenté le 2026-10-21** (revue ARGON 2.4) : `launch` initialise `tracing` vers `logs/<id>.log` (niveau `info`, ou `RUST_LOG` ; jamais stdout, I6) ; événements `launch agent=… release=… container=… project=…`, `blocked method=<m> dir=<d>` (nom nettoyé : 80 caractères `[A-Za-z0-9_./:-]` au plus), `shutdown relay_end=… container_gone=…` ; les autres commandes écrivent sur stderr seulement si `RUST_LOG` est défini. `doctor` (§8.6 point 10) compte les `blocked method=` des journaux. |
 | `zevbox update [--check] [--agent A]` | `--check` : compare la release active aux registres et n'écrit rien. Sans `--check` : candidate → build → smoke test → promotion (§8.7). **Code 1 si la mise à jour d'au moins un agent échoue** (les autres agents sont quand même traités ; amendement 2026-10-21, revue ARGON 3.3). |
-| `zevbox rollback [--agent A]` | Échange `current` et `previous` ; **refuse (code 1) si l'image `previous` n'existe plus**, avec « Fix: run 'zevbox update --agent A' » (implémenté le 2026-10-21, revue ARGON 3.2). |
+| `zevbox rollback --agent A` (`--agent` obligatoire, code 2 sinon ; aligné sur le code le 2026-10-29) | Échange `current` et `previous` ; **refuse (code 1) si l'image `previous` n'existe plus**, avec « Fix: run 'zevbox update --agent A' » (implémenté le 2026-10-21, revue ARGON 3.2). |
 | `zevbox tools list` / `tools add <paquet-apt>…` / `tools remove <paquet>…` | Modifie `tools.json` puis reconstruit les agents (candidate → tests → promotion). |
 
 `--agent` accepte `claude`, `antigravity` ou `omlx` ; sans option, la commande s'applique à `claude` et `antigravity`, et à `omlx` seulement s'il a déjà une release (agent optionnel, 2026-10-29). `setup` ne construit pas oMLX et ne le compte pas comme manquant.
@@ -442,7 +442,7 @@ run -i --rm --init --progress none
   -e HOME=/home/agent
   --mount type=bind,source=<projet>,target=<projet>
   --mount type=bind,source=<stateRoot>/state/<agent>,target=/home/agent
-  -w <projet>
+  -w <projet>   [launch et shell : puis --tmpfs <projet>/.zed et, si .git existe, --read-only-path <projet>/.git (I13)]
   <image:release>
   <commande agent du lock.json…>
 ```
@@ -451,9 +451,9 @@ run -i --rm --init --progress none
 - Jamais `-t`, `-p`, `--publish-socket`, `--ssh`, `--virtualization`, `-v`, ni `-e` sans valeur (qui hériterait d'une variable de l'hôte).
 - Une virgule dans un chemin casserait la syntaxe `--mount` : `launch` et `shell` refusent les projets dont le chemin contient `,`.
 - `--cap-drop ALL` : vérifié viable sur la VM (F15) ; reconfirmer avec le vrai agent à l'étape 11 (smoke test).
-- Antigravity : la commande est `cmd` + `args` du manifeste, exécutée depuis son dossier d'installation (`/opt/zevbox/antigravity/agy_acp_server.par --uid=`). VÉRIFIER à l'étape 14 la signification de `--uid=` (vide dans le registre) et consigner le résultat.
+- Antigravity : la commande est le `cmd` du manifeste, exécutée depuis son dossier d'installation (`/opt/zevbox/antigravity/agy_acp_server.par`). Vérifié le 2026-10-14 (DECISIONS, étape 14) : le `--uid=` du registre n'est pas un drapeau reconnu par le binaire et n'est **pas** passé.
 
-Mode interactif (`shell`, `auth`) : même vecteur, mais `-it` au lieu de `-i`, nom `zevbox-<agent>-sh-<id8>`, label `zevbox.interactive=1`, commande `bash` (shell) ou la commande d'auth du lock. Pas de relais (le terminal est branché directement : `std::process::Command` avec `stdin/stdout/stderr` hérités, puis `status()`).
+Mode interactif (`shell`, `auth`) : même vecteur, mais `-it` au lieu de `-i`, nom `zevbox-<agent>-sh-<id8>`, label `zevbox.interactive=1`, commande `bash` (shell) ou la commande d'auth du lock (`auth claude` seulement : son « projet » est un dossier vide jetable `stateRoot/tmp/auth-*`, sans protections I13 ; l'auth d'Antigravity et d'oMLX se fait sur le Mac, sans ce conteneur). Pas de relais (le terminal est branché directement : `std::process::Command` avec `stdin/stdout/stderr` hérités, puis `status()`).
 
 ### 8.3 Cycle de vie et arrêt (`supervisor.rs`)
 
@@ -461,7 +461,7 @@ Démarrage (`launch`) :
 
 1. Contrôles préalables (§8.5). En cas d'échec : mode « erreur pour Zed ».
 2. Nettoyage des orphelins (§8.4), en silence (journal seulement).
-3. `tokio::process::Command` avec `stdin(piped)`, `stdout(piped)`, `stderr` → fichier `logs/<id>.log` (ouvert en ajout), `kill_on_drop(true)`.
+3. Surveillance du projet (`guard.rs`, I13) démarrée **avant** le conteneur (2026-10-21), puis `tokio::process::Command` avec `stdin(piped)`, `stdout(piped)`, `stderr` → fichier `logs/<id>.log` (ouvert en ajout), `kill_on_drop(true)`.
 4. Écrire `instances/<id>.json` : `{id, agent, project, release, image, containerName, relayPid, relayStartedAt (horodatage du processus), createdAt}`.
 5. Lancer `run_relay`. Installer les gestionnaires `SIGTERM`, `SIGINT`, `SIGHUP` (tokio::signal::unix), qui déclenchent l'arrêt.
 
@@ -471,7 +471,7 @@ Arrêt (quelle que soit la cause : `ClientEof`, `AgentEof`, signal, `Fatal`), bo
 2. S'il tourne encore : `container stop --time 3 <nom>` ; attendre jusqu'à **5 s**.
 3. S'il tourne encore : `child.start_kill()` puis attente de 1 s.
 4. Lire `container list --all --format json` : si un conteneur `<nom>` existe encore (et passe I8) → `container delete --force <nom>`.
-5. Revérifier son absence ; supprimer `instances/<id>.json` ; journaliser la durée et le résultat. Code de sortie 0 si le conteneur a disparu, sinon 1 (et l'enregistrement est conservé pour `clean`).
+5. Revérifier son absence ; supprimer `instances/<id>.json` ; journaliser la durée et le résultat. Code de sortie 0 si le conteneur a disparu, sinon 1 (et l'enregistrement est conservé pour `clean`) ; 1 aussi si le relais s'est arrêté sur `Fatal` ou si la surveillance a arrêté l'agent (I13).
 
 Si Zed tue zevbox avec `SIGKILL`, rien de tout cela ne s'exécute : le pipe stdin du conteneur se ferme, l'adaptateur reçoit EOF et sort, `--rm` supprime le conteneur ; l'enregistrement orphelin est affiché par `status` et nettoyé au prochain `launch`, `stop` ou `clean`. Vérifié sur la vraie VM (test `real_sigkill_of_zevbox_still_removes_container`, étape 10).
 
@@ -483,15 +483,15 @@ Un conteneur `zevbox-*` **avec** label `zevbox.managed=1` mais **sans** enregist
 
 ### 8.5 Contrôles préalables de `launch` et erreurs visibles dans Zed
 
-Ordre : config présente (sinon `zevbox is not set up. Fix: run 'zevbox setup'`) et lisible → projet autorisé (I2) → agent connu → release active et image présente (`container image list --format json`, comparée avec `image_matches`, F14) → runtime en marche (`container system status` ; s'il est arrêté : `container system start`, puis revérifier une fois) → authentifié au sens de `auth --status` (`auth::is_authenticated` : témoin présent pour Claude, jeton de rafraîchissement non vide pour Antigravity, serveur + clé pour oMLX ; aligné le 2026-10-29, backlog 4).
+Ordre : config présente (sinon `zevbox is not set up. Fix: run 'zevbox setup' in a macOS terminal.`) et lisible → projet autorisé (I2) → `<projet>/.zed` ni fichier ni lien (I13) → agent connu → release active → runtime en marche (`container system status` ; s'il est arrêté : `container system start`, puis revérifier une fois) → image présente (`container image list --format json`, comparée avec `image_matches`, F14 ; le runtime est vérifié avant l'image, qu'il faut pouvoir lister — ordre aligné sur le code le 2026-10-29) → authentifié au sens de `auth --status` (`auth::is_authenticated` : témoin présent pour Claude, jeton de rafraîchissement non vide pour Antigravity, serveur + clé pour oMLX ; aligné le 2026-10-29, backlog 4).
 
 En cas d'échec, zevbox ne démarre pas de conteneur. Il lit la première ligne de Zed. Si c'est une requête, il répond `{"jsonrpc":"2.0","id":<id>,"error":{"code":-32000,"message":"zevbox: <problème>. Fix: <commande exacte>"}}`, puis il sort avec le code 3. Il écrit le même message sur stderr. Exemples :
 
 - `zevbox: Claude is not authenticated. Fix: run 'zevbox auth claude' in a macOS terminal.`
 - `zevbox: /x/y is not an allowed project: <raison>. Fix: open a folder inside your home folder (not ~/Library or a hidden ~/.… folder) or on an external disk.`
-- `zevbox: no active Claude image. Fix: run 'zevbox update --agent claude'.`
+- `zevbox: no active Claude release. Fix: run 'zevbox update --agent claude' in a macOS terminal.` (même texte avec `image '<réf>'` si la release existe mais pas son image)
 
-VÉRIFIER à l'étape 16 (👤) comment Zed affiche ce message, et le consigner dans le README.
+Vérifié le 2026-10-14 (DECISIONS, « À vérifier ») : Zed affiche ce message tel quel dans le panneau agent. Autres refus : un `.zed` fichier ou lien (I13, `guard::project_files_problem`) ; service Apple Container arrêté et non démarrable (`Apple Container system is not running, and zevbox could not start it. Fix: …`).
 
 ### 8.6 `doctor` — contrôles
 
@@ -499,13 +499,13 @@ VÉRIFIER à l'étape 16 (👤) comment Zed affiche ce message, et le consigner 
 2. `container system status` = running (sinon `WARN` + `container system start`).
 3. Architecture `arm64`.
 4. `config.json` valide. ~~Chaque projet existe et est canonique~~ (supprimé le 2026-10-16 avec la liste des projets, F1).
-5. Pour chaque agent : (oMLX sans release : `OK` « optional, not installed » ; installé : contrôle supplémentaire `omlx:server`, le serveur vu depuis une VM, `WARN` si injoignable — 2026-10-29) release active, image présente (`FAIL` + `zevbox update --agent A` sinon), témoin d'auth identique à `auth --status` (`auth::is_authenticated`, jeton de rafraîchissement pour Antigravity ; `WARN` + `zevbox auth A` sinon) ; la release et l'état d'auth restent affichés même avec un autre avertissement (implémenté le 2026-10-21, revue ARGON 3.4/3.5).
+5. Pour chaque agent : (oMLX sans release : `OK` « optional, not installed » ; installé : contrôle supplémentaire `omlx:server`, le serveur vu depuis une VM, `WARN` si injoignable — 2026-10-29) release active, image présente (`FAIL` + `zevbox update --agent A` sinon), témoin d'auth identique à `auth --status` (`auth::is_authenticated`, jeton de rafraîchissement pour Antigravity ; `WARN` + `zevbox auth A` sinon) ; la release et l'état d'auth restent affichés même avec un autre avertissement (implémenté le 2026-10-21, revue ARGON 3.4/3.5) ; Claude sans `model` par défaut dans `state/claude/.claude/settings.json` : `WARN` + `zevbox auth claude` (R8).
 6. Droits `0700` sur `stateRoot` et `state/*`.
 7. `~/.local/bin/zevbox` existe ; c'est le binaire référencé par les entrées Zed.
 8. Les entrées Zed `zevbox · …` correspondent ~~à `config.projects`~~ aux agents ayant une release active (amendement 2026-10-14 ; sinon `WARN` → `zevbox zed install`).
-9. Instances orphelines ou non enregistrées.
+9. Instances orphelines ou non enregistrées, **de cette racine d'état seulement** (§8.4, backlog 10).
 10. Méthodes ACP refusées dans les 7 derniers jours (lues dans les journaux), hors `AUDITED_REFUSALS`.
-11. ~~Les conteneurs de `inventory-preexisting.json` existent toujours~~ — **supprimé le 2026-10-21** (décision 👤 R5) : fichier jamais écrit ni lu ; le ciblage des conteneurs repose sur le nom `zevbox-*` **et** le label (I8). Ajouts de la même date : un contrôle `disk` (images zevbox anciennes, G1) et la vérification des droits `0700` de `state/<agent>`.
+11. ~~Les conteneurs de `inventory-preexisting.json` existent toujours~~ — **supprimé le 2026-10-21** (décision 👤 R5) : fichier jamais écrit ni lu ; le ciblage des conteneurs repose sur le nom `zevbox-*` **et** le label (I8). Ajouts de la même date : un contrôle `disk` (images zevbox anciennes de cette racine d'état, G1 et backlog 12) et la vérification des droits `0700` de `state/<agent>`.
 
 ### 8.7 Releases, mises à jour, retour arrière (`release.rs`)
 
@@ -537,10 +537,10 @@ Une **release** = un agent + des versions figées + une image construite et test
 
 Pipeline `update` (et `tools add/remove`, qui réutilisent les versions actuelles au lieu de résoudre) :
 
-1. **Résoudre** : `curl --fail --silent --show-error --location --max-time 60 -o <fichier> <url>` du manifeste. Valider : `id` attendu (`claude-acp` / `antigravity-acp`), présence de `distribution.npx.package` (Claude) ou de `distribution.binary["linux-aarch64"]` avec `archive` et `cmd` (Antigravity). Champ manquant → erreur explicite `registry schema changed: <champ>` ; l'agent est déclaré indisponible et la release active reste en place. Ne jamais fabriquer une URL à partir d'un numéro de version. Ne jamais utiliser `preview`.
-2. **Base** : `baseImage` = `node:22-bookworm-slim` figée par digest. VÉRIFIER à l'étape 11 comment obtenir le digest avec le CLI (`container image pull` puis `container image inspect` / `image list --format json`) et le consigner.
+1. **Résoudre** : `curl --fail --silent --show-error --location --max-time 60 <url>` du manifeste (sortie lue directement, sha256 calculé). Valider : `id` attendu (`claude-acp` / `antigravity-acp`), présence de `distribution.npx.package` (Claude) ou de `distribution.binary["linux-aarch64"]` avec `archive` et `cmd` (Antigravity). Champ manquant → erreur explicite `registry schema changed: <champ>` ; l'agent est déclaré indisponible et la release active reste en place. Ne jamais fabriquer une URL à partir d'un numéro de version. Ne jamais utiliser `preview`.
+2. **Base** : `baseImage` = `node:22-bookworm-slim` figée par digest. Digest vérifié le 2026-10-13 avec `container image list --format json` (DECISIONS) ; constante `release::BASE_IMAGE`.
 3. **Contexte de build** dans `releases/<id>/context/` : `Containerfile` (depuis `include_str!("../assets/Containerfile")`), `zevbox-release.json` (le lock sans `smokeTest`), et selon l'agent :
-   - Claude : `package.json` minimal `{"private":true,"dependencies":{"@agentclientprotocol/claude-agent-acp":"<version exacte>"}}` + `package-lock.json`, généré en lançant `container run --rm --mount type=bind,source=<context>,target=/w -w /w <baseImage> npm install --package-lock-only --ignore-scripts`. Le lock est conservé dans la release.
+   - Claude : `package.json` minimal `{"private":true,"dependencies":{"@agentclientprotocol/claude-agent-acp":"<version>"}}` (npm le réécrit en `^<version>` : l'exactitude vient du `package-lock.json` et de `npm ci`) + `package-lock.json`, généré en lançant `container run --rm --mount type=bind,source=<context>,target=/w -w /w <baseImage> npm install --package-lock-only --ignore-scripts <paquet@version>`. Le lock est conservé dans la release.
    - Antigravity : télécharger l'archive dans `releases/<id>/context/agy.zip`, calculer son sha256 et l'écrire dans `archiveSha256`.
    - oMLX (2026-10-29) : comme Claude (même étape `claude`, choisie par `agents::build_target`) ; le lock a `agentCommand` = l'adaptateur, `authCommand` = `[]` (l'auth se fait sur le Mac) et `authMarker` = `.claude/settings.json` (authentifié = URL et clé présentes).
 4. **Build** : `container build -f <context>/Containerfile --target <agent> --tag zevbox/<agent>:<id> --build-arg BASE_IMAGE=<baseImage> --build-arg ZEVBOX_UID=<uid> --build-arg ZEVBOX_GID=<gid> --build-arg APT_PACKAGES="<paquets validés>" [--build-arg AGY_SHA256=<sha>] <context>`. stdout et stderr du build → `releases/<id>/build.log`.
@@ -548,7 +548,7 @@ Pipeline `update` (et `tools add/remove`, qui réutilisent les versions actuelle
    - `container run --rm <image> uname -s` = `Linux` ;
    - pour chaque paquet de `tools.json` : `container run --rm <image> dpkg -s <paquet>` réussit ;
    - `container run --rm <image> cat /etc/zevbox-release.json` contient `releaseId` ;
-   - ACP : démarrer le vrai chemin `launch` (même code) avec un projet temporaire de test (`tempfile::tempdir()` dans `$TMPDIR`, canonicalisé, ajouté aux projets autorisés **en mémoire seulement**, supprimé ensuite), envoyer `initialize` (`protocolVersion: 1`), exiger une réponse `result` avec le même `id` sous **60 s**, vérifier que la réponse réécrite ne contient aucune méthode d'auth `terminal`, fermer stdin, vérifier que le conteneur a disparu sous 15 s.
+   - ACP (**non implémenté au 2026-10-29** : `release::run_smoke_test` fait seulement `uname`, `dpkg -s` et `/etc/zevbox-release.json` ; backlog 14) : démarrer le vrai chemin `launch` (même code) avec un projet temporaire de test (`tempfile::tempdir()` dans `$TMPDIR`, canonicalisé, ajouté aux projets autorisés **en mémoire seulement**, supprimé ensuite), envoyer `initialize` (`protocolVersion: 1`), exiger une réponse `result` avec le même `id` sous **60 s**, vérifier que la réponse réécrite ne contient aucune méthode d'auth `terminal`, fermer stdin, vérifier que le conteneur a disparu sous 15 s.
 6. **Promotion** seulement si tout passe : `active.json[agent] = {current: <id>, previous: <ancien current>}` (écriture atomique). Sinon : release marquée `failed` dans son lock, image candidate supprimée (`container image delete`, seulement ce tag exact), release active inchangée, message clair + chemin de `build.log`.
 7. Après promotion : `zed install` si de nouveaux agents deviennent disponibles.
 
@@ -565,7 +565,8 @@ ARG APT_PACKAGES=""
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates git curl jq unzip python3 procps less ${APT_PACKAGES} \
  && rm -rf /var/lib/apt/lists/*
-RUN (getent group ${ZEVBOX_GID} || groupadd -g ${ZEVBOX_GID} agent) \
+RUN (getent group nobody || groupadd -r nobody) \
+ && (getent group ${ZEVBOX_GID} || groupadd -g ${ZEVBOX_GID} agent) \
  && useradd -u ${ZEVBOX_UID} -g ${ZEVBOX_GID} -M -d /home/agent -s /bin/bash agent \
  && mkdir -p /home/agent && chown ${ZEVBOX_UID}:${ZEVBOX_GID} /home/agent
 COPY zevbox-release.json /etc/zevbox-release.json
@@ -582,14 +583,13 @@ RUN echo "${AGY_SHA256}  /tmp/agy.zip" | sha256sum -c - \
  && mkdir -p /opt/zevbox/antigravity && unzip -q /tmp/agy.zip -d /opt/zevbox/antigravity \
  && rm /tmp/agy.zip && chmod +x /opt/zevbox/antigravity/agy_acp_server.par
 ```
-
 - `BASE_IMAGE` est passé en `--build-arg BASE_IMAGE=<baseImage du lock>` (§8.7, point 4).
 - Rien n'est installé dans `/home/agent` (il est masqué par le montage d'état).
 - `APT_PACKAGES` : chaque nom est validé par zevbox avec `^[a-z0-9][a-z0-9+.-]{0,62}$` avant d'être passé. C'est la seule chose qui empêche une injection dans le `RUN`.
 - Pas de `npm install …@latest`. Pas de `--omit=optional` (F6).
-- VÉRIFIER : la structure réelle du zip Antigravity (le binaire peut être dans un sous-dossier, et d'autres fichiers peuvent être nécessaires) ; adapter le chemin et le consigner.
+- Vérifié le 2026-10-14 (DECISIONS, étape 14) : dans le zip Antigravity, `agy_acp_server.par` est à la racine de l'archive.
 
-`tools.json` : `{"schemaVersion":1,"apt":["ripgrep"]}`. `tools add` refuse les doublons et les noms invalides. L'ajout d'un outil ne crée jamais de montage.
+`tools.json` : `{"schemaVersion":1,"apt":["ripgrep"]}`. `tools add` ignore les doublons (« no new tools to add », code 0 si rien de neuf) et refuse les noms invalides (code 1, rien de modifié) — aligné sur le code le 2026-10-29. L'ajout d'un outil ne crée jamais de montage.
 
 ### 8.9 Réglages Zed (`zed_settings.rs`)
 
@@ -635,7 +635,7 @@ Ils existent déjà. **Ne pas les écrire, les faire passer.** Lire le test avan
 
 Faux outils : `fake-container` reproduit les formats JSON de `container` 1.5.0 et journalise chaque appel dans `$FAKE_CONTAINER_LOG` ; `run` exécute `fake-agent.py` (le PID du conteneur = celui de l'agent). `fake-agent.py` se comporte comme l'adaptateur Claude (méthodes d'auth terminal, demande `fs/read_text_file`, `terminal/create` et `session/request_permission` pendant un prompt) et journalise tout ce qu'il reçoit dans `$FAKE_AGENT_LOG`.
 
-Tests ajoutés par l'agent : bienvenus (`#[cfg(test)]` dans `src/` ou nouveaux fichiers dans `tests/`), surtout pour `update`, `tools`, `doctor`, `auth`, `shell`, qui ne sont pas couverts par le harnais.
+Tests ajoutés par l'agent : bienvenus (`#[cfg(test)]` dans `src/` ou nouveaux fichiers dans `tests/`), surtout pour `update`, `tools`, `doctor`, `auth`, `shell`, qui ne sont pas couverts par le harnais. Ajoutés depuis (hors manifeste de §0.4) : `omlx_test.rs`, `doctor_test.rs`, `shell_protection_test.rs`, `launch_*_test.rs`, `r*_test.rs`, `rollback_test.rs`, `stop_pid_reuse_test.rs`, `zed_dry_run_test.rs` et des tests unitaires dans `src/` ; `cargo test` fait foi pour le total.
 
 ## 10. Étapes de réalisation (ordre strict)
 
@@ -677,8 +677,8 @@ Chaque étape : implémenter → `make verify STEP=N` → `STEP N: OK` → ✅ +
 - Utiliser l'API CST listée dans `docs/DECISIONS.md` (vérifiée). Laisser une entrée gérée intacte si sa valeur est déjà identique (idempotence octet pour octet) ; sinon `set_value` ; supprimer les clés gérées absentes ; `append` les nouvelles.
 - Porte : `make verify STEP=8` (`zed_settings_test`).
 
-### Étape 9 — `instances.rs`, `supervisor.rs`, CLI `init`, `project`, `zed`, `status`, `stop`, `clean`, `launch`
-- Suivre §8.3–§8.5 à la lettre. Erreur préalable : lire la 1re ligne de stdin, répondre à son `id`, sortir en 3. `stop`/`clean` : `stop_and_delete_verified`. Règles de projet : `home` = `paths::home_dir()`, `forbidden` = `[stateRoot, env!("CARGO_MANIFEST_DIR"), dossier de paths::installed_binary()]`.
+### Étape 9 — `instances.rs`, `supervisor.rs`, CLI `init`, ~~`project`~~ (supprimée le 2026-10-16), `zed`, `status`, `stop`, `clean`, `launch`
+- Suivre §8.3–§8.5 à la lettre. Erreur préalable : lire la 1re ligne de stdin, répondre à son `id`, sortir en 3. `stop`/`clean` : `stop_and_delete_verified`. Règles de projet : `home` = `paths::home_dir()`, `forbidden` = `[stateRoot, dossier de paths::installed_binary()]` (`paths::project_rules`).
 - Piège tokio : voir §13.11.
 - Porte : `make verify STEP=9` (`lifecycle_test`, `cli_test`, puis tout `cargo test`).
 
@@ -707,7 +707,7 @@ Chaque étape : implémenter → `make verify STEP=N` → `STEP N: OK` → ✅ +
 - `make install`, `zevbox zed install` sur le vrai fichier (sauvegarde vérifiée). L'humain teste dans Zed : lecture, modification bénigne, `uname -s; cat /etc/os-release; cat /etc/zevbox-release.json; pwd`. Consigner archivage, changement de thread, 2e thread, fermeture de fenêtre, sortie de Zed, `zevbox stop` (conteneur encore là ?). Autre dossier → message `-32602`. Témoin d'auth renommé → message §8.5 visible ? `dev: open acp logs` : aucun `fs/*`/`terminal/*`.
 
 ### Étape 17 — README, acceptation finale
-- README (français) : installation en 3 commandes, usage quotidien, référence des commandes réellement implémentées, §11, comportements Zed observés, limites (§3), dépannage par message d'erreur.
+- README (anglais, jumeau français `docs/fr/README.md`) : installation en 3 commandes, usage quotidien, référence des commandes réellement implémentées, §11, comportements Zed observés, limites (§3), dépannage par message d'erreur.
 - Porte : `make verify STEP=17` (vérifie aussi qu'il ne reste aucun `NotImplemented`). Cocher §12 avec preuves.
 
 ## 11. Ce qui persiste et ce qui disparaît
