@@ -375,5 +375,5 @@ never relaxed:
 9. **I9 — Private logs**: no token, password or message content is ever logged.
 10. **I10 — No build or network at launch**: `launch` is instant and downloads nothing.
 11. **I11 — Rust robustness**: zero `unwrap()`, `expect()` or `panic!()` in production code (`src/`).
-12. **I12 — zevbox isolation**: zevbox's own binary and internal files are never mounted into a container.
+12. **I12 — zevbox isolation**: zevbox's own binary, internal files and source code are never mounted into a container. A project may not be, contain or sit inside the source folder the binary was built from (`env!("CARGO_MANIFEST_DIR")`), and a folder whose `Cargo.toml` declares the `zevbox` package is refused.
 13. **I13 — Project files the Mac would run**: in the ACP container, `<project>/.zed` is masked by a tmpfs and an existing `<project>/.git` is read-only; `guard.rs` starts watching the project before the container starts (a `.zed` that is a file or a link is refused at launch) and stops the agent if a `.git` appears or changes elsewhere. Zed runs programs named in `.zed/settings.json` and git filters by itself (decision P1 in [DECISIONS](DECISIONS.md), 2026-10-16).

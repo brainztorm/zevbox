@@ -101,6 +101,9 @@ pub fn project_rules(paths: &Paths) -> Result<crate::config::ProjectRules, Paths
     if let Some(dir) = installed.parent() {
         forbidden.push(dir.to_path_buf());
     }
+    // I1 (DECISIONS backlog 13): the source folder this binary was built from. An
+    // agent working there could change the code the user builds and installs next.
+    forbidden.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
     Ok(crate::config::ProjectRules {
         home: home_dir()?,
         forbidden,

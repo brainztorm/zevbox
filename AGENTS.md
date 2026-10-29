@@ -75,7 +75,7 @@ ways, responses routed by pending id · I5 `cwd` == project root, no extra dirs,
 `mcpServers: []` · I6 stdout = JSON-RPC only in `launch` · I7 no host shell ·
 I8 stop/delete one verified `zevbox-*` + label container, never `--all`; « unregistered » = only containers whose `/home/agent` mount is under this state root ·
 I9 no message content/tokens in logs (`launch` journals to `logs/<id>.log` via tracing: names, paths, ids, sizes only) · I10 no network/build in `launch` ·
-I11 no unwrap/expect/panic in `src/` · I12 zevbox files never mounted ·
+I11 no unwrap/expect/panic in `src/` · I12 zevbox files (and its sources: build folder, any `Cargo.toml` named zevbox) never mounted ·
 I13 `.zed` masked, existing `.git` read-only in the ACP container, project guard (started before the container) stops the agent on a new `.git`, `.zed` must not be a file or link (`guard.rs`).
 
 ## Common changes

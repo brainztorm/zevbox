@@ -197,10 +197,37 @@ pub fn validate_project_path(path: &Path, rules: &ProjectRules) -> Result<PathBu
             )));
         }
     }
+    // I1 (DECISIONS backlog 13): any copy of the zevbox sources, not only the one
+    // this binary was built from (`forbidden` above).
+    if is_zevbox_source(&canonical) {
+        return Err(reject(
+            "it holds the zevbox source code (an agent could change the code you build and install)",
+        ));
+    }
     if let Some(reason) = zone_rejection(&canonical, &home) {
         return Err(reject(reason));
     }
     Ok(canonical)
+}
+
+/// True if `dir/Cargo.toml` declares the `zevbox` package.
+fn is_zevbox_source(dir: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(dir.join("Cargo.toml")) else {
+        return false;
+    };
+    let mut in_package = false;
+    for line in text.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_package = line == "[package]";
+        } else if in_package {
+            if let Some(value) = line.strip_prefix("name").map(str::trim_start) {
+                if let Some(value) = value.strip_prefix('=') {
+                    return value.trim().trim_matches('"') == "zevbox";
+                }
+            }
+        }
+    }
+    false
 }
 
 /// Mount point of external disks on macOS.
@@ -311,5 +338,56 @@ mod zone_tests {
         ] {
             assert!(rejected(p), "{p} must be refused");
         }
+    }
+}
+
+#[cfg(test)]
+mod zevbox_source_tests {
+    use super::*;
+
+    fn rules(home: &Path) -> ProjectRules {
+        ProjectRules {
+            home: home.to_path_buf(),
+            forbidden: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_copy_of_the_zevbox_sources_is_not_a_project() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = std::fs::canonicalize(tmp.path()).unwrap();
+        let clone = home.join("code/zevbox-copy");
+        std::fs::create_dir_all(&clone).unwrap();
+        std::fs::write(
+            clone.join("Cargo.toml"),
+            "[package]\nname = \"zevbox\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+        let err = validate_project_path(&clone, &rules(&home)).unwrap_err();
+        assert!(err.to_string().contains("zevbox source code"), "{err}");
+    }
+
+    #[test]
+    fn other_rust_projects_are_fine() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = std::fs::canonicalize(tmp.path()).unwrap();
+        let app = home.join("code/app");
+        std::fs::create_dir_all(&app).unwrap();
+        // `zevbox` only as a dependency or in another table: not the zevbox sources.
+        std::fs::write(
+            app.join("Cargo.toml"),
+            "[package]\nname = \"app\"\n\n[dependencies]\nzevbox = \"1\"\n\n[[bin]]\nname = \"zevbox\"\n",
+        )
+        .unwrap();
+        assert!(validate_project_path(&app, &rules(&home)).is_ok());
+    }
+
+    #[test]
+    fn the_build_folder_of_this_binary_is_forbidden() {
+        let paths = crate::paths::Paths::new("/nonexistent/state");
+        let rules = crate::paths::project_rules(&paths).unwrap();
+        assert!(rules
+            .forbidden
+            .contains(&PathBuf::from(env!("CARGO_MANIFEST_DIR"))));
     }
 }

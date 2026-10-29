@@ -221,7 +221,7 @@ affaiblis pour faire passer un test :
 - **I9 — Journaux privés** : aucun jeton, identifiant ou contenu de message n'est journalisé ni affiché en cas d'erreur.
 - **I10 — Ni réseau ni build dans `launch`** : le lancement n'utilise que la release active.
 - **I11 — Pas de panic en production** : zéro `unwrap()`, `expect()`, `panic!()` dans `src/` (Clippy `deny`).
-- **I12 — zevbox hors de portée** : son binaire, sa configuration et ses releases ne sont jamais montés dans un conteneur.
+- **I12 — zevbox hors de portée** : son binaire, sa configuration, ses releases et son code source ne sont jamais montés dans un conteneur : le dossier source de zevbox (et toute copie) est refusé comme projet, pour qu'un agent ne puisse pas modifier le code que vous compilez et installez.
 - **I13 — Fichiers du projet que le Mac exécuterait** : dans la VM, le dossier `.zed` du projet est masqué (les écritures de l'agent restent dans la mémoire de la VM) et un `.git` existant est en lecture seule. La surveillance démarre avant la VM, et un `.zed` qui est un fichier ou un lien est refusé au lancement. Pendant la session, zevbox arrête l'agent si un `.git` apparaît ou change ailleurs. Motif : Zed lance tout seul des programmes indiqués dans `.zed/settings.json` et dans les réglages git (voir [ARCHITECTURE.md](ARCHITECTURE.md)).
 
 ### Modèle de menace et limites connues
