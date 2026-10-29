@@ -134,8 +134,12 @@ pub fn smallest(models: &[ServerModel]) -> Option<&ServerModel> {
 /// `modelPicker` lists every server model with its own id as label (same names
 /// as before; a model's first request then pays the load time instead of the
 /// switch). The same rows also tell the ACP adapter the model supports Auto mode
-/// (without them it falls back to Accept edits). `permissions.defaultMode` is not
-/// set here: it is the user's choice and is kept when present.
+/// (without them it falls back to Accept edits).
+///
+/// Permission mode (user decision 2026-10-29): `permissions.defaultMode` is
+/// `bypassPermissions` when the file has none, so local models never stop to ask
+/// (everything runs in the VM; Auto would make the model review each tool use,
+/// too slow locally). A mode the user wrote is kept.
 pub fn settings_json(
     existing: Option<Value>,
     url: &str,
@@ -182,6 +186,14 @@ pub fn settings_json(
         "modelPicker".to_string(),
         json!({ "options": models.iter().map(|m| json!({ "model": m.id, "label": m.id })).collect::<Vec<_>>() }),
     );
+    let mut permissions = match root.remove("permissions") {
+        Some(Value::Object(map)) => map,
+        _ => Map::new(),
+    };
+    permissions
+        .entry("defaultMode")
+        .or_insert_with(|| json!("bypassPermissions"));
+    root.insert("permissions".to_string(), Value::Object(permissions));
     let mut hooks = match root.remove("hooks") {
         Some(Value::Object(map)) => map,
         _ => Map::new(),
@@ -275,7 +287,7 @@ mod tests {
         let models = parse_models(STATUS).unwrap();
         // An older zevbox file: its model slots and `model` must go (backlog 9).
         let existing = json!({"theme": "dark", "model": "old",
-            "permissions": {"defaultMode": "bypassPermissions"}, "env": {
+            "permissions": {"defaultMode": "acceptEdits", "allow": ["Bash"]}, "env": {
             "FOO": "1",
             "ANTHROPIC_MODEL": "old",
             "ANTHROPIC_DEFAULT_OPUS_MODEL": "old",
@@ -322,8 +334,9 @@ mod tests {
             ]})
         );
         assert!(s["modelPicker"].get("replaceBuiltInOptions").is_none());
-        // The user's own permission mode is kept, never imposed.
-        assert_eq!(s["permissions"]["defaultMode"], "bypassPermissions");
+        // The user's own permission mode is kept, with the other permission keys.
+        assert_eq!(s["permissions"]["defaultMode"], "acceptEdits");
+        assert_eq!(s["permissions"]["allow"], json!(["Bash"]));
         assert_eq!(
             s["hooks"]["PostModelSwitch"][0]["hooks"][0]["command"],
             UNLOAD_HOOK
@@ -331,6 +344,32 @@ mod tests {
         // F6: the key goes in the bearer-token variable only; nothing else is set.
         let names: Vec<&String> = s["env"].as_object().unwrap().keys().collect();
         assert_eq!(names.len(), 7, "{names:?}");
+    }
+
+    #[test]
+    fn new_settings_default_to_bypass_permissions() {
+        let models = parse_models(STATUS).unwrap();
+        let s = settings_json(
+            None,
+            "http://h:8000",
+            "k",
+            "Big-Model",
+            "Big-Model",
+            &models,
+        );
+        assert_eq!(s["permissions"]["defaultMode"], "bypassPermissions");
+        // An existing file without a mode gets it too, its other keys untouched.
+        let old = json!({"permissions": {"deny": ["WebFetch"]}});
+        let s = settings_json(
+            Some(old),
+            "http://h:8000",
+            "k",
+            "Big-Model",
+            "Big-Model",
+            &models,
+        );
+        assert_eq!(s["permissions"]["defaultMode"], "bypassPermissions");
+        assert_eq!(s["permissions"]["deny"], json!(["WebFetch"]));
     }
 
     #[test]

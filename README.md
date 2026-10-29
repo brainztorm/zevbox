@@ -145,8 +145,8 @@ Documentation en français : **[docs/fr/](docs/fr/README.md)**.
 - **Local models (oMLX)**: the Zed model picker lists the server's models; the default is the
   smallest one. Switching model unloads the previous one on the server, except that smallest
   model, which Claude Code keeps using for small background requests. The switch is immediate;
-  the first prompt then waits while the server loads the model. To never be asked for
-  permissions, choose the **Bypass permissions** mode (Auto works but is slow on local models).
+  the first prompt then waits while the server loads the model. The default mode is **Bypass
+  permissions**: the agent never asks (it only acts inside its VM and your project).
 - **Interactive shell in the agent's VM**: `zevbox shell claude`
 - **Extra Linux tools (apt packages) in the VMs**: `zevbox tools add ripgrep clang`
 - **Check and diagnose**: `zevbox status` · `zevbox doctor`

@@ -306,9 +306,12 @@ flowchart LR
   d'un modèle absent de la mémoire (« Couldn't confirm model … with the API »). `modelPicker`
   liste tous les modèles du serveur (libellé = identifiant), ce qui supprime l'essai : le
   changement est immédiat et c'est le premier prompt qui attend le chargement. Les mêmes lignes
-  gardent le mode Auto disponible. Le mode de permissions (`permissions.defaultMode`) reste au
-  choix de l'utilisateur et `auth omlx` le conserve ; avec des modèles locaux, Auto est lent (un
-  examen par le modèle à chaque outil), Bypass permissions ne demande rien.
+  gardent le mode Auto disponible.
+- **Mode de permissions** : `auth omlx` écrit `permissions.defaultMode: "bypassPermissions"` si
+  le fichier n'a pas de mode (décision 👤 du 2026-10-29) : les modèles locaux ne s'arrêtent jamais
+  pour demander, tout s'exécute dans la VM (projet monté, `.git` en lecture seule, I13). Un mode
+  écrit par l'utilisateur est conservé. Auto ferait examiner chaque outil par le modèle, trop
+  lent en local.
 - **Déchargement** : un hook `PostModelSwitch` s'exécute **dans la VM** et demande au serveur de
   décharger le modèle qu'on vient de quitter — sauf le plus petit, que les requêtes de fond
   rechargeraient aussitôt. Le relais ne change pas et `launch` ne fait toujours aucun accès
