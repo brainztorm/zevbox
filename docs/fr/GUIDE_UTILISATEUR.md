@@ -153,7 +153,11 @@ zevbox auth omlx --url http://192.168.1.8:8000
    (le sélecteur de modèles de Zed les affiche), le modèle par défaut (`--model <id>`, sinon le
    plus petit) et un hook qui décharge le modèle précédent sur le serveur quand vous changez de
    modèle dans Zed. Le plus petit modèle n'est jamais déchargé : Claude Code s'en sert pour ses
-   petites requêtes de fond.
+   petites requêtes de fond. Il liste aussi les modèles dans `modelPicker` : un changement dans
+   Zed est immédiat (le premier prompt attend ensuite que le serveur charge le modèle) et le mode
+   Auto reste disponible. Avec des modèles locaux, choisissez **Bypass permissions** pour ne
+   jamais être sollicité (Auto fait examiner chaque outil par le modèle, ce qui est lent) ;
+   `auth omlx` conserve un `permissions.defaultMode` que vous ajoutez au fichier.
 4. Il vérifie qu'**une VM** joint le serveur : `omlx: the agent VM reaches the server (HTTP 401)`.
    Les VM ne sortent que par le réseau principal du Mac (l'interface de la route par défaut) :
    une adresse jointe par un câble direct vers le serveur ne marche pas depuis une VM ; donnez

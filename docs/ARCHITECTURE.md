@@ -328,6 +328,13 @@ flowchart LR
   No other model slot is set (`ANTHROPIC_MODEL`, `model`, opus/sonnet/haiku): each would add an
   entry that lends its name to every server model with a similar id, so Zed would show wrong
   names. The aliases opus/sonnet/haiku fall back to the default model.
+- **Switching models**: on a switch Claude Code confirms an unknown model with a probe request
+  to the server under a fixed 15 s deadline, longer than oMLX takes to load a model that is not
+  in memory ("Couldn't confirm model … with the API"). `modelPicker` lists every server model
+  (label = id), which skips the probe: the switch is immediate and the first prompt pays the
+  load time. The same rows let the Auto mode stay available. The permission mode
+  (`permissions.defaultMode`) is left to the user and kept by `auth omlx`; on local models Auto
+  is slow (one review by the model per tool use), Bypass permissions asks nothing.
 - **Unloading**: a `PostModelSwitch` hook runs **inside the VM** and asks the server to unload
   the model just left — except the smallest one, which the background requests would reload at
   once. The relay is unchanged and `launch` still does no network access (I10).
