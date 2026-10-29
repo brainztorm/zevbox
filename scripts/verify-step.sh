@@ -70,7 +70,7 @@ if [ "$step" -ge 17 ]; then
 fi
 if [ "$step" -ge 11 ] && [ "$step" -le 16 ]; then
   echo
-  echo "NOTE: step $step also requires the manual evidence listed in zevbox_plan.md §10 (write it in docs/PROGRESS.md)."
+  echo "NOTE: step $step also requires the manual evidence listed in zevbox_plan_V2.md §10 (write it in docs/PROGRESS.md)."
 fi
 
 printf '\nSTEP %s: OK\n' "$step"
