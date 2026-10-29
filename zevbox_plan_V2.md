@@ -447,7 +447,7 @@ run -i --rm --init --progress none
   <commande agent du lock.json…>
 ```
 
-- `<id8>` = 8 premiers caractères hexadécimaux d'un UUID v4 ; en cas de collision avec un enregistrement existant, en tirer un autre.
+- `<id8>` = 8 premiers caractères hexadécimaux d'un UUID v4, sans nouveau tirage en cas de collision (amendé le 2026-10-29, décision 👤 : 2^32 valeurs pour quelques instances à la fois, probabilité négligeable ; un nom déjà pris ferait échouer `container run`).
 - Jamais `-t`, `-p`, `--publish-socket`, `--ssh`, `--virtualization`, `-v`, ni `-e` sans valeur (qui hériterait d'une variable de l'hôte).
 - Une virgule dans un chemin casserait la syntaxe `--mount` : `launch` et `shell` refusent les projets dont le chemin contient `,`.
 - `--cap-drop ALL` : vérifié viable sur la VM (F15) ; reconfirmer avec le vrai agent à l'étape 11 (smoke test).
@@ -759,7 +759,7 @@ Limite connue : deux instances du même agent partagent `state/<agent>` (même c
 
 ---
 
-11. **tokio et stdin** : `tokio::io::stdin()` lit dans un thread bloquant ; à la fin, la destruction du runtime attendrait ce thread indéfiniment (Zed garde stdin ouvert après un SIGTERM). Dans `cli::run`, terminer par `runtime.shutdown_timeout(Duration::from_millis(200))` après `block_on`.
+11. **tokio et stdin** : `tokio::io::stdin()` lit dans un thread bloquant ; à la fin, la destruction du runtime attendrait ce thread indéfiniment (Zed garde stdin ouvert après un SIGTERM). Dans `cli::run`, terminer par `runtime.shutdown_background()` après `block_on` (amendé le 2026-10-29, décision 👤 : au lieu de `shutdown_timeout(200 ms)` ; à ce stade le conteneur est déjà supprimé et l'enregistrement retiré, rien d'utile n'est à attendre).
 12. **Noms d'image** : toujours `container::image_matches` (F14).
 13. **`--rm` est asynchrone** : après la sortie de `container run`, lister puis `delete --force` si besoin (§8.3, étapes 4–5).
 14. **Clippy dans les tests** : `allow-unwrap-in-tests` ne couvre pas les fonctions d'aide des fichiers `tests/` ; les fichiers fournis ont `#![allow(clippy::unwrap_used, …)]` en tête. Dans `src/`, jamais d'`allow` de ces lints (vérifié par `check-invariants.sh`).
