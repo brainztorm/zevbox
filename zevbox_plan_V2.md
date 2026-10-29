@@ -398,7 +398,7 @@ pub fn decide(policy: &Policy, state: &mut RelayState, dir: Direction, msg: serd
 
 **Indication d'auth :** si l'agent répond par une erreur de code `-32000` (« auth required » en ACP), le relais ajoute au message : ` → run 'zevbox auth <agent>' in a macOS terminal.`
 
-Quand une nouvelle version d'adaptateur utilise une méthode inconnue, elle sera refusée et journalisée (`blocked method=<m> dir=<d>`). `zevbox doctor` affiche les méthodes refusées dans les 30 derniers journaux, pour que le mainteneur décide de les auditer.
+Quand une nouvelle version d'adaptateur utilise une méthode inconnue, elle sera refusée et journalisée (`blocked method=<m> dir=<d>`). `zevbox doctor` affiche les méthodes refusées dans les journaux des 7 derniers jours (amendé le 2026-10-29, backlog 6 : avant, les 30 derniers journaux), sauf celles déjà auditées et sans effet (`policy::AUDITED_REFUSALS` : `_auth/status_update`, toujours refusée), pour que le mainteneur décide d'auditer les autres.
 
 ---
 
@@ -504,7 +504,7 @@ VÉRIFIER à l'étape 16 (👤) comment Zed affiche ce message, et le consigner 
 7. `~/.local/bin/zevbox` existe ; c'est le binaire référencé par les entrées Zed.
 8. Les entrées Zed `zevbox · …` correspondent ~~à `config.projects`~~ aux agents ayant une release active (amendement 2026-10-14 ; sinon `WARN` → `zevbox zed install`).
 9. Instances orphelines ou non enregistrées.
-10. Méthodes ACP refusées récemment (lues dans les journaux).
+10. Méthodes ACP refusées dans les 7 derniers jours (lues dans les journaux), hors `AUDITED_REFUSALS`.
 11. ~~Les conteneurs de `inventory-preexisting.json` existent toujours~~ — **supprimé le 2026-10-21** (décision 👤 R5) : fichier jamais écrit ni lu ; le ciblage des conteneurs repose sur le nom `zevbox-*` **et** le label (I8). Ajouts de la même date : un contrôle `disk` (images zevbox anciennes, G1) et la vérification des droits `0700` de `state/<agent>`.
 
 ### 8.7 Releases, mises à jour, retour arrière (`release.rs`)

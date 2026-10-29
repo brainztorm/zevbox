@@ -182,6 +182,10 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
 }
 
 /// Counts `blocked method=<m> dir=<d>` lines (written by the relay, I4) per method.
+/// Only the logs of the last days count: an old refusal must not be reported until
+/// the log is pruned (DECISIONS backlog 6).
+const BLOCKED_METHODS_DAYS: u64 = 7;
+
 fn count_blocked_methods(logs: &[String]) -> std::collections::BTreeMap<String, usize> {
     let mut counts = std::collections::BTreeMap::new();
     for text in logs {
@@ -190,6 +194,9 @@ fn count_blocked_methods(logs: &[String]) -> std::collections::BTreeMap<String, 
                 continue;
             };
             let method = rest.split_whitespace().next().unwrap_or("-");
+            if crate::relay::policy::AUDITED_REFUSALS.contains(&method) {
+                continue;
+            }
             *counts.entry(method.to_string()).or_insert(0) += 1;
         }
     }
@@ -197,10 +204,19 @@ fn count_blocked_methods(logs: &[String]) -> std::collections::BTreeMap<String, 
 }
 
 fn blocked_methods_check(paths: &Paths) -> (String, String, String) {
+    let window = std::time::Duration::from_secs(BLOCKED_METHODS_DAYS * 24 * 3600);
+    let recent = |e: &std::fs::DirEntry| {
+        e.metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_none_or(|age| age <= window)
+    };
     let logs: Vec<String> = std::fs::read_dir(paths.logs_dir())
         .map(|dir| {
             dir.filter_map(Result::ok)
                 .filter(|e| e.path().extension().is_some_and(|x| x == "log"))
+                .filter(recent)
                 .filter_map(|e| std::fs::read_to_string(e.path()).ok())
                 .collect()
         })
@@ -210,7 +226,7 @@ fn blocked_methods_check(paths: &Paths) -> (String, String, String) {
         return (
             "blocked_methods".to_string(),
             "OK".to_string(),
-            "no ACP method refused in the recent logs".to_string(),
+            format!("no ACP method refused in the last {BLOCKED_METHODS_DAYS} days"),
         );
     }
     let list = counts
@@ -221,7 +237,7 @@ fn blocked_methods_check(paths: &Paths) -> (String, String, String) {
     (
         "blocked_methods".to_string(),
         "WARN".to_string(),
-        format!("refused in recent sessions: {list}. If one looks legitimate, audit it before allowing it (AGENTS.md, plan §7.3); see 'zevbox logs'"),
+        format!("refused in the last {BLOCKED_METHODS_DAYS} days: {list}. If one looks legitimate, audit it before allowing it (AGENTS.md, plan §7.3); see 'zevbox logs'"),
     )
 }
 
@@ -481,7 +497,44 @@ fn finish(json_output: bool, checks: &[(String, String, String)]) -> anyhow::Res
 
 #[cfg(test)]
 mod tests {
-    use super::{agent_check, count_blocked_methods, disk_message};
+    use super::{agent_check, blocked_methods_check, count_blocked_methods, disk_message};
+    use crate::paths::Paths;
+
+    #[test]
+    fn audited_refusals_are_not_reported() {
+        let log = "x INFO blocked method=_auth/status_update dir=agent_to_client\n\
+                   x INFO blocked method=terminal/create dir=agent_to_client\n";
+        let counts = count_blocked_methods(&[log.to_string()]);
+        assert_eq!(counts.len(), 1);
+        assert_eq!(counts.get("terminal/create"), Some(&1));
+    }
+
+    #[test]
+    fn only_recent_logs_count() {
+        let tmp = tempfile::tempdir().unwrap();
+        let paths = Paths::new(tmp.path());
+        std::fs::create_dir_all(paths.logs_dir()).unwrap();
+        let old = paths.logs_dir().join("0a1b2c3d.log");
+        std::fs::write(
+            &old,
+            "x INFO blocked method=fs/read_text_file dir=agent_to_client\n",
+        )
+        .unwrap();
+        let eight_days = std::time::Duration::from_secs(8 * 24 * 3600);
+        let file = std::fs::File::options().write(true).open(&old).unwrap();
+        file.set_modified(std::time::SystemTime::now() - eight_days)
+            .unwrap();
+        assert_eq!(blocked_methods_check(&paths).1, "OK");
+        std::fs::write(
+            paths.logs_dir().join("deadbeef.log"),
+            "x INFO blocked method=terminal/create dir=agent_to_client\n",
+        )
+        .unwrap();
+        let (_, status, message) = blocked_methods_check(&paths);
+        assert_eq!(status, "WARN");
+        assert!(message.contains("terminal/create (1x)"), "{message}");
+        assert!(!message.contains("fs/read_text_file"), "{message}");
+    }
 
     #[test]
     fn counts_blocked_methods_from_log_lines() {
