@@ -304,6 +304,11 @@ fn cwd_matches_root(cwd: &str, root: &str) -> bool {
     cwd == root
 }
 
+/// Refused methods already audited and harmless: still refused by the relay, but
+/// `doctor` does not report them (DECISIONS backlog 6/7). `_auth/status_update`:
+/// claude-agent-acp 0.99 notification about the account; Zed has nothing to do.
+pub const AUDITED_REFUSALS: &[&str] = &["_auth/status_update"];
+
 /// Exact texts of §7.3. Do not change them: tests compare literally.
 pub fn blocked_message(method: &str) -> String {
     format!("zevbox: '{method}' is blocked by zevbox strict mode (the agent runs in an isolated Linux VM).")
