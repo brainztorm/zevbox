@@ -33,8 +33,8 @@ pub struct TestEnv {
     pub agent_log: PathBuf,
     pub zed_settings: PathBuf,
     pub installed_binary: PathBuf,
-    /// true: the real `container` CLI is used and HOME is the real one
-    /// (the CLI needs it to reach its services).
+    /// true: the real `container` CLI is used (it works with the test HOME:
+    /// its services do not depend on HOME).
     pub real: bool,
 }
 
@@ -139,13 +139,9 @@ impl TestEnv {
     }
 
     fn apply_env(&self, cmd: &mut tokio::process::Command, mode: &str) {
-        let home = if self.real {
-            std::env::var_os("HOME")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| self.home.clone())
-        } else {
-            self.home.clone()
-        };
+        // The test HOME also in real mode: the project lives under it, so the
+        // I2 zone rule accepts it (the real HOME would make `launch` refuse it).
+        let home = self.home.clone();
         cmd.env_clear()
             // Zed starts agents with a minimal PATH: zevbox must not depend on it.
             .env("PATH", "/usr/bin:/bin")
