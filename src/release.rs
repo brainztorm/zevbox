@@ -280,12 +280,32 @@ pub fn images_to_keep(paths: &Paths) -> Vec<String> {
 /// Deletes zevbox images not in [`images_to_keep`], one by one, then removes
 /// the image builder VM. Never touches other tools' images (`is_zevbox_image`).
 /// Returns the deleted references; errors are logged, never fatal.
+/// Stale zevbox images that belong to THIS state root: the image tag is a release
+/// id whose folder `releases/<id>/` exists here (DECISIONS backlog 12). An image
+/// of another state root (an isolated test, a try under /tmp, or the real
+/// installation seen from a test) is never stale here, so it is never deleted.
+/// An image whose folder is already gone stays: `container image delete` by hand.
+pub fn stale_images_here(paths: &Paths, images: &[crate::container::ImageInfo]) -> Vec<String> {
+    crate::container::stale_zevbox_images(images, &images_to_keep(paths))
+        .into_iter()
+        .filter(|reference| {
+            release_id_of_image(reference).is_some_and(|id| paths.release_dir(id).is_dir())
+        })
+        .collect()
+}
+
+/// The tag of `[registry/]zevbox/<agent>:<tag>`, when it can name a folder.
+fn release_id_of_image(reference: &str) -> Option<&str> {
+    let (_, tag) = reference.rsplit_once(':')?;
+    let usable = !tag.is_empty() && !tag.starts_with('.') && !tag.contains('/');
+    usable.then_some(tag)
+}
+
 pub async fn prune_images(paths: &Paths, cli: &crate::container::ContainerCli) -> Vec<String> {
     let mut deleted = Vec::new();
-    let keep = images_to_keep(paths);
     match cli.image_list().await {
         Ok(images) => {
-            for reference in crate::container::stale_zevbox_images(&images, &keep) {
+            for reference in stale_images_here(paths, &images) {
                 match cli.delete_zevbox_image(&reference).await {
                     Ok(()) => deleted.push(reference),
                     Err(e) => tracing::warn!("cannot delete image {reference}: {e}"),
@@ -686,5 +706,58 @@ mod release_dirs_tests {
             assert!(!rel.join(id).join("context/agy.zip").exists(), "{id}");
         }
         assert!(paths.active_file().exists(), "active.json untouched");
+    }
+}
+
+#[cfg(test)]
+mod stale_images_tests {
+    use super::*;
+    use crate::container::ImageInfo;
+
+    fn images(refs: &[&str]) -> Vec<ImageInfo> {
+        refs.iter()
+            .map(|r| ImageInfo {
+                reference: r.to_string(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn only_images_of_releases_known_here_are_stale() {
+        let tmp = tempfile::tempdir().unwrap();
+        let paths = Paths::new(tmp.path());
+        for id in ["claude-old", "claude-prev", "claude-cur"] {
+            std::fs::create_dir_all(paths.release_dir(id)).unwrap();
+        }
+        std::fs::write(
+            paths.active_file(),
+            r#"{"claude":{"current":"claude-cur","previous":"claude-prev"}}"#,
+        )
+        .unwrap();
+        let list = images(&[
+            "docker.io/zevbox/claude:claude-old",
+            "docker.io/zevbox/claude:claude-prev",
+            "docker.io/zevbox/claude:claude-cur",
+            // Another state root's releases (e.g. the real installation seen
+            // from an isolated test): no folder here, so never stale here.
+            "docker.io/zevbox/claude:claude-20261029-163307",
+            "docker.io/zevbox/antigravity:antigravity-20261029-163358",
+            "docker.io/library/debian:bookworm-slim",
+        ]);
+        assert_eq!(
+            stale_images_here(&paths, &list),
+            vec!["docker.io/zevbox/claude:claude-old".to_string()]
+        );
+    }
+
+    #[test]
+    fn tags_that_cannot_name_a_folder_are_ignored() {
+        assert_eq!(
+            release_id_of_image("zevbox/claude:claude-1"),
+            Some("claude-1")
+        );
+        assert_eq!(release_id_of_image("zevbox/claude:.."), None);
+        assert_eq!(release_id_of_image("zevbox/claude:"), None);
+        assert_eq!(release_id_of_image("zevbox/claude"), None);
     }
 }
