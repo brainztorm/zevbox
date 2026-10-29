@@ -158,8 +158,7 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
             .iter()
             .filter(|i| crate::container::is_zevbox_image(&i.reference))
             .count();
-        let keep = crate::release::images_to_keep(&paths);
-        let stale = crate::container::stale_zevbox_images(&images, &keep).len();
+        let stale = crate::release::stale_images_here(&paths, &images).len();
         let (status, message) = disk_message(zevbox, stale, cli.images_bytes().await);
         checks.push(("disk".to_string(), status.to_string(), message));
     }
