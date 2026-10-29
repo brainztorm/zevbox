@@ -390,6 +390,15 @@ sequenceDiagram
 
 ---
 
+### Problème 4b : L'agent dit que sa VM est trop petite (mémoire, cœurs)
+- **Cause** : chaque VM d'agent reçoit les `resources` de `config.json` (`zevbox init` écrit
+  4 CPU et `4G`). Dans la VM, `nproc` peut afficher un cœur de plus que la limite, et `free` un
+  peu moins de mémoire que configuré (le noyau Linux en garde une part).
+- **Solution** : modifiez `~/Library/Application Support/zevbox/config.json`, par exemple
+  `"resources": {"cpus": 8, "memory": "8G"}`, puis ouvrez un nouveau thread dans Zed (les VM déjà
+  lancées gardent leur taille). Chaque agent ouvert a sa propre VM : leurs tailles s'additionnent
+  sur le Mac.
+
 ### Problème 5 : Vous voulez revenir à une version précédente d'un agent
 - **Cause** : Une mise à jour récente de Claude dans le registre a introduit un comportement indésirable.
 - **Solution** : Utilisez le rollback instantané :

@@ -410,6 +410,14 @@ sequenceDiagram
   container system start
   ```
 
+### Problem 4b: the agent says its VM is too small (memory, cores)
+- **Cause**: every agent VM gets the `resources` of `config.json` (`zevbox init` writes 4 CPUs
+  and `4G`). Inside the VM, `nproc` may show one more core than the limit, and `free` shows a
+  bit less memory than configured (the Linux kernel keeps some).
+- **Fix**: edit `~/Library/Application Support/zevbox/config.json`, for example
+  `"resources": {"cpus": 8, "memory": "8G"}`, then start a new thread in Zed (running VMs keep
+  their size). Each open agent has its own VM: their sizes add up on the Mac.
+
 ### Problem 5: you want the previous version of an agent back
 - **Cause**: a recent registry update of Claude introduced an unwanted behaviour.
 - **Fix**: instant rollback:
