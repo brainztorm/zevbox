@@ -301,6 +301,14 @@ flowchart LR
   (`ANTHROPIC_MODEL`, `model`, opus/sonnet/haiku) : chacune ajouterait une entrée qui prête son nom
   à tout modèle du serveur d'identifiant ressemblant, et Zed afficherait de faux noms. Les alias
   opus/sonnet/haiku retombent sur le modèle par défaut.
+- **Changement de modèle** : à chaque changement, Claude Code confirme un modèle inconnu par une
+  requête d'essai au serveur, avec un délai fixe de 15 s, plus court que le chargement par oMLX
+  d'un modèle absent de la mémoire (« Couldn't confirm model … with the API »). `modelPicker`
+  liste tous les modèles du serveur (libellé = identifiant), ce qui supprime l'essai : le
+  changement est immédiat et c'est le premier prompt qui attend le chargement. Les mêmes lignes
+  gardent le mode Auto disponible. Le mode de permissions (`permissions.defaultMode`) reste au
+  choix de l'utilisateur et `auth omlx` le conserve ; avec des modèles locaux, Auto est lent (un
+  examen par le modèle à chaque outil), Bypass permissions ne demande rien.
 - **Déchargement** : un hook `PostModelSwitch` s'exécute **dans la VM** et demande au serveur de
   décharger le modèle qu'on vient de quitter — sauf le plus petit, que les requêtes de fond
   rechargeraient aussitôt. Le relais ne change pas et `launch` ne fait toujours aucun accès

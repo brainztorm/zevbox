@@ -2,7 +2,8 @@
 //! folder, pointed at the user's oMLX server (Anthropic-compatible `/v1/messages`).
 //!
 //! Everything lives in `state/omlx/.claude/settings.json`, read by Claude Code in
-//! the VM: server URL and key (`env`), model list (`availableModels`) and a
+//! the VM: server URL and key (`env`), model list (`availableModels`, plus a
+//! `modelPicker` so that switching models never waits for the server) and a
 //! `PostModelSwitch` hook that asks the server to unload the model left behind.
 //! The key never appears on a command line, in `-e`, or in a log (I9).
 
@@ -123,6 +124,18 @@ pub fn smallest(models: &[ServerModel]) -> Option<&ServerModel> {
 /// so Zed showed the wrong name. Without those rows each model keeps its own
 /// name, and the aliases opus/sonnet/haiku are refused by `availableModels` and
 /// fall back to the default model, never to a Claude model the server lacks.
+///
+/// Model switch and Auto mode (DECISIONS backlog 11, Claude Code 2.1.312): on a
+/// switch Claude Code confirms an unknown model id with a probe request to the
+/// server (`POST /v1/messages`, `max_tokens: 1`) under a fixed 15 s deadline, and
+/// refuses the switch ("Couldn't confirm model ...") when it expires, which is
+/// what happens while oMLX loads a model that was unloaded (by our own hook, for
+/// one). The probe is skipped for ids listed in the `modelPicker` setting, so
+/// `modelPicker` lists every server model with its own id as label (same names
+/// as before; a model's first request then pays the load time instead of the
+/// switch). The same rows also tell the ACP adapter the model supports Auto mode
+/// (without them it falls back to Accept edits). `permissions.defaultMode` is not
+/// set here: it is the user's choice and is kept when present.
 pub fn settings_json(
     existing: Option<Value>,
     url: &str,
@@ -164,6 +177,10 @@ pub fn settings_json(
     root.insert(
         "availableModels".to_string(),
         json!(models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>()),
+    );
+    root.insert(
+        "modelPicker".to_string(),
+        json!({ "options": models.iter().map(|m| json!({ "model": m.id, "label": m.id })).collect::<Vec<_>>() }),
     );
     let mut hooks = match root.remove("hooks") {
         Some(Value::Object(map)) => map,
@@ -257,7 +274,8 @@ mod tests {
     fn settings_hold_server_models_and_hook_and_keep_other_keys() {
         let models = parse_models(STATUS).unwrap();
         // An older zevbox file: its model slots and `model` must go (backlog 9).
-        let existing = json!({"theme": "dark", "model": "old", "env": {
+        let existing = json!({"theme": "dark", "model": "old",
+            "permissions": {"defaultMode": "bypassPermissions"}, "env": {
             "FOO": "1",
             "ANTHROPIC_MODEL": "old",
             "ANTHROPIC_DEFAULT_OPUS_MODEL": "old",
@@ -294,6 +312,18 @@ mod tests {
             s["availableModels"],
             json!(["Big-Model", "Qwen3.8-27B-4bit"])
         );
+        // Listed models are never probed on a switch (15 s deadline, backlog 11);
+        // each row keeps the model's own id as its name.
+        assert_eq!(
+            s["modelPicker"],
+            json!({"options": [
+                {"model": "Big-Model", "label": "Big-Model"},
+                {"model": "Qwen3.8-27B-4bit", "label": "Qwen3.8-27B-4bit"}
+            ]})
+        );
+        assert!(s["modelPicker"].get("replaceBuiltInOptions").is_none());
+        // The user's own permission mode is kept, never imposed.
+        assert_eq!(s["permissions"]["defaultMode"], "bypassPermissions");
         assert_eq!(
             s["hooks"]["PostModelSwitch"][0]["hooks"][0]["command"],
             UNLOAD_HOOK

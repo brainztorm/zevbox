@@ -148,7 +148,10 @@ Documentation in English: **[README.md](../../README.md)**.
   `.git` du projet est en lecture seule ; l'agent lit l'historique mais ne committe pas (I13).
 - **Modèles locaux (oMLX)** : le sélecteur de modèles de Zed liste ceux du serveur ; le modèle
   par défaut est le plus petit. Changer de modèle décharge le précédent sur le serveur, sauf ce
-  plus petit modèle, que Claude Code garde pour ses petites requêtes de fond.
+  plus petit modèle, que Claude Code garde pour ses petites requêtes de fond. Le changement est
+  immédiat ; le premier prompt attend ensuite que le serveur charge le modèle. Pour ne jamais être
+  sollicité pour des permissions, choisissez le mode **Bypass permissions** (Auto marche mais est
+  lent avec des modèles locaux).
 - **Shell interactif dans la VM de l'agent** : `zevbox shell claude`
 - **Outils Linux supplémentaires (paquets apt) dans les VM** : `zevbox tools add ripgrep clang`
 - **Vérifier et diagnostiquer** : `zevbox status` · `zevbox doctor`
