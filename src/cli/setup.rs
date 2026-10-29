@@ -20,9 +20,10 @@ pub async fn run() -> anyhow::Result<u8> {
     let config = crate::config::load(&paths.config_file())?;
 
     // Releases first: Zed gets one entry per agent that has an active release.
+    // Opt-in agents (oMLX) are only built by 'zevbox auth omlx' or 'update --agent omlx'.
     let missing_release = crate::agents::AGENTS
         .iter()
-        .any(|a| crate::release::active_lock(&paths, a.id).is_err());
+        .any(|a| !a.opt_in && crate::release::active_lock(&paths, a.id).is_err());
     if missing_release {
         crate::ui::out("building agent releases (network, 1-3 min per agent)...");
         // §8.1: one agent failing to build does not block the other; the summary
@@ -59,6 +60,13 @@ pub async fn run() -> anyhow::Result<u8> {
     crate::ui::out("zevbox setup complete");
     for spec in crate::agents::AGENTS {
         let (release, authenticated) = agent_state(&paths, spec.id);
+        if spec.opt_in && release == "none" {
+            crate::ui::out(&format!(
+                "  {}: optional, not installed (to use it: 'zevbox auth {}')",
+                spec.display, spec.id
+            ));
+            continue;
+        }
         crate::ui::out(&format!(
             "  {}: release {release}, {}",
             spec.display,
@@ -71,7 +79,7 @@ pub async fn run() -> anyhow::Result<u8> {
     }
     let incomplete = crate::agents::AGENTS
         .iter()
-        .any(|a| crate::release::active_lock(&paths, a.id).is_err());
+        .any(|a| !a.opt_in && crate::release::active_lock(&paths, a.id).is_err());
     if incomplete {
         crate::ui::err(
             "zevbox: setup incomplete: an agent has no release. Fix: run 'zevbox update' (network needed) and read the errors above.",
@@ -97,10 +105,10 @@ fn agent_state(paths: &Paths, agent: &str) -> (String, bool) {
 /// Only asks on a terminal; otherwise prints the command to run.
 async fn authenticate_missing(paths: &Paths) -> anyhow::Result<()> {
     use std::io::IsTerminal;
-    for (spec, arg) in crate::agents::AGENTS
-        .iter()
-        .zip([super::AgentArg::Claude, super::AgentArg::Antigravity])
-    {
+    for spec in crate::agents::AGENTS {
+        let Some(arg) = super::AgentArg::from_id(spec.id) else {
+            continue;
+        };
         let (release, authenticated) = agent_state(paths, spec.id);
         if release == "none" || authenticated {
             continue;

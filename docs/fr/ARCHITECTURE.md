@@ -9,7 +9,7 @@ Ce document présente une vue d'ensemble détaillée du projet **`zevbox`**, de 
 ## 1. Contexte et Problématique
 
 ### Le problème avec les agents IA dans l'éditeur (Zed)
-Lorsqu'un éditeur comme **Zed** intègre un agent IA via le protocole ACP (*Agent Client Protocol*, p. ex. Claude Code ou Google Antigravity), cet agent s'exécute habituellement directement sur votre Mac avec l'ensemble de vos privilèges utilisateurs.
+Lorsqu'un éditeur comme **Zed** intègre un agent IA via le protocole ACP (*Agent Client Protocol*, p. ex. Claude Code ou Google Antigravity ; zevbox propose aussi oMLX, Claude Code sur un serveur de modèles local), cet agent s'exécute habituellement directement sur votre Mac avec l'ensemble de vos privilèges utilisateurs.
 
 Cela signifie qu'un agent pourrait :
 - Lire vos clés privées SSH (`~/.ssh/id_rsa`), identifiants cloud (`~/.aws`, `~/.config/gcloud`), trousseaux et variables d'environnement.
@@ -30,7 +30,7 @@ flowchart LR
     end
 
     subgraph VM ["Micro-VM Apple Container (Linux arm64)"]
-        Agent["Agent ACP\n(Claude / Antigravity)"]
+        Agent["Agent ACP\n(Claude / Antigravity / oMLX)"]
         VMFS["Système de fichiers éphémère Linux\n(RAM / Overlay jetable)"]
     end
 
@@ -274,6 +274,38 @@ zevbox exécute donc le flux OAuth 2.0 **PKCE d'Antigravity sur l'hôte** (`zevb
 | **Mode d'authentification** | CLI console interactif (`--cli auth login`) dans la VM | OAuth 2.0 PKCE exécuté par zevbox sur le Mac |
 | **Fonctionne depuis une VM isolée** | **oui** (pas de serveur local nécessaire) | **non** — d'où le flux côté hôte |
 | **Emplacement du jeton (dans la VM)** | `/home/agent/.claude/.credentials.json` | `/home/agent/.gemini/antigravity-acp/acp_token.json` |
+
+### 7b. oMLX : l'adaptateur Claude sur un serveur de modèles local
+
+`zevbox · oMLX` (optionnel) n'est pas un nouvel adaptateur. C'est **l'adaptateur Claude**,
+construit à partir de la même étape du Containerfile dans sa propre image (`zevbox/omlx:<id>`),
+avec son propre dossier d'état (`state/omlx`, monté en `/home/agent`). Rien n'est partagé avec
+l'agent Claude ni avec son abonnement.
+
+```mermaid
+flowchart LR
+    Auth["zevbox auth omlx (sur le Mac)\nURL + clé → liste des modèles\n→ test depuis une VM"] --> Settings["state/omlx/.claude/settings.json (0600)\nenv : ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN\nmodel · availableModels · hook PostModelSwitch"]
+    Settings -.->|"monté en /home/agent"| VM["VM oMLX\nclaude-agent-acp"]
+    VM -->|"API Anthropic /v1/messages\npar le réseau principal du Mac"| Server["serveur oMLX\n(p. ex. Mac Studio)"]
+    VM -->|"modèle changé dans Zed :\nPOST /v1/models/<précédent>/unload"| Server
+```
+
+- **Configuration** : Claude Code lit l'URL du serveur et la clé dans le bloc `env` de son propre
+  fichier de réglages ; aucune connexion claude.ai n'a lieu. La clé n'apparaît jamais sur une
+  ligne de commande, dans un `container run -e` ni dans un journal (I9) ; `zevbox auth omlx` la
+  passe à `curl` sur stdin.
+- **Modèles** : `availableModels` contient les identifiants des modèles du serveur, qui
+  deviennent les entrées du sélecteur de modèles de Zed. Le défaut est le plus petit modèle ; la
+  case « haiku » (petites requêtes de fond de Claude Code) est toujours ce plus petit modèle.
+- **Déchargement** : un hook `PostModelSwitch` s'exécute **dans la VM** et demande au serveur de
+  décharger le modèle qu'on vient de quitter — sauf le plus petit, que les requêtes de fond
+  rechargeraient aussitôt. Le relais ne change pas et `launch` ne fait toujours aucun accès
+  réseau (I10).
+- **Réseau** : les VM ne sortent que par l'interface principale du Mac (la route par défaut). Un
+  serveur joint par un câble direct leur est invisible ; `zevbox auth omlx` et `zevbox doctor`
+  testent le serveur depuis une VM et le signalent.
+- **Optionnel** : `update` et `setup` sans `--agent` ne touchent pas à oMLX tant qu'il n'est pas
+  installé.
 
 ---
 

@@ -84,6 +84,7 @@ impl Paths {
             self.state_root.join("state"),
             self.state_dir("claude"),
             self.state_dir("antigravity"),
+            self.state_dir("omlx"),
             self.instances_dir(),
             self.logs_dir(),
             self.backups_dir(),

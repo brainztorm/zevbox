@@ -3,7 +3,22 @@
 use crate::paths::Paths;
 use crate::supervisor::{EXIT_ERROR, EXIT_OK, EXIT_PRECONDITION};
 
+pub use super::auth_omlx::OmlxOptions;
+
 pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
+    run_with(agent, status, OmlxOptions::default()).await
+}
+
+/// `zevbox auth <agent> [--status] [--url U] [--model M]` (the options are oMLX's).
+pub async fn run_with(
+    agent: super::AgentArg,
+    status: bool,
+    omlx: OmlxOptions,
+) -> anyhow::Result<u8> {
+    if agent != super::AgentArg::Omlx && (omlx.url.is_some() || omlx.model.is_some()) {
+        crate::ui::err("zevbox: --url and --model only apply to 'zevbox auth omlx'");
+        return Ok(crate::supervisor::EXIT_USAGE);
+    }
     let paths = Paths::from_env()?;
     if status && !paths.config_file().exists() {
         crate::ui::out("unknown");
@@ -48,6 +63,9 @@ pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
 
     if agent.id() == "antigravity" {
         return auth_antigravity(&paths).await;
+    }
+    if agent.id() == "omlx" {
+        return super::auth_omlx::run(&paths, &config, &lock, omlx).await;
     }
 
     match ensure_claude_default_model(&paths, &host_claude_settings()) {
@@ -451,13 +469,14 @@ fn read_request_head(stream: &mut std::net::TcpStream) -> String {
 
 /// The one definition of « authenticated », shared by `auth --status`, `setup` and
 /// `doctor`. Claude: the credentials file exists. Antigravity: `acp_token.json`
-/// holds a non-empty `refresh_token` (DECISIONS R5).
+/// holds a non-empty `refresh_token` (DECISIONS R5). oMLX: the settings name a
+/// server and a key.
 pub fn is_authenticated(paths: &Paths, agent: &str, auth_marker: &str) -> bool {
     let marker = paths.state_dir(agent).join(auth_marker);
-    if agent == "antigravity" {
-        has_refresh_token(&marker)
-    } else {
-        marker.exists()
+    match agent {
+        "antigravity" => has_refresh_token(&marker),
+        "omlx" => crate::omlx::is_configured(&marker),
+        _ => marker.exists(),
     }
 }
 

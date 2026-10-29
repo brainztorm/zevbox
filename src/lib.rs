@@ -10,6 +10,7 @@ pub mod container;
 pub mod fsutil;
 pub mod guard;
 pub mod instances;
+pub mod omlx;
 pub mod paths;
 pub mod relay;
 pub mod release;

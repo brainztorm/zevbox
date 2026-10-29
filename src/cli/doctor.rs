@@ -105,6 +105,17 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
     for spec in crate::agents::AGENTS {
         let name = format!("agent:{}", spec.id);
         let Some(entry) = active.get(spec.id) else {
+            if spec.opt_in {
+                checks.push((
+                    name,
+                    "OK".to_string(),
+                    format!(
+                        "optional, not installed (to use it: 'zevbox auth {}')",
+                        spec.id
+                    ),
+                ));
+                continue;
+            }
             checks.push((
                 name,
                 "WARN".to_string(),
@@ -136,6 +147,9 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
             spec.id == "claude" && !has_default_model(&paths),
         );
         checks.push((name, status.to_string(), message));
+        if spec.id == "omlx" && authenticated && image_present == Some(true) {
+            checks.push(omlx_reach_check(&paths, &cli, &lock.image).await);
+        }
     }
 
     // 6. Disk used by zevbox images (DECISIONS G1)
@@ -272,7 +286,13 @@ fn permissions_check(paths: &Paths) -> (String, String, String) {
     use std::os::unix::fs::PermissionsExt;
     let mut wrong = Vec::new();
     let mut dirs = vec![paths.state_root.clone()];
-    dirs.extend(crate::agents::AGENTS.iter().map(|a| paths.state_dir(a.id)));
+    // An opt-in agent's folder may not exist yet (installations made before it).
+    dirs.extend(
+        crate::agents::AGENTS
+            .iter()
+            .map(|a| paths.state_dir(a.id))
+            .filter(|d| d.exists() || !d.ends_with("omlx")),
+    );
     for dir in dirs {
         match std::fs::metadata(&dir) {
             Ok(m) => {
@@ -396,6 +416,33 @@ fn instances_check(
 }
 
 /// True iff the container's Claude settings hold a `model` string (DECISIONS R8).
+/// The oMLX server as the agent VM sees it (its network only uses the Mac's
+/// primary interface, DECISIONS 2026-10-29). No key is sent: 401 means reachable.
+async fn omlx_reach_check(
+    paths: &Paths,
+    cli: &crate::container::ContainerCli,
+    image: &str,
+) -> (String, String, String) {
+    let name = "omlx:server".to_string();
+    let settings = paths.state_dir("omlx").join(crate::omlx::AUTH_MARKER);
+    let Some(url) = crate::omlx::configured_url(&settings) else {
+        return (
+            name,
+            "WARN".to_string(),
+            "no server configured. Fix: run 'zevbox auth omlx'".to_string(),
+        );
+    };
+    match cli.http_status_from_vm(image, &format!("{url}/v1/models")).await {
+        Ok(code) if code != "000" => (name, "OK".to_string(), format!("{url} reachable from the agent VM (HTTP {code})")),
+        Ok(_) => (
+            name,
+            "WARN".to_string(),
+            format!("{url} is not reachable from the agent VM (VMs only use the Mac's main network, not a direct cable to the server). Fix: run 'zevbox auth omlx --url http://<server address on the main network>:<port>'"),
+        ),
+        Err(e) => (name, "WARN".to_string(), format!("cannot test {url} from a VM: {e}")),
+    }
+}
+
 fn has_default_model(paths: &Paths) -> bool {
     let path = paths
         .state_dir("claude")

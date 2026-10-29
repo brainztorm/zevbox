@@ -14,3 +14,10 @@ pub fn err(line: &str) {
     let mut stderr = std::io::stderr().lock();
     let _ = writeln!(stderr, "{line}");
 }
+
+/// Writes a prompt to stdout without a newline, then flushes.
+pub fn out_inline(text: &str) {
+    let mut stdout = std::io::stdout().lock();
+    let _ = write!(stdout, "{text}");
+    let _ = stdout.flush();
+}

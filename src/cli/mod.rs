@@ -2,6 +2,7 @@
 //! in its own file and returns an exit code.
 
 pub mod auth;
+mod auth_omlx;
 mod clean;
 mod doctor;
 mod init;
@@ -23,7 +24,7 @@ use std::path::PathBuf;
 #[command(
     name = "zevbox",
     version,
-    about = "Run Claude / Antigravity for Zed inside isolated Apple Container micro-VMs"
+    about = "Run Claude / Antigravity / oMLX for Zed inside isolated Apple Container micro-VMs"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -34,6 +35,7 @@ pub struct Cli {
 pub enum AgentArg {
     Claude,
     Antigravity,
+    Omlx,
 }
 
 impl AgentArg {
@@ -41,7 +43,15 @@ impl AgentArg {
         match self {
             AgentArg::Claude => "claude",
             AgentArg::Antigravity => "antigravity",
+            AgentArg::Omlx => "omlx",
         }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::value_variants()
+            .iter()
+            .copied()
+            .find(|a| a.id() == id)
     }
 }
 
@@ -61,11 +71,18 @@ pub enum Command {
         #[command(subcommand)]
         action: ZedAction,
     },
-    /// Log an agent in, inside its Linux VM (interactive)
+    /// Log an agent in, inside its Linux VM (interactive); for omlx: connect to
+    /// the local inference server
     Auth {
         agent: AgentArg,
         #[arg(long)]
         status: bool,
+        /// omlx only: server URL, e.g. http://192.168.1.8:8000
+        #[arg(long)]
+        url: Option<String>,
+        /// omlx only: default model (default: the smallest one on the server)
+        #[arg(long)]
+        model: Option<String>,
     },
     /// Called by Zed: start the agent VM and relay ACP on stdin/stdout
     Launch {
@@ -204,7 +221,12 @@ async fn dispatch(command: Command) -> anyhow::Result<u8> {
         Command::Init => init::run().await,
         Command::Doctor { json } => doctor::run(json).await,
         Command::Zed { action } => zed::run(action).await,
-        Command::Auth { agent, status } => auth::run(agent, status).await,
+        Command::Auth {
+            agent,
+            status,
+            url,
+            model,
+        } => auth::run_with(agent, status, auth::OmlxOptions { url, model }).await,
         Command::Launch { agent, project } => launch::run(agent, project).await,
         Command::Status { json } => status::run(json).await,
         Command::Stop { id, project } => stop::run(id, project).await,

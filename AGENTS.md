@@ -1,7 +1,7 @@
 # AGENTS.md — guide for AI agents working on zevbox
 
-zevbox runs ACP agents (Claude, Antigravity) for the Zed editor inside Apple
-Container micro-VMs, with a filtering ACP relay so the agent can never use Zed
+zevbox runs ACP agents (Claude, Antigravity, and oMLX = the Claude adapter on
+a local model server) for the Zed editor inside Apple Container micro-VMs, with a filtering ACP relay so the agent can never use Zed
 to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
 
 ## Absolute rules (the human's orders; no exception, no « later »)
@@ -58,7 +58,8 @@ in the manifest.
 
 - `cli/` clap definitions + one file per command (thin) · `ui.rs` only human stdout/stderr
 - `paths.rs` every location (env overrides for tests) · `config.rs` config.json + project zone rules (I2)
-- `agents.rs` static agent table · `release.rs` registry, locks, build, promote, rollback
+- `agents.rs` static agent table (`opt_in`: oMLX) · `release.rs` registry, locks, build, promote, rollback
+- `omlx.rs` oMLX settings (server, key, models, unload hook) · `cli/auth_omlx.rs` `zevbox auth omlx`
 - `container.rs` the only module calling the `container` CLI · `instances.rs` instance records
 - `supervisor.rs` `launch`: preflight, start, relay, bounded shutdown · `relay/` ACP relay
   (`policy.rs` = pure security decisions, `jsonrpc.rs` helpers, `mod.rs` I/O loop)
@@ -82,11 +83,13 @@ I13 `.zed` masked, existing `.git` read-only in the ACP container, project guard
 - **Allow a new ACP method**: audit what it makes Zed do on the Mac; if safe,
   add it in `relay/policy.rs`, add a test (new test file or `#[cfg(test)]`),
   and add a row to the tables of plan §7.3.
-- **Add an agent**: entry in `agents.rs`, stage in `assets/Containerfile`,
-  registry parser in `release.rs`, tests, plan §2/§8.7.
+- **Add an agent**: entry in `agents.rs`, stage in `assets/Containerfile` (or
+  reuse one through `build_target`, like oMLX), registry parser in `release.rs`,
+  tests, plan §2/§8.7. `tests/zed_settings_test.rs` counts the agents (👤).
 
 ## Never
 
 Use `--all`/`-a` with `container stop|delete`; pass `-t` to the ACP container;
-mount `$HOME`, `~/.claude`, `~/.gemini`, `~/.ssh`; set `ANTHROPIC_API_KEY`;
+mount `$HOME`, `~/.claude`, `~/.gemini`, `~/.ssh`; set `ANTHROPIC_API_KEY`
+(oMLX uses `ANTHROPIC_AUTH_TOKEN` in `state/omlx` only); put a key in argv or `-e`;
 write to the user's project from zevbox; point Zed at `target/`.

@@ -380,6 +380,40 @@ impl ContainerCli {
         self.exec(&["builder", "delete"]).await.map(|_| ())
     }
 
+    /// HTTP status of `GET <url>` seen from a throw-away VM of `image` (no mount,
+    /// no secret: a 401 still proves the server is reachable). "000" = unreachable.
+    /// The VM network only reaches the Mac's primary interface (DECISIONS 2026-10-29).
+    pub async fn http_status_from_vm(
+        &self,
+        image: &str,
+        url: &str,
+    ) -> Result<String, ContainerError> {
+        let out = self
+            .exec(&[
+                "run",
+                "--rm",
+                "--progress",
+                "none",
+                image,
+                "curl",
+                "--silent",
+                "--output",
+                "/dev/null",
+                "--max-time",
+                "5",
+                "--write-out",
+                "%{http_code}",
+                url,
+            ])
+            .await;
+        match out {
+            Ok(code) => Ok(code.trim().to_string()),
+            // curl exits non-zero when it cannot connect; it still printed "000".
+            Err(ContainerError::Failed { code: Some(_), .. }) => Ok("000".to_string()),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Bytes used by all images (`container system df`), if the CLI reports it.
     pub async fn images_bytes(&self) -> Option<u64> {
         parse_images_bytes(
