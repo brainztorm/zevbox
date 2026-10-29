@@ -205,7 +205,7 @@ sequenceDiagram
 | Direction | ACP method | zevbox action | Reason |
 |---|---|---|---|
 | **Client → Agent** | `initialize` | **Rewritten** | disables every host capability (`fs=false`, `terminal=false`). |
-| **Client → Agent** | `session/new` | **Rewritten** | forces `cwd` to the project root, empties `mcpServers`. |
+| **Client → Agent** | `session/new` | **Rewritten** | forces `cwd` to the project root, empties `mcpServers`, removes `_meta` and `systemPrompt`. |
 | **Agent → Client** | `fs/read_text_file`, `fs/write_text_file` | **Blocked** (error -32601) | the agent must not read/write the Mac through Zed. |
 | **Agent → Client** | `terminal/create`, `terminal/exec` | **Blocked** (error -32601) | the agent must not open a terminal on the Mac. |
 | **Agent → Client** | `authenticate` (terminal) | **Blocked** | no authentication code runs on the host. |
