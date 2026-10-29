@@ -33,7 +33,7 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
 ## Style reference
 
 Files whose header says `WORKED EXAMPLE` (`src/fsutil.rs`, `src/config.rs`,
-`src/tools.rs`, `src/relay/jsonrpc.rs`, `src/relay/policy.rs`, `src/container.rs`,
+`src/relay/jsonrpc.rs`, `src/relay/policy.rs`, `src/container.rs`,
 `src/zed_settings.rs`) are finished and were written as models: copy their error handling, comments
 and structure in the other modules.
 
@@ -48,7 +48,7 @@ and structure in the other modules.
 ## Protected files (never edit)
 
 `tests/**` (tests, fixtures, fake `container`, fake agent), `scripts/**`,
-`clippy.toml`, listed with their SHA-256 in `tests/PROTECTED.sha256` and
+`clippy.toml`: the files listed with their SHA-256 in `tests/PROTECTED.sha256`,
 checked by every gate. If you are convinced a protected test is wrong: stop,
 write the evidence in `docs/PROGRESS.md`, and ask the human (👤). You may add
 new tests in `src/` (`#[cfg(test)]`) or new files under `tests/` that are not
@@ -85,6 +85,7 @@ I13 `.zed` masked, existing `.git` read-only in the ACP container, project guard
   and add a row to the tables of plan §7.3.
 - **Add an agent**: entry in `agents.rs`, stage in `assets/Containerfile` (or
   reuse one through `build_target`, like oMLX), registry parser in `release.rs`,
+  `AgentArg` in `cli/mod.rs`, its state folder in `paths.rs` (`all_dirs`),
   tests, plan §2/§8.7. `tests/zed_settings_test.rs` counts the agents (👤).
 
 ## Never

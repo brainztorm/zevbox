@@ -122,6 +122,7 @@ Four key components:
 1. **Supervisor and CLI (`src/supervisor.rs`, `src/cli/`)**
    - manages the micro-VM lifecycle through the Apple Container CLI (`container`);
    - runs the *preflight* checks before any launch;
+   - starts the project guard (`src/guard.rs`, I13) before the container;
    - guarantees a clean, *bounded shutdown* when Zed exits.
 2. **ACP relay (`src/relay/mod.rs`, `src/relay/policy.rs`)**
    - inspects every JSON-RPC frame between Zed and the agent;
@@ -129,7 +130,8 @@ Four key components:
 3. **Container engine (`src/container.rs`)**
    - builds the exact `container` CLI invocation;
    - drops all Linux capabilities (`--cap-drop ALL`), forbids a TTY for the ACP container, and
-     maps the host UID/GID.
+     maps the host UID/GID;
+   - sizes the VM from `config.json` (`resources`, default 4 CPUs and `4G` of memory).
 4. **Release manager (`src/release.rs`)**
    - fetches and verifies the official ACP registry manifests;
    - builds Linux images from a Debian base (`node:22-bookworm-slim`) pinned by SHA-256 digest;
@@ -138,7 +140,7 @@ Four key components:
 ```mermaid
 flowchart TD
     subgraph SupervisorArea ["zevbox supervisor"]
-        Preflight["1. Preflight checks\n- config present\n- project in an allowed zone\n- local image available\n- Apple Container runtime running"]
+        Preflight["1. Preflight checks\n- config present\n- project in an allowed zone\n- active release\n- Apple Container runtime running (started if needed)\n- local image available\n- agent authenticated (as auth --status)"]
         Spawn["2. Start the micro-VM\ncontainer run -i --rm --cap-drop ALL …"]
         CleanOrphans["Orphan clean-up (I8)"]
     end
@@ -181,7 +183,7 @@ sequenceDiagram
     Note over Zed,Agent: initialisation
     Zed->>Relay: initialize { clientCapabilities: { fs: true, terminal: true, … } }
     Note over Relay: rewrite: fs, terminal and terminal-auth removed
-    Relay->>Agent: initialize { clientCapabilities: { fs: false, terminal: false, auth: false } }
+    Relay->>Agent: initialize { clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, auth: { terminal: false } } }
     Agent->>Relay: initialize result { authMethods: [...] }
     Note over Relay: clean-up: terminal auth methods removed
     Relay->>Zed: initialize result
@@ -189,7 +191,7 @@ sequenceDiagram
     Note over Zed,Agent: session creation
     Zed->>Relay: session/new { cwd: "/Users/…", mcpServers: [...] }
     Note over Relay: check: cwd must be exactly the allowed root
-    Note over Relay: security: mcpServers emptied (no external Mac tools)
+    Note over Relay: security: mcpServers emptied (no external Mac tools), _meta and systemPrompt removed
     Relay->>Agent: session/new { cwd: "/Users/…", mcpServers: [] }
     Agent->>Relay: session/new result
 
@@ -204,12 +206,14 @@ sequenceDiagram
 
 | Direction | ACP method | zevbox action | Reason |
 |---|---|---|---|
-| **Client → Agent** | `initialize` | **Rewritten** | disables every host capability (`fs=false`, `terminal=false`). |
-| **Client → Agent** | `session/new` | **Rewritten** | forces `cwd` to the project root, empties `mcpServers`, removes `_meta` and `systemPrompt`. |
-| **Agent → Client** | `fs/read_text_file`, `fs/write_text_file` | **Blocked** (error -32601) | the agent must not read/write the Mac through Zed. |
-| **Agent → Client** | `terminal/create`, `terminal/exec` | **Blocked** (error -32601) | the agent must not open a terminal on the Mac. |
-| **Agent → Client** | `authenticate` (terminal) | **Blocked** | no authentication code runs on the host. |
-| **Agent → Client** | `session/update`, notifications | **Forwarded** | lets the agent stream its answers to Zed. |
+| **Client → Agent** | `initialize` | **Rewritten** | disables every host capability (`fs`, `terminal`, `auth.terminal` all false). |
+| **Client → Agent** | `authenticate` | **Forwarded** only for an auth method kept in the `initialize` response, else error -32602 | terminal auth methods are removed, so no authentication code runs on the host. |
+| **Client → Agent** | `session/new`, `session/load`, `session/resume`, `session/fork` | **Rewritten** | forces `cwd` to the project root (error -32602 otherwise, also for extra directories), empties `mcpServers`, removes `_meta` and `systemPrompt`. |
+| **Client → Agent** | `session/prompt`, `session/set_mode`, `session/set_model`, `session/set_config_option`, `session/list`, `session/close`, `session/delete`, `logout` | **Forwarded** | they only act inside the agent's VM. |
+| **Client → Agent** | any other method (including `_`-prefixed) | **Blocked** (error -32601) | allow-list (I4). |
+| **Agent → Client** | `session/request_permission` | **Forwarded** | shows a choice to the user, no action on the Mac. |
+| **Agent → Client** | `fs/*`, `terminal/*`, `elicitation/create`, any other method | **Blocked** (error -32601) | the agent must not read, write or run anything on the Mac through Zed. |
+| **Agent → Client** | `session/update`, `$/cancel_request` (notifications) | **Forwarded** | lets the agent stream its answers to Zed; other notifications are dropped. |
 
 ---
 
@@ -227,18 +231,20 @@ flowchart TD
 
     PreflightCheck -- "yes" --> CleanPre["clean up any orphan containers"]
     CleanPre --> GenID["generate unique id (8 hex) & name zevbox-<agent>-<id8>"]
-    GenID --> SaveRec["write instances/<id8>.json"]
-    SaveRec --> SpawnVM["container run -i --rm …"]
+    GenID --> Guard["open logs/<id8>.log\nstart the project guard (I13)"]
+    Guard --> SpawnVM["container run -i --rm …\n+ write instances/<id8>.json"]
     SpawnVM --> Loop["asynchronous bidirectional relay loop\n(tokio::select!)"]
 
     Loop --> EventCheck{"event?"}
     EventCheck -- "Zed closes stdin (EOF)" --> StopNormal["normal stop"]
     EventCheck -- "agent crash / exit" --> StopCrash["immediate clean-up"]
-    EventCheck -- "SIGTERM / SIGINT" --> StopSig["signal caught"]
+    EventCheck -- "guard sees a new .git" --> StopGuard["stop the agent (message on stderr)"]
+    EventCheck -- "SIGTERM / SIGINT / SIGHUP" --> StopSig["signal caught"]
 
-    StopNormal --> ShutdownBound["bounded shutdown (container stop --time 5)\nforced delete if stubborn (delete --force)"]
+    StopNormal --> ShutdownBound["bounded shutdown (container stop --time 3)\nforced delete if stubborn (delete --force)"]
     StopCrash --> ShutdownBound
     StopSig --> ShutdownBound
+    StopGuard --> ShutdownBound
 
     ShutdownBound --> DelRec["remove instances/<id8>.json"]
     DelRec --> EndExit
@@ -259,10 +265,13 @@ flowchart LR
     Build --> Smoke["smoke test in the VM\n1. uname -s == Linux\n2. dpkg check (tools)\n3. /etc/zevbox-release.json present"]
     Smoke --> Promote["promotion (active.json)\ncurrent = new release\nprevious = old release"]
     Promote --> ZedSync["Zed settings refresh"]
+    ZedSync --> Prune["old images and release folders of this state root removed\n(current and previous releases are kept)"]
 ```
 
+If the smoke test fails, nothing is promoted and the new image is deleted.
+
 If a regression shows up, `zevbox rollback --agent <agent>` swaps `current` and `previous` in
-`active.json` in under a second, with no rebuild.
+`active.json` in under a second, with no rebuild (it refuses if the image of `previous` is gone).
 
 ---
 
@@ -275,9 +284,9 @@ flowchart TD
     subgraph ClaudeAuth ["Claude Code (in the VM)"]
         C1["zevbox auth claude"] --> C2["interactive container: container run -it …"]
         C2 --> C3["claude-agent-acp --cli auth login"]
-        C3 --> C4["user pastes the URL, then the code, in the terminal"]
+        C3 --> C4["user opens the printed URL in the browser,\nthen pastes the code in the terminal"]
         C4 --> C5["token saved in state/claude/.claude/.credentials.json"]
-        C5 --> C6["marker detected: AUTHENTICATED ✅"]
+        C5 --> C6["marker present: auth --status says authenticated"]
     end
 
     subgraph AgyAuth ["Antigravity's native flow (does not work from a VM)"]
@@ -303,17 +312,18 @@ published on the VM and the macOS keychain is never touched.
 | **Authentication** | interactive console CLI (`--cli auth login`) in the VM | OAuth 2.0 PKCE run by zevbox on the Mac |
 | **Works from a network-isolated VM** | **yes** (no local server needed) | **no** — hence the host-side flow |
 | **Token location (in the VM)** | `/home/agent/.claude/.credentials.json` | `/home/agent/.gemini/antigravity-acp/acp_token.json` |
+| **Counts as authenticated** (`auth --status`, `doctor`, and the `launch` preflight) | the credentials file exists | `acp_token.json` holds a non-empty refresh token |
 
 ### 7b. oMLX: the Claude adapter on a local model server
 
 `zevbox · oMLX` (optional) is not a new adapter. It is **the Claude adapter**, built from the
 same Containerfile stage into its own image (`zevbox/omlx:<id>`), with its own state folder
 (`state/omlx`, mounted at `/home/agent`). Nothing is shared with the Claude agent and its
-subscription.
+subscription. The release is built from the same registry manifest as Claude (`claude-acp`).
 
 ```mermaid
 flowchart LR
-    Auth["zevbox auth omlx (on the Mac)\nURL + key → model list\n→ test from a VM"] --> Settings["state/omlx/.claude/settings.json (0600)\nenv: ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN\nmodel · availableModels · PostModelSwitch hook"]
+    Auth["zevbox auth omlx (on the Mac)\nURL + key → model list\n→ test from a VM"] --> Settings["state/omlx/.claude/settings.json (0600)\nenv: ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN\navailableModels · modelPicker · permissions.defaultMode\nPostModelSwitch hook"]
     Settings -.->|"mounted at /home/agent"| VM["oMLX VM\nclaude-agent-acp"]
     VM -->|"Anthropic API /v1/messages\nthrough the Mac's main network"| Server["oMLX server\n(e.g. Mac Studio)"]
     VM -->|"model switched in Zed:\nPOST /v1/models/<previous>/unload"| Server
@@ -329,7 +339,7 @@ flowchart LR
   entry that lends its name to every server model with a similar id, so Zed would show wrong
   names. The aliases opus/sonnet/haiku fall back to the default model.
 - **Switching models**: on a switch Claude Code confirms an unknown model with a probe request
-  to the server under a fixed 15 s deadline, longer than oMLX takes to load a model that is not
+  to the server under a fixed 15 s deadline, shorter than oMLX can take to load a model that is not
   in memory ("Couldn't confirm model … with the API"). `modelPicker` lists every server model
   (label = id), which skips the probe: the switch is immediate and the first prompt pays the
   load time. The same rows let the Auto mode stay available.
@@ -342,7 +352,9 @@ flowchart LR
   once. The relay is unchanged and `launch` still does no network access (I10).
 - **Network**: the VMs only go out through the Mac's main interface (the default route). A server
   reached by a direct cable is invisible to them; `zevbox auth omlx` and `zevbox doctor` test the
-  server from a VM and say so.
+  server from a VM and say so (`doctor` as the `omlx:server` check).
+- **Authenticated** means the settings file holds a server URL and a key (`auth --status`,
+  `doctor` and the `launch` preflight all use this test).
 - **Opt-in**: `update` and `setup` without `--agent` leave oMLX alone until it is installed.
 
 ---
@@ -356,12 +368,12 @@ never relaxed:
 2. **I2 — Projects in allowed zones**: the canonical project must be strictly inside the home folder (not `~/Library`, not a hidden `~/.…` folder) or on a disk under `/Volumes`; picking a zevbox agent in Zed is the consent, there is no project list.
 3. **I3 — Host filesystem and terminal blocked**: no `fs/*` or `terminal/*` call ever reaches Zed.
 4. **I4 — Bidirectional filtering by id**: only listed methods are routed; responses are matched to their pending request.
-5. **I5 — Confined working directory**: `cwd` is always the project root.
+5. **I5 — Confined working directory**: `cwd` is always the project root, with no extra directories and `mcpServers` empty.
 6. **I6 — Pure JSON-RPC on stdout**: nothing but strict JSON-RPC is written to stdout, to keep Zed stable.
 7. **I7 — Zero host shell**: `/bin/sh`, `bash` or `zsh` are never spawned on the Mac.
-8. **I8 — Surgical container targeting**: `stop` and `delete` only target verified containers with the `zevbox-` prefix; `--all` is banned. `clean`, `status` and `doctor` only count as unregistered the containers whose `/home/agent` mount is under their own state root, so an isolated test never stops the real agents.
+8. **I8 — Surgical container targeting**: `stop` and `delete` only target verified containers (`zevbox-` prefix and the zevbox label); `--all` is banned. `clean`, `status` and `doctor` only count as unregistered the containers whose `/home/agent` mount is under their own state root, so an isolated test never stops the real agents.
 9. **I9 — Private logs**: no token, password or message content is ever logged.
 10. **I10 — No build or network at launch**: `launch` is instant and downloads nothing.
 11. **I11 — Rust robustness**: zero `unwrap()`, `expect()` or `panic!()` in production code (`src/`).
 12. **I12 — zevbox isolation**: zevbox's own binary and internal files are never mounted into a container.
-13. **I13 — Project files the Mac would run**: in the ACP container, `<project>/.zed` is masked by a tmpfs and an existing `<project>/.git` is read-only; `guard.rs` starts watching the project before the container starts (a `.zed` that is a file or a link is refused at launch) and stops the agent if a `.git` appears or changes elsewhere. Zed runs programs named in `.zed/settings.json` and git filters by itself (see [EXP-01](experiments/EXP-01-resultats.md)).
+13. **I13 — Project files the Mac would run**: in the ACP container, `<project>/.zed` is masked by a tmpfs and an existing `<project>/.git` is read-only; `guard.rs` starts watching the project before the container starts (a `.zed` that is a file or a link is refused at launch) and stops the agent if a `.git` appears or changes elsewhere. Zed runs programs named in `.zed/settings.json` and git filters by itself (decision P1 in [DECISIONS](DECISIONS.md), 2026-10-16).
