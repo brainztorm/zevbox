@@ -6,7 +6,7 @@
 
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 pub const NAME_PREFIX: &str = "zevbox-";
@@ -174,6 +174,40 @@ pub fn parse_list_json(text: &str) -> Result<Vec<ContainerInfo>, ContainerError>
         .collect()
 }
 
+/// Name → source of the `/home/agent` mount, from `container list --all --format json`
+/// (`configuration.mounts[].destination`/`source`). Containers without that mount,
+/// or entries the CLI does not describe, are absent.
+pub fn parse_home_sources(text: &str) -> Result<BTreeMap<String, String>, ContainerError> {
+    Ok(json_array(text)?
+        .iter()
+        .filter_map(|c| {
+            let name = str_at(c, "/configuration/id")?;
+            let source = c
+                .pointer("/configuration/mounts")
+                .and_then(Value::as_array)?
+                .iter()
+                .find(|m| m.get("destination").and_then(Value::as_str) == Some("/home/agent"))
+                .and_then(|m| m.get("source").and_then(Value::as_str))?;
+            Some((name, source.to_string()))
+        })
+        .collect())
+}
+
+/// DECISIONS backlog 10: a zevbox container belongs to the installation whose state
+/// root holds its `/home/agent` mount (`<stateRoot>/state/<agent>`). Another state
+/// root (an isolated test, a manual try under /tmp) must never see the real agents
+/// as « unregistered », or `clean` would stop them. An unknown mount (`None`, e.g.
+/// a CLI that does not list mounts) keeps the previous behaviour: ours.
+pub fn belongs_to(home_source: Option<&str>, state_root: &Path) -> bool {
+    let Some(source) = home_source else {
+        return true;
+    };
+    let source = Path::new(source);
+    // The CLI may print the canonical path (/private/tmp/… for /tmp/…).
+    source.starts_with(state_root)
+        || std::fs::canonicalize(state_root).is_ok_and(|root| source.starts_with(root))
+}
+
 /// Parses `container image list --format json`.
 pub fn parse_image_list_json(text: &str) -> Result<Vec<ImageInfo>, ContainerError> {
     json_array(text)?
@@ -331,6 +365,19 @@ impl ContainerCli {
     pub async fn list_all(&self) -> Result<Vec<ContainerInfo>, ContainerError> {
         // `--all` here only *reads*; it is never used with stop/delete (I8).
         parse_list_json(&self.exec(&["list", "--all", "--format", "json"]).await?)
+    }
+
+    /// The containers of `list_all` that zevbox may target (I8) and that belong to
+    /// this state root (`belongs_to`): the only candidates for « unregistered ».
+    pub async fn list_ours(&self, state_root: &Path) -> Result<Vec<ContainerInfo>, ContainerError> {
+        let text = self.exec(&["list", "--all", "--format", "json"]).await?;
+        let homes = parse_home_sources(&text)?;
+        Ok(parse_list_json(&text)?
+            .into_iter()
+            .filter(|c| {
+                may_target(c) && belongs_to(homes.get(&c.name).map(String::as_str), state_root)
+            })
+            .collect())
     }
 
     pub async fn image_list(&self) -> Result<Vec<ImageInfo>, ContainerError> {
@@ -586,5 +633,58 @@ mod version_tests {
         assert_eq!(version_at_least("1.5.0-rc1", min), Some(true));
         assert_eq!(version_at_least("", min), None);
         assert_eq!(version_at_least("unknown", min), None);
+    }
+}
+
+#[cfg(test)]
+mod ownership_tests {
+    use super::*;
+
+    // Shape of `container list --all --format json` (container 1.5, trimmed).
+    const LIST: &str = r#"[
+      {"configuration": {"id": "zevbox-claude-0a1b2c3d", "labels": {"zevbox.managed": "1"},
+        "mounts": [
+          {"destination": "/Users/u/code/p", "source": "/Users/u/code/p"},
+          {"destination": "/home/agent", "source": "/Users/u/Library/Application Support/zevbox/state/claude"}
+        ]}, "status": {"state": "running"}},
+      {"configuration": {"id": "zevbox-claude-deadbeef", "labels": {"zevbox.managed": "1"}},
+        "status": {"state": "running"}}
+    ]"#;
+
+    #[test]
+    fn home_sources_come_from_the_home_agent_mount() {
+        let homes = parse_home_sources(LIST).unwrap();
+        assert_eq!(
+            homes.get("zevbox-claude-0a1b2c3d").map(String::as_str),
+            Some("/Users/u/Library/Application Support/zevbox/state/claude")
+        );
+        assert!(!homes.contains_key("zevbox-claude-deadbeef"));
+    }
+
+    #[test]
+    fn only_containers_of_this_state_root_belong_to_it() {
+        let real = Path::new("/Users/u/Library/Application Support/zevbox");
+        let home = "/Users/u/Library/Application Support/zevbox/state/claude";
+        assert!(belongs_to(Some(home), real));
+        // An isolated test root never claims the real agents (backlog 10).
+        assert!(!belongs_to(
+            Some(home),
+            Path::new("/private/tmp/t/state-root")
+        ));
+        // A sibling folder whose name starts the same is another root.
+        assert!(!belongs_to(
+            Some("/Users/u/Library/Application Support/zevbox-old/state/claude"),
+            real
+        ));
+        // Mount unknown: previous behaviour.
+        assert!(belongs_to(None, real));
+    }
+
+    #[test]
+    fn canonical_mount_source_matches_a_non_canonical_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let canonical = std::fs::canonicalize(tmp.path()).unwrap();
+        let home = canonical.join("state/claude");
+        assert!(belongs_to(home.to_str(), tmp.path()));
     }
 }

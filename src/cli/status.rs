@@ -16,7 +16,7 @@ pub async fn run(json: bool) -> anyhow::Result<u8> {
     let cli = crate::container::ContainerCli::new(config.container_binary);
 
     let records = crate::instances::list(&paths).unwrap_or_default();
-    let containers = cli.list_all().await.unwrap_or_default();
+    let containers = cli.list_ours(&paths.state_root).await.unwrap_or_default();
 
     let mut items = Vec::new();
 
@@ -39,7 +39,7 @@ pub async fn run(json: bool) -> anyhow::Result<u8> {
     }
 
     for c in &containers {
-        if crate::container::may_target(c) && !records.iter().any(|r| r.container_name == c.name) {
+        if !records.iter().any(|r| r.container_name == c.name) {
             let id = c
                 .labels
                 .get(crate::container::LABEL_INSTANCE)

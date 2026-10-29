@@ -359,7 +359,7 @@ never relaxed:
 5. **I5 — Confined working directory**: `cwd` is always the project root.
 6. **I6 — Pure JSON-RPC on stdout**: nothing but strict JSON-RPC is written to stdout, to keep Zed stable.
 7. **I7 — Zero host shell**: `/bin/sh`, `bash` or `zsh` are never spawned on the Mac.
-8. **I8 — Surgical container targeting**: `stop` and `delete` only target verified containers with the `zevbox-` prefix; `--all` is banned.
+8. **I8 — Surgical container targeting**: `stop` and `delete` only target verified containers with the `zevbox-` prefix; `--all` is banned. `clean`, `status` and `doctor` only count as unregistered the containers whose `/home/agent` mount is under their own state root, so an isolated test never stops the real agents.
 9. **I9 — Private logs**: no token, password or message content is ever logged.
 10. **I10 — No build or network at launch**: `launch` is instant and downloads nothing.
 11. **I11 — Rust robustness**: zero `unwrap()`, `expect()` or `panic!()` in production code (`src/`).

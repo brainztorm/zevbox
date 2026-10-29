@@ -217,7 +217,7 @@ affaiblis pour faire passer un test :
 - **I5 — `cwd` confiné** : le répertoire de travail est toujours exactement la racine du projet ; `mcpServers` est vidé.
 - **I6 — JSON-RPC pur sur stdout** : en mode `launch`, stdout ne porte que du JSON-RPC.
 - **I7 — Pas de shell hôte** : zevbox ne lance jamais `sh`, `bash` ni `zsh` sur le Mac.
-- **I8 — Ciblage chirurgical des conteneurs** : `container stop`/`delete` n'utilisent jamais `--all` et ne touchent que des conteneurs au préfixe `zevbox-` **et** au label zevbox.
+- **I8 — Ciblage chirurgical des conteneurs** : `container stop`/`delete` n'utilisent jamais `--all` et ne touchent que des conteneurs au préfixe `zevbox-` **et** au label zevbox ; `clean` ne supprime que les conteneurs non enregistrés de sa propre racine d'état (leur montage `/home/agent` est dessous).
 - **I9 — Journaux privés** : aucun jeton, identifiant ou contenu de message n'est journalisé ni affiché en cas d'erreur.
 - **I10 — Ni réseau ni build dans `launch`** : le lancement n'utilise que la release active.
 - **I11 — Pas de panic en production** : zéro `unwrap()`, `expect()`, `panic!()` dans `src/` (Clippy `deny`).
