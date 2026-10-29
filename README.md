@@ -216,7 +216,7 @@ never weakened to make a test pass:
 - **I9 — Private logs**: no token, credential or message content is ever logged or printed on error.
 - **I10 — No network or build in `launch`**: launching uses the active release only.
 - **I11 — No panics in production**: zero `unwrap()`, `expect()`, `panic!()` in `src/` (Clippy `deny`).
-- **I12 — zevbox is out of reach**: its binary, configuration and releases are never mounted into a container.
+- **I12 — zevbox is out of reach**: its binary, configuration, releases and source code are never mounted into a container: the zevbox source folder (and any copy of it) is refused as a project, so an agent cannot change the code you build and install.
 - **I13 — Project files the Mac would run**: in the VM, the project's `.zed` folder is masked (the agent's edits stay in VM memory) and an existing `.git` is read-only. The watch starts before the VM does, and a `.zed` that is a file or a link is refused at launch. During the session zevbox stops the agent if a `.git` appears or changes anywhere else. Reason: Zed runs programs named in `.zed/settings.json` and in git settings by itself (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 
 ### Threat model and known limits
