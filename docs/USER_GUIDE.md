@@ -171,9 +171,10 @@ zevbox auth omlx --url http://192.168.1.8:8000
    hook that unloads the previous model on the server when you switch models in Zed. The
    smallest model is never unloaded: Claude Code keeps using it for small background requests.
    It also lists the models in `modelPicker`, so a switch in Zed is immediate (the first prompt
-   then waits for the server to load the model) and the Auto mode stays available. On local
-   models, choose **Bypass permissions** to never be asked (Auto asks the model to review each
-   tool use, which is slow); `auth omlx` keeps a `permissions.defaultMode` you add to the file.
+   then waits for the server to load the model) and the Auto mode stays available. The default
+   permission mode is **Bypass permissions** (`permissions.defaultMode`): the agent never asks,
+   it only acts inside its VM and your project. Auto would make the model review each tool use,
+   which is slow on local models. A mode you write in the file yourself is kept.
 4. It checks that **a VM** reaches the server: `omlx: the agent VM reaches the server (HTTP 401)`.
    The VMs only go out through the Mac's main network (the interface with the default route),
    so an address reached through a direct cable to the server does not work from a VM: use the

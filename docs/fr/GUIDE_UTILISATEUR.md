@@ -155,9 +155,10 @@ zevbox auth omlx --url http://192.168.1.8:8000
    modèle dans Zed. Le plus petit modèle n'est jamais déchargé : Claude Code s'en sert pour ses
    petites requêtes de fond. Il liste aussi les modèles dans `modelPicker` : un changement dans
    Zed est immédiat (le premier prompt attend ensuite que le serveur charge le modèle) et le mode
-   Auto reste disponible. Avec des modèles locaux, choisissez **Bypass permissions** pour ne
-   jamais être sollicité (Auto fait examiner chaque outil par le modèle, ce qui est lent) ;
-   `auth omlx` conserve un `permissions.defaultMode` que vous ajoutez au fichier.
+   Auto reste disponible. Le mode de permissions par défaut est **Bypass permissions**
+   (`permissions.defaultMode`) : l'agent ne demande jamais rien, il n'agit que dans sa VM et
+   votre projet. Auto ferait examiner chaque outil par le modèle, lent avec des modèles locaux.
+   Un mode que vous écrivez vous-même dans le fichier est conservé.
 4. Il vérifie qu'**une VM** joint le serveur : `omlx: the agent VM reaches the server (HTTP 401)`.
    Les VM ne sortent que par le réseau principal du Mac (l'interface de la route par défaut) :
    une adresse jointe par un câble direct vers le serveur ne marche pas depuis une VM ; donnez

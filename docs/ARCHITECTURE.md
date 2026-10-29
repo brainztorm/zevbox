@@ -332,9 +332,11 @@ flowchart LR
   to the server under a fixed 15 s deadline, longer than oMLX takes to load a model that is not
   in memory ("Couldn't confirm model … with the API"). `modelPicker` lists every server model
   (label = id), which skips the probe: the switch is immediate and the first prompt pays the
-  load time. The same rows let the Auto mode stay available. The permission mode
-  (`permissions.defaultMode`) is left to the user and kept by `auth omlx`; on local models Auto
-  is slow (one review by the model per tool use), Bypass permissions asks nothing.
+  load time. The same rows let the Auto mode stay available.
+- **Permission mode**: `auth omlx` writes `permissions.defaultMode: "bypassPermissions"` when the
+  file has no mode (user decision 2026-10-29): local models never stop to ask, everything runs
+  in the VM (project mounted, `.git` read-only, I13). A mode the user wrote is kept. Auto would
+  make the model review each tool use, too slow locally.
 - **Unloading**: a `PostModelSwitch` hook runs **inside the VM** and asks the server to unload
   the model just left — except the smallest one, which the background requests would reload at
   once. The relay is unchanged and `launch` still does no network access (I10).

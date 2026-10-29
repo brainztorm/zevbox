@@ -149,9 +149,9 @@ Documentation in English: **[README.md](../../README.md)**.
 - **Modèles locaux (oMLX)** : le sélecteur de modèles de Zed liste ceux du serveur ; le modèle
   par défaut est le plus petit. Changer de modèle décharge le précédent sur le serveur, sauf ce
   plus petit modèle, que Claude Code garde pour ses petites requêtes de fond. Le changement est
-  immédiat ; le premier prompt attend ensuite que le serveur charge le modèle. Pour ne jamais être
-  sollicité pour des permissions, choisissez le mode **Bypass permissions** (Auto marche mais est
-  lent avec des modèles locaux).
+  immédiat ; le premier prompt attend ensuite que le serveur charge le modèle. Le mode par défaut
+  est **Bypass permissions** : l'agent ne demande jamais rien (il n'agit que dans sa VM et votre
+  projet).
 - **Shell interactif dans la VM de l'agent** : `zevbox shell claude`
 - **Outils Linux supplémentaires (paquets apt) dans les VM** : `zevbox tools add ripgrep clang`
 - **Vérifier et diagnostiquer** : `zevbox status` · `zevbox doctor`
