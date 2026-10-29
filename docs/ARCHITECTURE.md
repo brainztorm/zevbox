@@ -323,8 +323,11 @@ flowchart LR
   settings file, so no claude.ai sign-in happens. The key never appears on a command line, in a
   `container run -e`, or in a log (I9); `zevbox auth omlx` passes it to `curl` on stdin.
 - **Models**: `availableModels` holds the server's model ids, which become the entries of
-  Zed's model picker. The default is the smallest model; the "haiku" slot (Claude Code's small
-  background requests) is always the smallest model too.
+  Zed's model picker. The default is the smallest model (`ANTHROPIC_DEFAULT_MODEL`); Claude
+  Code's small background requests always use the smallest model too (`ANTHROPIC_SMALL_FAST_MODEL`).
+  No other model slot is set (`ANTHROPIC_MODEL`, `model`, opus/sonnet/haiku): each would add an
+  entry that lends its name to every server model with a similar id, so Zed would show wrong
+  names. The aliases opus/sonnet/haiku fall back to the default model.
 - **Unloading**: a `PostModelSwitch` hook runs **inside the VM** and asks the server to unload
   the model just left — except the smallest one, which the background requests would reload at
   once. The relay is unchanged and `launch` still does no network access (I10).

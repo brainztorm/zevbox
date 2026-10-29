@@ -112,7 +112,17 @@ pub fn smallest(models: &[ServerModel]) -> Option<&ServerModel> {
 
 /// The settings.json Claude Code reads in the VM. `existing` is the current file
 /// (keys zevbox does not manage are kept, e.g. what Claude Code writes itself).
-/// The helper model serves Claude Code's small background requests (haiku slot).
+/// The helper model serves Claude Code's small background requests.
+///
+/// Model slots (DECISIONS backlog 9, tested on adapter 0.99.0): the default model
+/// is set with `ANTHROPIC_DEFAULT_MODEL` and the helper with
+/// `ANTHROPIC_SMALL_FAST_MODEL` only. `ANTHROPIC_MODEL`, `settings.model` and
+/// `ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL` would each add a row to the SDK
+/// model list named after the server model id; the adapter gives such a row's
+/// name to every `availableModels` id it resembles (same word, e.g. `Qwen3.8`),
+/// so Zed showed the wrong name. Without those rows each model keeps its own
+/// name, and the aliases opus/sonnet/haiku are refused by `availableModels` and
+/// fall back to the default model, never to a Claude model the server lacks.
 pub fn settings_json(
     existing: Option<Value>,
     url: &str,
@@ -129,13 +139,20 @@ pub fn settings_json(
         Some(Value::Object(map)) => map,
         _ => Map::new(),
     };
+    // Written by earlier zevbox versions; they would bring the wrong names back.
+    for stale in [
+        "ANTHROPIC_MODEL",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    ] {
+        env.remove(stale);
+    }
+    root.remove("model");
     for (name, value) in [
         ("ANTHROPIC_BASE_URL", url),
         ("ANTHROPIC_AUTH_TOKEN", key),
-        ("ANTHROPIC_MODEL", default_model),
-        ("ANTHROPIC_DEFAULT_OPUS_MODEL", default_model),
-        ("ANTHROPIC_DEFAULT_SONNET_MODEL", default_model),
-        ("ANTHROPIC_DEFAULT_HAIKU_MODEL", helper_model),
+        ("ANTHROPIC_DEFAULT_MODEL", default_model),
         ("ANTHROPIC_SMALL_FAST_MODEL", helper_model),
         ("ZEVBOX_OMLX_HELPER_MODEL", helper_model),
         // No telemetry, error reporting or update checks towards Anthropic.
@@ -144,7 +161,6 @@ pub fn settings_json(
         env.insert(name.to_string(), Value::String(value.to_string()));
     }
     root.insert("env".to_string(), Value::Object(env));
-    root.insert("model".to_string(), json!(default_model));
     root.insert(
         "availableModels".to_string(),
         json!(models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>()),
@@ -240,7 +256,14 @@ mod tests {
     #[test]
     fn settings_hold_server_models_and_hook_and_keep_other_keys() {
         let models = parse_models(STATUS).unwrap();
-        let existing = json!({"theme": "dark", "env": {"FOO": "1"}, "model": "old"});
+        // An older zevbox file: its model slots and `model` must go (backlog 9).
+        let existing = json!({"theme": "dark", "model": "old", "env": {
+            "FOO": "1",
+            "ANTHROPIC_MODEL": "old",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL": "old",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": "old",
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL": "old"
+        }});
         let s = settings_json(
             Some(existing),
             "http://192.168.1.8:8000",
@@ -251,7 +274,18 @@ mod tests {
         );
         assert_eq!(s["theme"], "dark");
         assert_eq!(s["env"]["FOO"], "1");
-        assert_eq!(s["model"], "Big-Model");
+        // The default model is a slot-less variable: no `model`, no opus/sonnet/haiku
+        // slot, which would give their SDK rows' names to similar ids (backlog 9).
+        assert_eq!(s["env"]["ANTHROPIC_DEFAULT_MODEL"], "Big-Model");
+        assert!(s.get("model").is_none());
+        for gone in [
+            "ANTHROPIC_MODEL",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+        ] {
+            assert!(s["env"].get(gone).is_none(), "{gone}");
+        }
         assert_eq!(s["env"]["ANTHROPIC_BASE_URL"], "http://192.168.1.8:8000");
         assert_eq!(s["env"]["ANTHROPIC_AUTH_TOKEN"], "k-1");
         assert_eq!(s["env"]["ANTHROPIC_SMALL_FAST_MODEL"], "Qwen3.8-27B-4bit");
@@ -266,7 +300,7 @@ mod tests {
         );
         // F6: the key goes in the bearer-token variable only; nothing else is set.
         let names: Vec<&String> = s["env"].as_object().unwrap().keys().collect();
-        assert_eq!(names.len(), 10, "{names:?}");
+        assert_eq!(names.len(), 7, "{names:?}");
     }
 
     #[test]

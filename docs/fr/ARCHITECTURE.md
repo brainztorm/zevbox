@@ -295,8 +295,12 @@ flowchart LR
   ligne de commande, dans un `container run -e` ni dans un journal (I9) ; `zevbox auth omlx` la
   passe à `curl` sur stdin.
 - **Modèles** : `availableModels` contient les identifiants des modèles du serveur, qui
-  deviennent les entrées du sélecteur de modèles de Zed. Le défaut est le plus petit modèle ; la
-  case « haiku » (petites requêtes de fond de Claude Code) est toujours ce plus petit modèle.
+  deviennent les entrées du sélecteur de modèles de Zed. Le défaut est le plus petit modèle
+  (`ANTHROPIC_DEFAULT_MODEL`) ; les petites requêtes de fond de Claude Code utilisent toujours ce
+  plus petit modèle (`ANTHROPIC_SMALL_FAST_MODEL`). Aucune autre case de modèle n'est fixée
+  (`ANTHROPIC_MODEL`, `model`, opus/sonnet/haiku) : chacune ajouterait une entrée qui prête son nom
+  à tout modèle du serveur d'identifiant ressemblant, et Zed afficherait de faux noms. Les alias
+  opus/sonnet/haiku retombent sur le modèle par défaut.
 - **Déchargement** : un hook `PostModelSwitch` s'exécute **dans la VM** et demande au serveur de
   décharger le modèle qu'on vient de quitter — sauf le plus petit, que les requêtes de fond
   rechargeraient aussitôt. Le relais ne change pas et `launch` ne fait toujours aucun accès
