@@ -171,7 +171,7 @@ pub async fn run(json_output: bool) -> anyhow::Result<u8> {
     checks.extend(zed_checks(&paths));
 
     // 9. Orphan or unregistered instances (plan §8.6 point 9)
-    if let Ok(containers) = cli.list_all().await {
+    if let Ok(containers) = cli.list_ours(&paths.state_root).await {
         checks.push(instances_check(&paths, &containers));
     }
 
@@ -396,9 +396,7 @@ fn instances_check(
         .count();
     let unregistered = containers
         .iter()
-        .filter(|c| {
-            crate::container::may_target(c) && !records.iter().any(|r| r.container_name == c.name)
-        })
+        .filter(|c| !records.iter().any(|r| r.container_name == c.name))
         .count();
     if orphans == 0 && unregistered == 0 {
         (

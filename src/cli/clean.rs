@@ -20,13 +20,11 @@ pub async fn run(images: bool) -> anyhow::Result<u8> {
         crate::ui::out(&format!("cleaned orphan instance {id}"));
     }
 
-    // 2. Clean unregistered zevbox containers
+    // 2. Clean unregistered zevbox containers of this state root only (backlog 10)
     let records = crate::instances::list(&paths).unwrap_or_default();
-    if let Ok(containers) = cli.list_all().await {
+    if let Ok(containers) = cli.list_ours(&paths.state_root).await {
         for c in containers {
-            if crate::container::may_target(&c)
-                && !records.iter().any(|r| r.container_name == c.name)
-            {
+            if !records.iter().any(|r| r.container_name == c.name) {
                 crate::ui::out(&format!("removing unregistered container {}", c.name));
                 let _ = cli.stop_and_delete_verified(&c.name).await;
             }

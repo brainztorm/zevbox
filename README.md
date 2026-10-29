@@ -212,7 +212,7 @@ never weakened to make a test pass:
 - **I5 — Confined `cwd`**: the working directory is always exactly the project root; `mcpServers` is emptied.
 - **I6 — Pure JSON-RPC on stdout**: in `launch` mode stdout carries nothing but JSON-RPC, so Zed never sees garbage.
 - **I7 — No host shell**: zevbox never spawns `sh`, `bash` or `zsh` on the Mac.
-- **I8 — Surgical container targeting**: `container stop`/`delete` never use `--all` and only touch containers with the `zevbox-` prefix **and** the zevbox label.
+- **I8 — Surgical container targeting**: `container stop`/`delete` never use `--all` and only touch containers with the `zevbox-` prefix **and** the zevbox label; `clean` only removes unregistered containers of its own state root (their `/home/agent` mount is under it).
 - **I9 — Private logs**: no token, credential or message content is ever logged or printed on error.
 - **I10 — No network or build in `launch`**: launching uses the active release only.
 - **I11 — No panics in production**: zero `unwrap()`, `expect()`, `panic!()` in `src/` (Clippy `deny`).

@@ -335,7 +335,7 @@ Ces règles sont testées automatiquement à chaque compilation (`scripts/check-
 5. **I5 — Confinement du répertoire de travail** : Le `cwd` est invariablement contraint à la racine du projet.
 6. **I6 — Pureté JSON-RPC sur stdout** : Seuls des messages JSON-RPC stricts sont émis sur stdout pour préserver la stabilité de Zed.
 7. **I7 — Zéro shell sur l'hôte** : Aucun appel à `/bin/sh`, `bash` ou `zsh` n'est exécuté sur le Mac hôte.
-8. **I8 — Ciblage chirurgical des conteneurs** : `stop` et `delete` ne ciblent que des conteneurs validés avec le préfixe `zevbox-`. L'option globale `--all` est bannie.
+8. **I8 — Ciblage chirurgical des conteneurs** : `stop` et `delete` ne ciblent que des conteneurs validés avec le préfixe `zevbox-`. L'option globale `--all` est bannie. `clean`, `status` et `doctor` ne comptent comme non enregistrés que les conteneurs dont le montage `/home/agent` est sous leur propre racine d'état : un test isolé n'arrête jamais les vrais agents.
 9. **I9 — Confidentialité des journaux** : Aucun jeton, mot de passe ou contenu de message n'est consigné dans les logs.
 10. **I10 — Absence de build ou réseau au lancement** : La commande `launch` est instantanée et ne réalise aucun téléchargement.
 11. **I11 — Robustesse Rust** : Zéro `unwrap()`, `expect()` ou `panic!()` dans le code de production (`src/`).

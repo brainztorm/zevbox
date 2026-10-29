@@ -479,7 +479,7 @@ Si Zed tue zevbox avec `SIGKILL`, rien de tout cela ne s'exécute : le pipe stdi
 
 Une instance est **orpheline** si son `relayPid` n'existe plus (`nix::sys::signal::kill(pid, None)` renvoie `ESRCH`), ou si le processus existe mais n'est pas le même (heure de démarrage différente, lue via `ps -o lstart= -p <pid>` lancé avec `Command`). Nettoyage : appliquer les étapes 4–5 de l'arrêt au conteneur nommé dans l'enregistrement (s'il passe I8), puis supprimer l'enregistrement.
 
-Un conteneur `zevbox-*` **avec** label `zevbox.managed=1` mais **sans** enregistrement est signalé par `doctor` et `status` (`unregistered`). Seul `clean` le supprime, après avoir affiché son nom.
+Un conteneur `zevbox-*` **avec** label `zevbox.managed=1` mais **sans** enregistrement est signalé par `doctor` et `status` (`unregistered`). Seul `clean` le supprime, après avoir affiché son nom. **Seuls comptent les conteneurs de cette racine d'état** (ajouté le 2026-10-29, DECISIONS backlog 10) : la source du montage `/home/agent` (lue dans `configuration.mounts` de `container list`) doit être sous la racine d'état courante ; un conteneur d'une autre racine (test isolé, essai sous `/tmp`, ou l'inverse) n'est jamais `unregistered` ; montage inconnu → comportement antérieur.
 
 ### 8.5 Contrôles préalables de `launch` et erreurs visibles dans Zed
 
