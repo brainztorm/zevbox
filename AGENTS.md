@@ -67,7 +67,7 @@ in the manifest.
 - `guard.rs` project watcher during `launch` (I13)
 - `console/` `zevbox console`, the full-screen French keyboard menu (`ratatui` + `crossterm`): `menu.rs` pure menu model
   (labels, confirmations, argv per leaf), `app.rs` state and keys, `ui.rs` rendering, `runner.rs` child processes,
-  `state.rs` banner data. It reimplements no command: it runs `zevbox <cmd>` (spec `docs/SPEC_console.md`)
+  `state.rs` banner data, `text.rs` wrapping and display width. It reimplements no command: it runs `zevbox <cmd>` (spec `docs/SPEC_console.md`)
 
 ## Invariants (details: plan §3) — never weaken them to pass a test
 

@@ -34,6 +34,34 @@ pub fn wrap(text: &str, max: usize) -> Vec<String> {
     rows
 }
 
+/// Cuts `text` into rows of at most `max` columns at spaces (prose of the
+/// description panel); a word longer than a row is cut by columns. Leading
+/// spaces (list indentation) are kept. Always at least one row.
+pub fn wrap_words(text: &str, max: usize) -> Vec<String> {
+    let max = max.max(1);
+    let mut rows = Vec::new();
+    let mut current: Option<String> = None;
+    for word in text.split(' ') {
+        let candidate = match &current {
+            None => word.to_string(),
+            Some(line) => format!("{line} {word}"),
+        };
+        if width(&candidate) <= max {
+            current = Some(candidate);
+            continue;
+        }
+        if let Some(line) = current.take() {
+            rows.push(line);
+        }
+        let mut pieces = wrap(word, max);
+        let last = pieces.pop().unwrap_or_default();
+        rows.extend(pieces);
+        current = Some(last);
+    }
+    rows.push(current.unwrap_or_default());
+    rows
+}
+
 /// Screen rows taken by `lines` wrapped at `max` columns.
 pub fn wrapped_rows<'a>(lines: impl Iterator<Item = &'a str>, max: usize) -> usize {
     lines.map(|l| wrap(l, max).len()).sum()
@@ -106,6 +134,23 @@ mod tests {
         // Wide characters take two columns each.
         assert_eq!(wrap("日本語", 4), ["日本", "語"]);
         assert_eq!(wrapped_rows(["abcdef", "", "日本語"].into_iter(), 4), 5);
+    }
+
+    #[test]
+    fn wrap_words_cuts_at_spaces() {
+        assert_eq!(
+            wrap_words("Arrête tous les agents zevbox", 12),
+            ["Arrête tous", "les agents", "zevbox"]
+        );
+        assert_eq!(
+            wrap_words("  · Voir les agents", 40),
+            ["  · Voir les agents"]
+        );
+        assert_eq!(wrap_words("abcdefghij xy", 4), ["abcd", "efgh", "ij", "xy"]);
+        assert_eq!(wrap_words("", 4), [""]);
+        for row in wrap_words("Une phrase un peu longue pour tester la largeur", 10) {
+            assert!(width(&row) <= 10, "{row}");
+        }
     }
 
     #[test]

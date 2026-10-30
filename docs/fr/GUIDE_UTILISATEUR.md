@@ -357,10 +357,21 @@ zevbox console
 
 Un menu plein écran s'ouvre dans votre terminal (l'interface est en français ; la sortie des
 commandes reste en anglais). Il exige un terminal interactif et fonctionne aussi avant
-`zevbox setup`. Les commandes sont à gauche ; à droite, une description en clair, la durée, la
-nécessité du réseau et la ligne équivalente (`Commande : zevbox update --check`), pour apprendre
-la vraie commande au passage. Un bandeau en haut indique la version active de chaque agent et le
-nombre d'agents en cours.
+`zevbox setup`. Les commandes sont à gauche ; à droite, une explication en clair de l'entrée
+surlignée (ce qu'elle fait, quand s'en servir, ce qu'elle change et ce qu'elle ne touche pas, par
+exemple qu'arrêter un agent coupe son thread ouvert dans Zed), la durée, la nécessité du réseau et
+la ligne équivalente (`Commande : zevbox update --check`), pour apprendre la vraie commande au
+passage. Une entrée de connexion indique aussi si l'agent est connecté. Un bandeau en haut indique
+la version active de chaque agent et le nombre d'agents en cours.
+
+Le panneau qui reçoit les touches a une bordure **bleue** : le menu à gauche tant que vous
+parcourez les menus ; le panneau de droite dès qu'une action est ouverte (une liste où choisir, la
+sortie d'une commande). La ligne du bas commence par l'endroit où vont les touches (« Menu : … »,
+« Liste à droite : … », « Sortie à droite : … ») et liste les touches valables ; Échap revient en
+arrière. La console n'utilise que trois couleurs, chacune avec un seul sens : **bleu** là où vous
+êtes (panneau actif, ligne sélectionnée, bouton choisi), **vert** tout va bien (`✓ terminé`,
+versions installées, « connecté »), **rouge** attention (`✗ échec …`, la boîte « Êtes-vous
+sûr ? », « non installé »). Ce sont les couleurs de votre terminal : elles suivent son thème.
 
 | Touche | Effet |
 |---|---|
@@ -368,6 +379,7 @@ nombre d'agents en cours.
 | Entrée ou Droite | ouvrir un sous-menu ou lancer l'action |
 | Échap ou Gauche | revenir en arrière ; au premier niveau, quitter |
 | `q` ou Ctrl-C | quitter (`q` est une lettre normale pendant une saisie de texte) |
+| PgUp / PgDn | dans le menu : lire la suite d'une longue explication |
 | PgUp / PgDn, Haut / Bas | faire défiler la sortie d'une commande |
 
 Les menus : **Agents en cours** (état, arrêter un agent ou tous, lire le journal d'une session),
@@ -376,7 +388,7 @@ Les menus : **Agents en cours** (état, arrêter un agent ou tous, lire le journ
 (voir, ajouter, retirer), **Diagnostic et ménage** (`doctor`, `clean`, `clean --images`),
 **Zed** (aperçu, installer, retirer les entrées), **Shell dans une VM** et **Première
 installation** (`setup`). Quand une action demande un choix (un agent, une instance en cours, un
-outil) ou un texte (noms de paquets, adresse, clé et modèle oMLX, projet d'un shell), la console
+outil ; la liste s'affiche dans le panneau de droite) ou un texte (noms de paquets, adresse, clé et modèle oMLX, projet d'un shell), la console
 le demande d'abord ; la clé oMLX est saisie masquée et transmise à la commande sur son entrée
 standard, jamais sur la ligne de commande (« Connecter oMLX » pré-remplit l'adresse et le modèle
 actuels ; une clé vide garde l'actuelle). Une valeur qui commence par `-` est refusée. `launch`
@@ -390,7 +402,8 @@ et de refaire la connexion d'un agent déjà connecté. Les actions de lecture, 
 `zed install` et `setup` s'exécutent sans demander.
 
 Chaque action lance la vraie commande `zevbox <commande>` comme processus enfant ; sa sortie
-s'affiche en direct dans le panneau de droite, et se termine par `✓ terminé`, `✗ échec (code N)`,
+s'affiche en direct dans le panneau de droite (les lignes que la commande écrit sur stderr
+commencent par `!`), et se termine par `✓ terminé`, `✗ échec (code N)`,
 `✗ échec (interrompue)` ou `✗ échec (impossible de lancer la commande)`. Pendant qu'elle tourne,
 Échap propose de l'interrompre : SIGTERM puis SIGKILL après 5 secondes, à la commande et à tout ce
 qu'elle a lancé.

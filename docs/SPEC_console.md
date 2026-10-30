@@ -41,22 +41,40 @@
 ## 3. Écran
 
 ```
-┌ zevbox ─ Claude 0.99.1 · Antigravity 1.4.5 · oMLX 0.99.1 ─ 2 agents en cours ┐
-│ ▸ Agents en cours        │ Mettre à jour les agents                          │
-│   Mises à jour           │                                                   │
-│   ...                    │ <effet en clair>                                  │
-│                          │ Durée : … · réseau nécessaire                     │
-│                          │ Commande : zevbox update                          │
-└ ↑↓ choisir · Entrée ouvrir/lancer · Échap retour · q quitter ────────────────┘
+ zevbox ─ Claude 0.99.1 · Antigravity 1.4.5 · oMLX non installé ─ 2 en cours
+┌ zevbox › Mises à jour ───────────────┐┌ Tout mettre à jour ──────────────────┐
+│  Vérifier s'il y a des mises à jour  ││Construit une image neuve pour Claude,│
+│▸ Tout mettre à jour                  ││Antigravity et oMLX s'il est installé…│
+│  Mettre à jour un agent              ││                                      │
+│  Revenir à la version précédente     ││Durée : 1 à 3 min par agent · réseau  │
+│                                      ││Commande : zevbox update              │
+└──────────────────────────────────────┘└──────────────────────────────────────┘
+ Menu : ↑↓ choisir · Entrée ouvrir · PgUp/PgDn texte · Échap retour · q quitter
 ```
 
 - **Bandeau** (haut) : version de la release active de chaque agent installé (`agentVersion`
-  du lock), ou « non installé » ; nombre d'instances enregistrées. Rafraîchi au retour d'une commande.
-- **Gauche** : la liste du niveau courant ; un sous-menu est marqué `›`. Titre = chemin
-  (`zevbox › Mises à jour`).
-- **Droite** : titre, description en clair, durée et réseau si utiles, ligne
-  `Commande : zevbox …` (avec les paramètres choisis quand ils sont connus).
-- **Bas** : les touches valables à cet endroit.
+  du lock), ou « non installé » ; nombre d'instances enregistrées (« N agents en cours », abrégé
+  en « N en cours » si la ligne ne tient pas). Rafraîchi au retour d'une commande.
+- **Gauche** (40 colonnes) : la liste du niveau courant ; un sous-menu est marqué `›`. Titre =
+  chemin (`zevbox › Mises à jour`), coupé par la gauche avec « … » s'il est trop long.
+- **Droite** : titre = l'entrée surlignée ; une explication en clair pour un non-spécialiste
+  (ce que ça fait, quand s'en servir, ce que ça change et ne change pas, les conséquences), l'état
+  de connexion pour les entrées de connexion, durée et réseau si utiles, puis la ligne
+  `Commande : zevbox …` (avec les paramètres choisis quand ils sont connus). Une explication plus
+  longue que le panneau se lit avec PgUp/PgDn (la bordure du bas l'indique). Quand une action
+  demande un choix, la liste s'affiche ici, avec l'explication et la commande.
+- **Focus** : le panneau qui reçoit les touches a sa bordure et son titre en bleu, l'autre est
+  gris : à gauche pendant la navigation dans les menus, à droite dès qu'une action est ouverte
+  (liste, saisie, sortie, question).
+- **Bas** : où vont les touches (« Menu : », « Liste à droite : », « Saisie : », « Sortie à
+  droite : », « Question : »), puis les touches valables à cet endroit.
+- **Couleurs** : trois, une signification chacune, prises dans la palette du terminal (elles
+  suivent son thème) : **bleu** = là où l'on est (bordure et titre du panneau actif, ligne
+  sélectionnée en blanc gras sur bleu, bouton choisi) ; **vert** = tout va bien (`✓ terminé`,
+  versions installées, « connecté ») ; **rouge** = attention (`✗ échec …`, cadre et titre de
+  « Êtes-vous sûr ? », « non installé », « non connecté »). Le reste est dans la couleur par
+  défaut, ou en gris pour le secondaire (durée, réseau, `Commande :`, lignes `$ zevbox …`). Les
+  lignes écrites sur stderr ne sont pas colorées : elles commencent par `!`.
 - Terminal trop petit (moins de 80 × 20) : message « Agrandissez la fenêtre (80 × 20 minimum) ».
 - Pas de terminal (stdin ou stdout non TTY) : `zevbox console` refuse avec
   `zevbox console needs an interactive terminal.` et le code 2.
@@ -70,6 +88,7 @@
 | Échap ou ← | revenir au niveau précédent ; au premier niveau, quitter |
 | q | quitter (sauf pendant une saisie de texte) |
 | ← → ou Tab | dans « Êtes-vous sûr ? » : passer de Oui à Non |
+| PgUp / PgDn | dans le menu : faire défiler une explication plus longue que le panneau |
 | PgUp / PgDn, ↑ ↓ | faire défiler la sortie d'une commande |
 | Ctrl-C | quitter proprement (comme `q`) |
 

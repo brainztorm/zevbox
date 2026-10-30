@@ -384,10 +384,21 @@ zevbox console
 
 It opens a full-screen menu in your terminal (the interface is in French; the commands' own
 output stays in English). It needs an interactive terminal, and it also works before
-`zevbox setup`. The commands are on the left; on the right, a plain description, the duration,
-whether the network is needed, and the equivalent line (`Commande : zevbox update --check`)
-so you learn the real command as you go. A banner at the top shows the active version of each
-agent and how many agents are running.
+`zevbox setup`. The commands are on the left; on the right, a plain explanation of the
+highlighted entry (what it does, when to use it, what it changes and what it leaves alone, for
+example that stopping an agent cuts its open thread in Zed), the duration, whether the network
+is needed, and the equivalent line (`Commande : zevbox update --check`) so you learn the real
+command as you go. A sign-in entry also says whether that agent is connected. A banner at the
+top shows the active version of each agent and how many agents are running.
+
+The panel that receives the keys has a **blue** border: the menu on the left while you move
+through the menus; the right panel as soon as an action is open (a list to choose from, a
+command's output). The bottom line starts with where the keys go (« Menu : … », « Liste à
+droite : … », « Sortie à droite : … ») and lists the keys valid there; Esc goes back. The console
+uses three colours, each with one meaning: **blue** where you are (active panel, selected row,
+focused button), **green** OK (`✓ terminé`, installed versions, « connecté »), **red** attention
+(`✗ échec …`, the « Êtes-vous sûr ? » box, « non installé »). They come from your terminal's
+palette, so they follow its theme.
 
 | Key | Effect |
 |---|---|
@@ -395,6 +406,7 @@ agent and how many agents are running.
 | Enter or Right | open a submenu or run the action |
 | Esc or Left | go back; at the first level, quit |
 | `q` or Ctrl-C | quit (`q` is a normal letter while you type text) |
+| PgUp / PgDn | in the menu: read the rest of a long explanation |
 | PgUp / PgDn, Up / Down | scroll a command's output |
 
 The menus: **Agents en cours** (status, stop one or all, read a session log), **Mises à jour**
@@ -402,8 +414,8 @@ The menus: **Agents en cours** (status, stop one or all, read a session log), **
 Antigravity, oMLX), **Outils Linux** (list, add, remove), **Diagnostic et ménage** (`doctor`,
 `clean`, `clean --images`), **Zed** (preview, install, remove the entries), **Shell dans une VM**
 and **Première installation** (`setup`). When an action needs a choice (an agent, a running
-instance, a tool) or some text (package names, the oMLX address, key and model, the project of
-a shell), the console asks for it first; the oMLX key is typed masked and goes to the command
+instance, a tool; the list appears in the right-hand panel) or some text (package names, the
+oMLX address, key and model, the project of a shell), the console asks for it first; the oMLX key is typed masked and goes to the command
 on its standard input, never on the command line (« Connecter oMLX » pre-fills the current address
 and model; an empty key keeps the current one). Values starting with `-` are refused. `launch`
 is not in the menu: only Zed runs it.
@@ -416,7 +428,7 @@ an agent that is already connected. Reading actions, `clean`, `zed install` and 
 without asking.
 
 Each action runs the real `zevbox <command>` as a child process; its output appears live in the
-right-hand panel, ending with `✓ terminé`, `✗ échec (code N)`, `✗ échec (interrompue)` or
+right-hand panel (lines the command writes to stderr start with `!`), ending with `✓ terminé`, `✗ échec (code N)`, `✗ échec (interrompue)` or
 `✗ échec (impossible de lancer la commande)`. While it runs, Esc offers to interrupt it: SIGTERM,
 then SIGKILL after 5 seconds, to the command and everything it started. The interactive commands (the Claude and
 Antigravity sign-ins, the shell and `setup`) hand the whole terminal over: the console steps
