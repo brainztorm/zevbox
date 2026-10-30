@@ -1,8 +1,8 @@
 # Spécification — `zevbox console` : interface plein écran au clavier
 
-- **Statut** : première version, branche `console` (2026-10-30). Conception validée par 👤 le
-  2026-10-30 (proposition en conversation) ; les 5 questions ouvertes ont reçu les réponses par
-  défaut ci-dessous, à confirmer par 👤.
+- **Statut** : implémentée, fusionnée dans `main` en **version 0.2.0** (2026-10-30). Conception validée
+  par 👤 le 2026-10-30 ; réponses par défaut du §1 acceptées après essai (« c'est très bien »),
+  puis retours intégrés (explications, cadre bleu du panneau actif, trois couleurs).
 - **But** : ne plus avoir à retenir les commandes et leurs options. On lance `zevbox console` :
   à gauche les commandes, à droite ce qu'elles font ; Entrée exécute, Échap revient, les flèches
   naviguent ; un « Êtes-vous sûr ? » Oui/Non protège les actions qui ont un impact.
