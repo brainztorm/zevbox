@@ -73,7 +73,7 @@ make install
 ```bash
 zevbox --help
 ```
-*You should see the list of the 14 commands (plus `help`).*
+*You should see the list of the 15 commands (plus `help`), including `console`.*
 
 ---
 
@@ -374,6 +374,55 @@ sequenceDiagram
   anything: it starts the image already built. Run `zevbox update --check` from time to time
   to see whether a new agent version is out.
 
+### The console: a menu instead of commands
+
+If you would rather not remember commands and options, run:
+
+```bash
+zevbox console
+```
+
+It opens a full-screen menu in your terminal (the interface is in French; the commands' own
+output stays in English). It needs an interactive terminal, and it also works before
+`zevbox setup`. The commands are on the left; on the right, a plain description, the duration,
+whether the network is needed, and the equivalent line (`Commande : zevbox update --check`)
+so you learn the real command as you go. A banner at the top shows the active version of each
+agent and how many agents are running.
+
+| Key | Effect |
+|---|---|
+| Up / Down | move (the list wraps around) |
+| Enter or Right | open a submenu or run the action |
+| Esc or Left | go back; at the first level, quit |
+| `q` or Ctrl-C | quit (`q` is a normal letter while you type text) |
+| PgUp / PgDn, Up / Down | scroll a command's output |
+
+The menus: **Agents en cours** (status, stop one or all, read a session log), **Mises à jour**
+(check, update all or one agent, roll back), **Connexion des agents** (sign-in status, Claude,
+Antigravity, oMLX), **Outils Linux** (list, add, remove), **Diagnostic et ménage** (`doctor`,
+`clean`, `clean --images`), **Zed** (preview, install, remove the entries), **Shell dans une VM**
+and **Première installation** (`setup`). When an action needs a choice (an agent, a running
+instance, a tool) or some text (package names, the oMLX address, key and model, the project of
+a shell), the console asks for it first; the oMLX key is typed masked and goes to the command
+on its standard input, never on the command line (« Connecter oMLX » pre-fills the current address
+and model; an empty key keeps the current one). Values starting with `-` are refused. `launch`
+is not in the menu: only Zed runs it.
+
+Before anything with an impact the console asks **« Êtes-vous sûr ? »** with the concrete
+consequence and `[ Oui ] [ Non ]`; **Non** is selected by default, Esc means Non, and Left,
+Right or Tab switch button. It asks before stopping one or all agents, updating, rolling back,
+adding or removing a tool, `clean --images`, removing the Zed entries, and signing in again to
+an agent that is already connected. Reading actions, `clean`, `zed install` and `setup` run
+without asking.
+
+Each action runs the real `zevbox <command>` as a child process; its output appears live in the
+right-hand panel, ending with `✓ terminé`, `✗ échec (code N)`, `✗ échec (interrompue)` or
+`✗ échec (impossible de lancer la commande)`. While it runs, Esc offers to interrupt it: SIGTERM,
+then SIGKILL after 5 seconds, to the command and everything it started. The interactive commands (the Claude and
+Antigravity sign-ins, the shell and `setup`) hand the whole terminal over: the console steps
+aside, the command runs normally, then "Appuyez sur Entrée pour revenir à la console" brings
+the menu back.
+
 ## 6. Do / don't
 
 | ✅ Do | ❌ Don't |
@@ -456,6 +505,7 @@ sequenceDiagram
 
 | Action | Command |
 |---|---|
+| Open the keyboard menu (no commands to remember) | `zevbox console` |
 | Diagnose the system | `zevbox doctor` |
 | Build / update the agent images | `zevbox update` |
 | Sign in to Claude / Google (Antigravity) | `zevbox auth claude` / `zevbox auth antigravity` |

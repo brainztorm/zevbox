@@ -137,6 +137,8 @@ Four key components:
    - builds Linux images from the current Ubuntu release (`ubuntu:rolling`, pulled again at every `update` and pinned by its SHA-256 digest in the release lock), with Node, Python and build tools installed;
    - runs *smoke tests* before promoting a release.
 
+Apart from these four, `zevbox console` (`src/console/`, a `ratatui` + `crossterm` full-screen keyboard menu, French interface) is only a front end for the human: it never touches the launch path (I6 unchanged) and **reimplements no command**. Each action runs the current binary (`std::env::current_exe()`) as `zevbox <command>` with its arguments one by one (no shell, I7), so the command line stays the single source of truth; the oMLX key goes to `auth omlx` on its standard input, never in argv or the environment. The console reads state (versions, instances, tools) through library functions for its banner and pickers, and changes nothing itself.
+
 ```mermaid
 flowchart TD
     subgraph SupervisorArea ["zevbox supervisor"]

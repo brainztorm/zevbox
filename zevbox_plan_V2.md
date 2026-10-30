@@ -36,6 +36,7 @@ Un binaire unique `zevbox` (Rust, macOS arm64) qui permet de :
 cd ~/code/zevbox && make install          # compile et installe ~/.local/bin/zevbox
 zevbox setup                             # configuration guidée, images, auth, Zed
 # → ouvrir le projet dans Zed, choisir « zevbox · Claude » dans le panneau Agent (amendement 2026-10-14, §8.9)
+zevbox console                                        # ou : un menu au clavier à la place des commandes
 zevbox status                                         # voir ce qui tourne
 zevbox stop                                           # tout arrêter (seulement les instances zevbox)
 ```
@@ -145,6 +146,7 @@ zevbox/
 │   ├── cli/ (mod.rs complet : clap + dispatch ; un fichier par commande, + auth_omlx.rs)
 │   ├── config.rs  fsutil.rs  tools.rs  instances.rs  container.rs
 │   ├── supervisor.rs  release.rs  zed_settings.rs  omlx.rs  guard.rs
+│   ├── console/ (mod.rs, menu.rs, app.rs, state.rs, ui.rs, runner.rs : `zevbox console`, 2026-10-30)
 │   └── relay/ (mod.rs, policy.rs, jsonrpc.rs)
 └── tests/ 🔒
     ├── common/mod.rs             # TestEnv : état temporaire, lance le vrai binaire avec le faux container
@@ -251,6 +253,8 @@ hex = "0.4"
 nix = { version = "0.29", features = ["signal", "process", "user"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 notify = "8"   # guard.rs (I13), ajoutée le 2026-10-16 avec la protection P1
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }   # console/ (2026-10-30)
+crossterm = "0.29"                                                                  # console/ (2026-10-30)
 [dev-dependencies]
 tempfile = "3"
 
@@ -406,7 +410,7 @@ Quand une nouvelle version d'adaptateur utilise une méthode inconnue, elle sera
 
 ### 8.1 Référence CLI (contrat)
 
-Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manquant (non configuré, non authentifié, aucune release active). Toute commande sans `config.json` sort en `3` avec `zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init' in a macOS terminal.` sur stderr, sauf `init`, `setup` et `auth` (qui créent la configuration ; `auth --status` affiche alors `unknown`, code 0) ; `launch` fait la même réponse à Zed avec `… run 'zevbox setup' in a macOS terminal.` (§8.5).
+Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manquant (non configuré, non authentifié, aucune release active). Toute commande sans `config.json` sort en `3` avec `zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init' in a macOS terminal.` sur stderr, sauf `init`, `setup`, `auth` et `console` (les trois premières créent la configuration ; la console démarre sans, « Première installation » lance `setup` ; `auth --status` affiche alors `unknown`, code 0) ; `launch` fait la même réponse à Zed avec `… run 'zevbox setup' in a macOS terminal.` (§8.5).
 
 | Commande | Effet |
 |---|---|
@@ -424,6 +428,7 @@ Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manq
 | `zevbox logs [ID] [--path]` | Affiche les 200 dernières lignes du journal de l'instance (par défaut la plus récente) ; `--path` affiche seulement le chemin. **Journal implémenté le 2026-10-21** (revue ARGON 2.4) : `launch` initialise `tracing` vers `logs/<id>.log` (niveau `info`, ou `RUST_LOG` ; jamais stdout, I6) ; événements `launch agent=… release=… container=… project=…`, `blocked method=<m> dir=<d>` (nom nettoyé : 80 caractères `[A-Za-z0-9_./:-]` au plus), `shutdown relay_end=… container_gone=…` ; les autres commandes écrivent sur stderr seulement si `RUST_LOG` est défini. `doctor` (§8.6 point 10) compte les `blocked method=` des journaux. |
 | `zevbox update [--check] [--agent A]` | `--check` : compare la release active aux registres et n'écrit rien. Sans `--check` : candidate → build → smoke test → promotion (§8.7). **Code 1 si la mise à jour d'au moins un agent échoue** (les autres agents sont quand même traités ; amendement 2026-10-21, revue ARGON 3.3). |
 | `zevbox rollback --agent A` (`--agent` obligatoire, code 2 sinon ; aligné sur le code le 2026-10-29) | Échange `current` et `previous` ; **refuse (code 1) si l'image `previous` n'existe plus**, avec « Fix: run 'zevbox update --agent A' » (implémenté le 2026-10-21, revue ARGON 3.2). |
+| `zevbox console` (ajoutée le 2026-10-30, branche `console`, spécification `docs/SPEC_console.md`) | Menu plein écran au clavier au-dessus des autres commandes, **interface en français** (`ratatui` + `crossterm`). Ne réimplémente rien : chaque action lance le binaire courant (`current_exe()`) comme `zevbox <commande>`, arguments un par un (I7), sortie affichée en direct ; `shell`, `setup`, `auth claude` et `auth antigravity` reçoivent le vrai terminal (la console quitte l'écran alterné puis se redessine). Clé oMLX sur l'entrée standard de `auth omlx`, jamais en argument ni en variable d'environnement. « Êtes-vous sûr ? » (Non par défaut) avant arrêt d'agents, mises à jour, retour arrière, ajout/retrait d'outil, `clean --images`, `zed uninstall` et nouvelle connexion d'un agent déjà connecté. Ne propose jamais `launch` (I6). Sans terminal interactif (stdin ou stdout non TTY) : `zevbox console needs an interactive terminal.`, code 2. Ne lit l'état que par les fonctions de la bibliothèque ; ne modifie rien elle-même. |
 | `zevbox tools list` / `tools add <paquet-apt>…` / `tools remove <paquet>…` | Modifie `tools.json` puis reconstruit chaque agent installé avec le pipeline `update` (candidate → tests → promotion), qui prend aussi la **dernière** version du client ACP (amendé le 2026-10-30, décision 👤 : backlog 1 abandonné ; le relais refuse toute méthode non auditée, et `rollback` reste possible). |
 
 `--agent` accepte `claude`, `antigravity` ou `omlx` ; sans option, la commande s'applique à `claude` et `antigravity`, et à `omlx` seulement s'il a déjà une release (agent optionnel, 2026-10-29). `setup` ne construit pas oMLX et ne le compte pas comme manquant.

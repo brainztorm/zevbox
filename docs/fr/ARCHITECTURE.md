@@ -113,6 +113,8 @@ L'architecture repose sur quatre composants clés :
    - Construit les images Linux à partir de la version courante d'Ubuntu (`ubuntu:rolling`, retéléchargée à chaque `update` et figée par son empreinte SHA-256 dans le lock de la release), avec Node, Python et les outils de compilation installés.
    - Exécute des tests de fumée (*smoke tests*) avant toute promotion.
 
+En dehors de ces quatre composants, `zevbox console` (`src/console/`, menu plein écran au clavier en `ratatui` + `crossterm`, interface en français) n'est qu'une façade pour l'humain : il ne touche jamais au chemin de lancement (I6 inchangé) et **ne réimplémente aucune commande**. Chaque action lance le binaire courant (`std::env::current_exe()`) comme `zevbox <commande>`, arguments un par un (sans shell, I7), si bien que la ligne de commande reste la seule source de vérité ; la clé oMLX est transmise à `auth omlx` sur son entrée standard, jamais dans argv ni l'environnement. La console lit l'état (versions, instances, outils) par des fonctions de la bibliothèque pour son bandeau et ses listes, et ne modifie rien elle-même.
+
 ```mermaid
 flowchart TD
     subgraph SupervisorArea ["Superviseur zevbox"]

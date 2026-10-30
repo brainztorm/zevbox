@@ -557,6 +557,9 @@ pub fn build_image(
         .open(build_log_path)
         .map_err(|e| ReleaseError::Store(format!("cannot open build.log: {e}")))?;
 
+    // Never the caller's stdin: under `zevbox console`, `auth omlx` → quick start →
+    // update runs with stdin = the pipe holding the oMLX key (I9).
+    cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::from(log_file.try_clone().map_err(|e| {
         ReleaseError::Store(format!("cannot clone log file handle: {e}"))
     })?));

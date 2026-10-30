@@ -227,6 +227,18 @@ pub fn configured_url(settings: &Path) -> Option<String> {
     non_empty("ANTHROPIC_BASE_URL")
 }
 
+/// The default model (`env.ANTHROPIC_DEFAULT_MODEL`) of a settings file, if any.
+/// `zevbox console` pre-fills its model field with it, so re-connecting does not
+/// silently reset the default to the smallest model.
+pub fn configured_model(settings: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(settings).ok()?;
+    let root: Value = serde_json::from_str(&text).ok()?;
+    root.pointer("/env/ANTHROPIC_DEFAULT_MODEL")
+        .and_then(Value::as_str)
+        .filter(|m| !m.is_empty())
+        .map(str::to_string)
+}
+
 /// curl config read on stdin: keeps the key out of the process list.
 pub fn curl_auth_config(key: &str) -> String {
     format!("header = \"Authorization: Bearer {key}\"\n")
@@ -235,6 +247,17 @@ pub fn curl_auth_config(key: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn configured_model_reads_the_default_model() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        assert_eq!(configured_model(&path), None);
+        std::fs::write(&path, r#"{"env":{"ANTHROPIC_DEFAULT_MODEL":"Qwen3-8B"}}"#).unwrap();
+        assert_eq!(configured_model(&path).as_deref(), Some("Qwen3-8B"));
+        std::fs::write(&path, r#"{"env":{"ANTHROPIC_DEFAULT_MODEL":""}}"#).unwrap();
+        assert_eq!(configured_model(&path), None);
+    }
 
     const STATUS: &str = r#"{"models":[
         {"id":"Big-Model","estimated_size":453635360875,"loaded":false},
