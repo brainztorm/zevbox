@@ -146,7 +146,7 @@ zevbox/
 │   ├── cli/ (mod.rs complet : clap + dispatch ; un fichier par commande, + auth_omlx.rs)
 │   ├── config.rs  fsutil.rs  tools.rs  instances.rs  container.rs
 │   ├── supervisor.rs  release.rs  zed_settings.rs  omlx.rs  guard.rs
-│   ├── console/ (mod.rs, menu.rs, app.rs, state.rs, ui.rs, runner.rs, text.rs : `zevbox console`, 2026-10-30)
+│   ├── console/ (mod.rs, i18n.rs, menu.rs, app.rs, state.rs, ui.rs, runner.rs, text.rs : `zevbox console`, 2026-10-30)
 │   └── relay/ (mod.rs, policy.rs, jsonrpc.rs)
 └── tests/ 🔒
     ├── common/mod.rs             # TestEnv : état temporaire, lance le vrai binaire avec le faux container
@@ -230,7 +230,7 @@ Versions vérifiées sur crates.io le 2026-10-13. N'en ajouter aucune autre sans
 ```toml
 [package]
 name = "zevbox"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.85"
 
@@ -428,7 +428,7 @@ Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manq
 | `zevbox logs [ID] [--path]` | Affiche les 200 dernières lignes du journal de l'instance (par défaut la plus récente) ; `--path` affiche seulement le chemin. **Journal implémenté le 2026-10-21** (revue ARGON 2.4) : `launch` initialise `tracing` vers `logs/<id>.log` (niveau `info`, ou `RUST_LOG` ; jamais stdout, I6) ; événements `launch agent=… release=… container=… project=…`, `blocked method=<m> dir=<d>` (nom nettoyé : 80 caractères `[A-Za-z0-9_./:-]` au plus), `shutdown relay_end=… container_gone=…` ; les autres commandes écrivent sur stderr seulement si `RUST_LOG` est défini. `doctor` (§8.6 point 10) compte les `blocked method=` des journaux. |
 | `zevbox update [--check] [--agent A]` | `--check` : compare la release active aux registres et n'écrit rien. Sans `--check` : candidate → build → smoke test → promotion (§8.7). **Code 1 si la mise à jour d'au moins un agent échoue** (les autres agents sont quand même traités ; amendement 2026-10-21, revue ARGON 3.3). |
 | `zevbox rollback --agent A` (`--agent` obligatoire, code 2 sinon ; aligné sur le code le 2026-10-29) | Échange `current` et `previous` ; **refuse (code 1) si l'image `previous` n'existe plus**, avec « Fix: run 'zevbox update --agent A' » (implémenté le 2026-10-21, revue ARGON 3.2). |
-| `zevbox console` (ajoutée le 2026-10-30, branche `console`, spécification `docs/SPEC_console.md`) | Menu plein écran au clavier au-dessus des autres commandes, **interface en français** (`ratatui` + `crossterm`). Ne réimplémente rien : chaque action lance le binaire courant (`current_exe()`) comme `zevbox <commande>`, arguments un par un (I7), sortie affichée en direct ; `shell`, `setup`, `auth claude` et `auth antigravity` reçoivent le vrai terminal (la console quitte l'écran alterné puis se redessine). Clé oMLX sur l'entrée standard de `auth omlx`, jamais en argument ni en variable d'environnement. « Êtes-vous sûr ? » (Non par défaut) avant arrêt d'agents, mises à jour, retour arrière, ajout/retrait d'outil, `clean --images`, `zed uninstall` et nouvelle connexion d'un agent déjà connecté. Ne propose jamais `launch` (I6). Sans terminal interactif (stdin ou stdout non TTY) : `zevbox console needs an interactive terminal.`, code 2. Ne lit l'état que par les fonctions de la bibliothèque ; ne modifie rien elle-même. |
+| `zevbox console` (ajoutée le 2026-10-30, branche `console`, spécification `docs/SPEC_console.md`) | Menu plein écran au clavier au-dessus des autres commandes, **interface en anglais ou en français** (`ratatui` + `crossterm`) : `--lang en|fr`, sinon d'après la première valeur non vide de `LC_ALL`, `LC_MESSAGES`, `LANG` (`fr…` → français, tout le reste → anglais) ; `--lang` invalide → erreur clap, code 2 ; tous les textes dans `src/console/i18n.rs`. Ne réimplémente rien : chaque action lance le binaire courant (`current_exe()`) comme `zevbox <commande>`, arguments un par un (I7), sortie affichée en direct ; `shell`, `setup`, `auth claude` et `auth antigravity` reçoivent le vrai terminal (la console quitte l'écran alterné puis se redessine). Clé oMLX sur l'entrée standard de `auth omlx`, jamais en argument ni en variable d'environnement. « Are you sure? » / « Êtes-vous sûr ? » (No / Non par défaut) avant arrêt d'agents, mises à jour, retour arrière, ajout/retrait d'outil, `clean --images`, `zed uninstall` et nouvelle connexion d'un agent déjà connecté. Ne propose jamais `launch` (I6). Sans terminal interactif (stdin ou stdout non TTY) : `zevbox console needs an interactive terminal.`, code 2. Ne lit l'état que par les fonctions de la bibliothèque ; ne modifie rien elle-même. |
 | `zevbox tools list` / `tools add <paquet-apt>…` / `tools remove <paquet>…` | Modifie `tools.json` puis reconstruit chaque agent installé avec le pipeline `update` (candidate → tests → promotion), qui prend aussi la **dernière** version du client ACP (amendé le 2026-10-30, décision 👤 : backlog 1 abandonné ; le relais refuse toute méthode non auditée, et `rollback` reste possible). |
 
 `--agent` accepte `claude`, `antigravity` ou `omlx` ; sans option, la commande s'applique à `claude` et `antigravity`, et à `omlx` seulement s'il a déjà une release (agent optionnel, 2026-10-29). `setup` ne construit pas oMLX et ne le compte pas comme manquant.

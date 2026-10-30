@@ -5,6 +5,7 @@
 //! The console never reimplements a command (§2): a leaf only turns the chosen
 //! parameters into the argument vector of the current binary.
 
+use super::i18n::{Lang, Msg};
 use super::state::Snapshot;
 
 /// One entry of a menu level: a submenu (marked `›`) or a leaf (an action).
@@ -15,25 +16,26 @@ pub enum Entry {
 }
 
 impl Entry {
-    pub fn label(&self) -> &'static str {
+    pub fn label(&self, lang: Lang) -> &'static str {
         match self {
-            Entry::Menu(m) => m.label,
-            Entry::Leaf(a) => a.label(),
+            Entry::Menu(m) => lang.t(m.label),
+            Entry::Leaf(a) => a.label(lang),
         }
     }
 
-    pub fn description(&self) -> &'static str {
+    pub fn description(&self, lang: Lang) -> &'static str {
         match self {
-            Entry::Menu(m) => m.description,
-            Entry::Leaf(a) => a.description(),
+            Entry::Menu(m) => lang.t(m.description),
+            Entry::Leaf(a) => a.description(lang),
         }
     }
 }
 
+/// A submenu; its texts are keys of the string table (`i18n.rs`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Menu {
-    pub label: &'static str,
-    pub description: &'static str,
+    pub label: Msg,
+    pub description: Msg,
     pub children: Vec<Entry>,
 }
 
@@ -93,13 +95,13 @@ pub enum TextField {
 }
 
 impl TextField {
-    pub fn prompt(self) -> &'static str {
+    pub fn prompt(self) -> Msg {
         match self {
-            TextField::Packages => "Outils à ajouter (noms séparés par des espaces)",
-            TextField::Url => "Adresse du serveur oMLX (ex. http://192.168.1.8:8000)",
-            TextField::Key => "Clé d'API (masquée)",
-            TextField::Model => "Modèle par défaut (optionnel, Entrée = le plus petit)",
-            TextField::Project => "Dossier du projet",
+            TextField::Packages => Msg::PromptPackages,
+            TextField::Url => Msg::PromptUrl,
+            TextField::Key => Msg::PromptKey,
+            TextField::Model => Msg::PromptModel,
+            TextField::Project => Msg::PromptProject,
         }
     }
 
@@ -109,14 +111,14 @@ impl TextField {
 
     /// Refuses what would reach `zevbox` as an option instead of a value. The key
     /// goes on stdin, never in argv, so it is free.
-    pub fn check(self, value: &str) -> Result<(), &'static str> {
+    pub fn check(self, value: &str) -> Result<(), Msg> {
         let dash = match self {
             TextField::Key => false,
             TextField::Packages => value.split_whitespace().any(|w| w.starts_with('-')),
             TextField::Url | TextField::Model | TextField::Project => value.trim().starts_with('-'),
         };
         if dash {
-            Err("Une valeur ne peut pas commencer par « - ».")
+            Err(Msg::DashRefused)
         } else {
             Ok(())
         }
@@ -252,16 +254,16 @@ fn line(tone: Tone, text: impl Into<String>) -> PanelLine {
 }
 
 /// Right panel of a submenu: its explanation and what it contains.
-pub fn menu_panel(menu: &Menu) -> Vec<PanelLine> {
+pub fn menu_panel(menu: &Menu, lang: Lang) -> Vec<PanelLine> {
     let mut lines = vec![
-        line(Tone::Body, menu.description),
+        line(Tone::Body, lang.t(menu.description)),
         line(Tone::Body, ""),
-        line(Tone::Dim, "Contient :"),
+        line(Tone::Dim, lang.t(Msg::Contains)),
     ];
     lines.extend(
         menu.children
             .iter()
-            .map(|c| line(Tone::Body, format!("  · {}", c.label()))),
+            .map(|c| line(Tone::Body, format!("  · {}", c.label(lang)))),
     );
     lines
 }
@@ -283,84 +285,89 @@ pub struct Confirmation {
 }
 
 impl Action {
-    pub fn label(self) -> &'static str {
+    pub fn label(self, lang: Lang) -> &'static str {
+        lang.t(self.label_msg())
+    }
+
+    pub fn label_msg(self) -> Msg {
         match self {
-            Action::Status => "Voir les agents en cours",
-            Action::StopOne => "Arrêter un agent",
-            Action::StopAll => "Arrêter tous les agents",
-            Action::Logs => "Lire le journal d'une session",
-            Action::UpdateCheck => "Vérifier s'il y a des mises à jour",
-            Action::UpdateAll => "Tout mettre à jour",
-            Action::UpdateAgent => "Mettre à jour un agent",
-            Action::Rollback => "Revenir à la version précédente",
-            Action::AuthStatus => "État des connexions",
-            Action::AuthClaude => "Se connecter à Claude",
-            Action::AuthAntigravity => "Se connecter à Antigravity",
-            Action::AuthOmlx => "Connecter oMLX",
-            Action::ToolsList => "Voir les outils ajoutés",
-            Action::ToolsAdd => "Ajouter un outil",
-            Action::ToolsRemove => "Retirer un outil",
-            Action::Doctor => "Diagnostic complet",
-            Action::Clean => "Faire le ménage",
-            Action::CleanImages => "Ménage avec les anciennes images",
-            Action::ZedDryRun => "Voir ce qui serait écrit",
-            Action::ZedInstall => "Installer les entrées zevbox",
-            Action::ZedUninstall => "Retirer les entrées zevbox",
-            Action::Shell => "Shell dans une VM",
-            Action::Setup => "Première installation",
+            Action::Status => Msg::StatusLabel,
+            Action::StopOne => Msg::StopOneLabel,
+            Action::StopAll => Msg::StopAllLabel,
+            Action::Logs => Msg::LogsLabel,
+            Action::UpdateCheck => Msg::UpdateCheckLabel,
+            Action::UpdateAll => Msg::UpdateAllLabel,
+            Action::UpdateAgent => Msg::UpdateAgentLabel,
+            Action::Rollback => Msg::RollbackLabel,
+            Action::AuthStatus => Msg::AuthStatusLabel,
+            Action::AuthClaude => Msg::AuthClaudeLabel,
+            Action::AuthAntigravity => Msg::AuthAntigravityLabel,
+            Action::AuthOmlx => Msg::AuthOmlxLabel,
+            Action::ToolsList => Msg::ToolsListLabel,
+            Action::ToolsAdd => Msg::ToolsAddLabel,
+            Action::ToolsRemove => Msg::ToolsRemoveLabel,
+            Action::Doctor => Msg::DoctorLabel,
+            Action::Clean => Msg::CleanLabel,
+            Action::CleanImages => Msg::CleanImagesLabel,
+            Action::ZedDryRun => Msg::ZedDryRunLabel,
+            Action::ZedInstall => Msg::ZedInstallLabel,
+            Action::ZedUninstall => Msg::ZedUninstallLabel,
+            Action::Shell => Msg::ShellLabel,
+            Action::Setup => Msg::SetupLabel,
         }
     }
 
     /// Plain-words explanation for a non-expert (feedback 👤 2026-10-30): what it
     /// does, when to use it, what it changes and what it leaves alone. Facts
     /// from the commands themselves and docs/USER_GUIDE.md.
-    pub fn description(self) -> &'static str {
+    pub fn description(self, lang: Lang) -> &'static str {
+        lang.t(self.description_msg())
+    }
+
+    pub fn description_msg(self) -> Msg {
         match self {
-            Action::Status => "Liste les agents en cours : leur identifiant (8 caractères), leur état, l'agent, le nom de sa VM et le projet ouvert. Un agent « orphan » est un reste qui ne tourne plus : « Faire le ménage » le supprime. Ne change rien.",
-            Action::StopOne => "Arrête l'agent choisi : sa VM est arrêtée puis supprimée. Le thread ouvert dans Zed avec cet agent est coupé. Votre projet n'est pas touché : ce que l'agent y a déjà écrit reste. Ouvrez un nouveau thread dans Zed pour repartir avec une VM neuve.",
-            Action::StopAll => "Arrête tous les agents zevbox de cette installation et supprime leurs VM. Tous les threads ouverts dans Zed avec un agent zevbox sont coupés ; vos projets ne sont pas touchés. Utile en fin de journée pour libérer mémoire et processeur. Vos autres conteneurs ne sont jamais arrêtés.",
-            Action::Logs => "Affiche les 200 dernières lignes du journal d'une session : démarrage, arrêt, méthodes refusées par le filtre, erreurs. Le journal ne contient jamais vos messages ni vos jetons : seulement des noms, chemins, identifiants et tailles. « La plus récente » = la dernière session. Ne change rien.",
-            Action::UpdateCheck => "Demande au registre ACP la dernière version de chaque agent et la compare à la version installée. Ne télécharge rien et ne change rien : à faire de temps en temps pour savoir s'il vaut la peine de « Tout mettre à jour ».",
-            Action::UpdateAll => "Construit une image neuve pour Claude, Antigravity et oMLX s'il est installé : dernière Ubuntu, dernière version de l'agent, vos outils ajoutés. Chaque image est testée avant d'être activée ; l'ancienne devient la version « précédente » (retour possible). Les threads déjà ouverts dans Zed gardent l'ancienne image jusqu'à leur fermeture.",
-            Action::UpdateAgent => "Comme « Tout mettre à jour », pour un seul agent : image neuve (dernière Ubuntu, dernière version de l'agent, vos outils), testée puis activée ; l'ancienne reste la version « précédente ». Installe aussi un agent qui ne l'est pas encore. Les threads déjà ouverts gardent l'ancienne image.",
-            Action::Rollback => "Réactive la version « précédente » de l'agent, celle d'avant la dernière mise à jour. Instantané : rien n'est téléchargé ni reconstruit. Un seul cran : les deux versions sont échangées, donc refaire « Revenir » ramène la plus récente. Les prochains threads ouverts dans Zed utilisent la version choisie.",
-            Action::AuthStatus => "Indique pour Claude, Antigravity et oMLX : « authenticated » (connecté), « not authenticated » (à connecter) ou « unknown » (agent pas encore installé). Ne change rien.",
-            Action::AuthClaude => "La connexion se fait dans une VM jetable qui ne voit aucun de vos dossiers. Une adresse https://claude.com/… s'affiche : ouvrez-la dans le navigateur du Mac (il ne s'ouvre pas tout seul), connectez-vous avec votre abonnement Claude, puis collez le code affiché. Le jeton est rangé dans le dossier d'état de zevbox, jamais dans votre ~/.claude.",
-            Action::AuthAntigravity => "Un petit serveur s'ouvre sur votre Mac (127.0.0.1 seulement) et le navigateur affiche la connexion Google : choisissez votre compte Google AI Pro et autorisez (5 minutes au plus). Le jeton est rangé dans le dossier d'état de zevbox ; le trousseau macOS n'est jamais touché.",
-            Action::AuthOmlx => "Relie l'agent oMLX à votre serveur de modèles (par exemple un Mac Studio) : son adresse, sa clé d'API (masquée, jamais sur la ligne de commande) et le modèle par défaut. Le Mac vérifie l'adresse et la clé et liste les modèles, puis zevbox écrit les réglages et vérifie qu'une VM atteint le serveur. Votre abonnement Claude n'est pas utilisé.",
-            Action::ToolsList => "Liste les paquets Ubuntu (apt) que vous avez ajoutés aux images des agents. Les outils de base (Node, Python, git, ripgrep, jq, curl, compilateurs) n'y figurent pas : ils sont toujours là. Ne change rien.",
-            Action::ToolsAdd => "Ajoute un ou plusieurs paquets Ubuntu (noms apt, par exemple « tree clang »), puis reconstruit l'image de chaque agent installé, ce qui le met aussi à sa dernière version, comme « Tout mettre à jour ». Les paquets sont ensuite là à chaque session. Les threads déjà ouverts gardent l'ancienne image.",
-            Action::ToolsRemove => "Retire un paquet de la liste, puis reconstruit l'image de chaque agent installé, qui passe aussi à sa dernière version. Les threads déjà ouverts dans Zed gardent l'ancienne image jusqu'à leur fermeture.",
-            Action::Doctor => "Vérifie toute l'installation : configuration, Apple Container (présent et démarré), image et connexion de chaque agent, place prise par les images, droits des dossiers, binaire installé, entrées dans Zed, agents orphelins, méthodes refusées par le filtre ces 7 derniers jours. Chaque problème vient avec la commande qui le corrige. Ne change rien.",
-            Action::Clean => "Supprime les restes : agents orphelins et leurs VM, VM zevbox qui ne sont plus enregistrées ; garde les 30 derniers journaux et les 20 dernières sauvegardes des réglages de Zed. Les agents en cours, les images et vos projets ne sont pas touchés.",
-            Action::CleanImages => "Comme « Faire le ménage », et en plus supprime les images des versions plus anciennes que la précédente, la VM de construction des images (son disque grossit avec le temps) et les anciens dossiers de version. La version actuelle et la précédente de chaque agent sont gardées : le retour en arrière reste possible.",
-            Action::ZedDryRun => "Montre les entrées « zevbox · … » qui seraient écrites dans les réglages de Zed, une par agent installé. N'écrit rien.",
-            Action::ZedInstall => "Écrit ou met à jour les entrées « zevbox · … » dans ~/.config/zed/settings.json, une par agent installé. Le reste du fichier, commentaires compris, n'est pas touché, et une sauvegarde est faite avant. Utile si les agents zevbox manquent dans Zed.",
-            Action::ZedUninstall => "Retire les entrées « zevbox · … » des réglages de Zed (une sauvegarde est faite avant) : les agents zevbox disparaissent de Zed. Rien d'autre n'est supprimé : images, connexions et réglages zevbox restent ; « Installer les entrées zevbox » les remet.",
-            Action::Shell => "Ouvre un terminal Linux dans une VM jetable identique à celle de l'agent, sur le projet choisi : vous voyez exactement ce que voit l'agent. Le projet est monté (vos modifications y restent), .git est en lecture seule et .zed masqué. Tout le reste disparaît à la sortie (exit). Le projet doit être dans votre dossier personnel ou sur un disque externe.",
-            Action::Setup => "Installation guidée, à faire une fois au début (sans risque si on la relance) : crée le dossier d'état et la configuration, construit les images de Claude et Antigravity, propose de connecter les agents, ajoute les entrées dans Zed, démarre Apple Container si besoin, puis lance le diagnostic. oMLX, optionnel, se connecte à part.",
+            Action::Status => Msg::StatusDesc,
+            Action::StopOne => Msg::StopOneDesc,
+            Action::StopAll => Msg::StopAllDesc,
+            Action::Logs => Msg::LogsDesc,
+            Action::UpdateCheck => Msg::UpdateCheckDesc,
+            Action::UpdateAll => Msg::UpdateAllDesc,
+            Action::UpdateAgent => Msg::UpdateAgentDesc,
+            Action::Rollback => Msg::RollbackDesc,
+            Action::AuthStatus => Msg::AuthStatusDesc,
+            Action::AuthClaude => Msg::AuthClaudeDesc,
+            Action::AuthAntigravity => Msg::AuthAntigravityDesc,
+            Action::AuthOmlx => Msg::AuthOmlxDesc,
+            Action::ToolsList => Msg::ToolsListDesc,
+            Action::ToolsAdd => Msg::ToolsAddDesc,
+            Action::ToolsRemove => Msg::ToolsRemoveDesc,
+            Action::Doctor => Msg::DoctorDesc,
+            Action::Clean => Msg::CleanDesc,
+            Action::CleanImages => Msg::CleanImagesDesc,
+            Action::ZedDryRun => Msg::ZedDryRunDesc,
+            Action::ZedInstall => Msg::ZedInstallDesc,
+            Action::ZedUninstall => Msg::ZedUninstallDesc,
+            Action::Shell => Msg::ShellDesc,
+            Action::Setup => Msg::SetupDesc,
         }
     }
 
-    /// « Durée … · réseau … » line, when useful.
-    pub fn cost(self) -> Option<&'static str> {
-        match self {
-            Action::StopOne | Action::StopAll => Some("Durée : quelques secondes par agent"),
-            Action::UpdateCheck => Some("Durée : quelques secondes · réseau nécessaire"),
-            Action::UpdateAll => Some("Durée : 1 à 3 min par agent · réseau nécessaire"),
-            Action::UpdateAgent => Some("Durée : 1 à 3 min · réseau nécessaire"),
-            Action::AuthClaude | Action::AuthAntigravity => Some("Interactif · réseau nécessaire"),
-            Action::AuthOmlx => Some("Durée : quelques secondes · réseau local nécessaire"),
-            Action::ToolsAdd | Action::ToolsRemove => {
-                Some("Durée : 1 à 3 min par agent installé · réseau nécessaire")
-            }
-            Action::Doctor | Action::Clean | Action::CleanImages => {
-                Some("Durée : quelques secondes")
-            }
-            Action::Shell => Some("Interactif · démarre une VM (quelques secondes)"),
-            Action::Setup => Some("Interactif · Durée : quelques minutes · réseau nécessaire"),
-            _ => None,
-        }
+    /// « Duration … · network … » line, when useful.
+    pub fn cost(self, lang: Lang) -> Option<&'static str> {
+        let msg = match self {
+            Action::StopOne | Action::StopAll => Msg::CostStop,
+            Action::UpdateCheck => Msg::CostCheck,
+            Action::UpdateAll => Msg::CostUpdateAll,
+            Action::UpdateAgent => Msg::CostUpdateAgent,
+            Action::AuthClaude | Action::AuthAntigravity => Msg::CostSignIn,
+            Action::AuthOmlx => Msg::CostOmlx,
+            Action::ToolsAdd | Action::ToolsRemove => Msg::CostTools,
+            Action::Doctor | Action::Clean | Action::CleanImages => Msg::CostSeconds,
+            Action::Shell => Msg::CostShell,
+            Action::Setup => Msg::CostSetup,
+            _ => return None,
+        };
+        Some(lang.t(msg))
     }
 
     /// Parameters asked for, in order.
@@ -399,27 +406,27 @@ impl Action {
     /// and `setup` never do.
     /// Right panel of a leaf: explanation, connection state (sign-in leaves),
     /// duration · network, then `Commande : zevbox …` with the choices so far.
-    pub fn panel(self, params: &Params, snap: &Snapshot) -> Vec<PanelLine> {
-        let mut lines = vec![line(Tone::Body, self.description())];
+    pub fn panel(self, params: &Params, snap: &Snapshot, lang: Lang) -> Vec<PanelLine> {
+        let mut lines = vec![line(Tone::Body, self.description(lang))];
         if let Some(agent) = self.auth_agent() {
             lines.push(line(Tone::Body, ""));
             lines.push(if snap.is_authenticated(agent) {
-                line(Tone::Good, "État : connecté")
+                line(Tone::Good, lang.t(Msg::Connected))
             } else {
-                line(Tone::Bad, "État : non connecté")
+                line(Tone::Bad, lang.t(Msg::NotConnected))
             });
         }
-        if let Some(cost) = self.cost() {
+        if let Some(cost) = self.cost(lang) {
             lines.push(line(Tone::Body, ""));
             lines.push(line(Tone::Dim, cost));
         }
-        if let Some(note) = self.cost_note(snap) {
+        if let Some(note) = self.cost_note(snap, lang) {
             lines.push(line(Tone::Body, note));
         }
         lines.push(line(Tone::Body, ""));
         lines.push(line(
             Tone::Dim,
-            format!("Commande : {}", self.preview(params)),
+            lang.f(Msg::CommandLine, &[&self.preview(params, lang)]),
         ));
         lines
     }
@@ -437,15 +444,13 @@ impl Action {
     /// Extra line under [`Action::cost`] that depends on the installation: the
     /// first login of an agent without a release builds its image first
     /// (`auth` quick start, DECISIONS R2).
-    pub fn cost_note(self, snap: &Snapshot) -> Option<&'static str> {
+    pub fn cost_note(self, snap: &Snapshot, lang: Lang) -> Option<&'static str> {
         let agent = self.auth_agent()?;
         let installed = snap
             .agents
             .iter()
             .any(|a| a.id == agent && a.version.is_some());
-        (!installed).then_some(
-            "Pas encore installé : la première connexion construit d'abord son image (quelques minutes, réseau nécessaire)",
-        )
+        (!installed).then_some(lang.t(Msg::FirstSignInBuilds))
     }
 
     pub fn confirm_rule(self) -> ConfirmRule {
@@ -467,15 +472,21 @@ impl Action {
     }
 
     /// The box to show before running, or `None` to run at once.
-    pub fn confirmation(self, params: &Params, snap: &Snapshot) -> Option<Confirmation> {
+    pub fn confirmation(
+        self,
+        params: &Params,
+        snap: &Snapshot,
+        lang: Lang,
+    ) -> Option<Confirmation> {
         let display = |id: &str| snap.display_of(id);
         let agent = params.agent.as_deref().unwrap_or("");
+        let pair = |q: Msg, c: Msg| (lang.t(q).to_string(), lang.t(c).to_string());
         let (question, consequence) = match self.confirm_rule() {
             ConfirmRule::Never => return None,
             ConfirmRule::IfAuthenticated(id) if !snap.is_authenticated(id) => return None,
             ConfirmRule::IfAuthenticated(id) => (
-                format!("{} est déjà connecté. Refaire la connexion ?", display(id)),
-                "La connexion actuelle sera remplacée.".to_string(),
+                lang.f(Msg::ReauthQ, &[&display(id)]),
+                lang.t(Msg::ReauthC).to_string(),
             ),
             ConfirmRule::Always => match self {
                 Action::StopOne => {
@@ -484,42 +495,30 @@ impl Action {
                         _ => "",
                     };
                     (
-                        format!("Arrêter l'agent {id} ?"),
-                        "Les threads ouverts dans Zed avec cet agent seront coupés.".to_string(),
+                        lang.f(Msg::StopOneQ, &[id]),
+                        lang.t(Msg::StopOneC).to_string(),
                     )
                 }
-                Action::StopAll => (
-                    "Arrêter tous les agents ?".to_string(),
-                    "Les threads ouverts dans Zed seront coupés.".to_string(),
-                ),
-                Action::UpdateAll => (
-                    "Tout mettre à jour ?".to_string(),
-                    "Les images sont reconstruites (réseau, plusieurs minutes) ; les nouvelles versions servent au prochain lancement depuis Zed.".to_string(),
-                ),
+                Action::StopAll => pair(Msg::StopAllQ, Msg::StopAllC),
+                Action::UpdateAll => pair(Msg::UpdateAllQ, Msg::UpdateAllC),
                 Action::UpdateAgent => (
-                    format!("Mettre à jour {} ?", display(agent)),
-                    "Son image est reconstruite (réseau, quelques minutes) ; la nouvelle version sert au prochain lancement depuis Zed.".to_string(),
+                    lang.f(Msg::UpdateAgentQ, &[&display(agent)]),
+                    lang.t(Msg::UpdateAgentC).to_string(),
                 ),
                 Action::Rollback => (
-                    format!("Revenir à la version précédente de {} ?", display(agent)),
-                    "Le prochain lancement depuis Zed utilisera la version précédente.".to_string(),
+                    lang.f(Msg::RollbackQ, &[&display(agent)]),
+                    lang.t(Msg::RollbackC).to_string(),
                 ),
                 Action::ToolsAdd => (
-                    format!("Ajouter {} ?", params.packages.join(" ")),
-                    "Les images sont reconstruites et les agents installés mis à jour (réseau, plusieurs minutes).".to_string(),
+                    lang.f(Msg::ToolsAddQ, &[&params.packages.join(" ")]),
+                    lang.t(Msg::ToolsC).to_string(),
                 ),
                 Action::ToolsRemove => (
-                    format!("Retirer {} ?", params.tool.as_deref().unwrap_or("")),
-                    "Les images sont reconstruites et les agents installés mis à jour (réseau, plusieurs minutes).".to_string(),
+                    lang.f(Msg::ToolsRemoveQ, &[params.tool.as_deref().unwrap_or("")]),
+                    lang.t(Msg::ToolsC).to_string(),
                 ),
-                Action::CleanImages => (
-                    "Supprimer les anciennes images ?".to_string(),
-                    "Les images plus anciennes que la version précédente et la VM de construction sont effacées ; la prochaine mise à jour recrée cette VM.".to_string(),
-                ),
-                Action::ZedUninstall => (
-                    "Retirer les entrées zevbox de Zed ?".to_string(),
-                    "Les agents zevbox disparaissent de Zed (une sauvegarde des réglages est gardée).".to_string(),
-                ),
+                Action::CleanImages => pair(Msg::CleanImagesQ, Msg::CleanImagesC),
+                Action::ZedUninstall => pair(Msg::ZedUninstallQ, Msg::ZedUninstallC),
                 _ => return None,
             },
         };
@@ -618,7 +617,7 @@ impl Action {
 
     /// « zevbox … » line of the description panel, with the parameters chosen so
     /// far and placeholders for the others. Never shows the key.
-    pub fn preview(self, p: &Params) -> String {
+    pub fn preview(self, p: &Params, lang: Lang) -> String {
         let or = |v: &Option<String>, placeholder: &str| {
             v.clone().unwrap_or_else(|| placeholder.to_string())
         };
@@ -627,24 +626,31 @@ impl Action {
             Action::Logs if p.instance.is_none() => "zevbox logs [<id>]".to_string(),
             Action::UpdateAgent if p.agent.is_none() => "zevbox update --agent <agent>".to_string(),
             Action::Rollback if p.agent.is_none() => "zevbox rollback --agent <agent>".to_string(),
-            Action::AuthStatus => "zevbox auth <agent> --status (pour chaque agent)".to_string(),
+            Action::AuthStatus => {
+                format!("zevbox auth <agent> --status {}", lang.t(Msg::ForEachAgent))
+            }
             Action::AuthOmlx => {
                 let model = match &p.model {
                     Some(m) if !m.is_empty() => format!(" --model {m}"),
                     Some(_) => String::new(),
-                    None => " [--model <modèle>]".to_string(),
+                    None => format!(" [--model {}]", lang.t(Msg::PhModel)),
                 };
                 format!(
-                    "zevbox auth omlx --url {}{model} (clé sur l'entrée standard)",
-                    or(&p.url, "<adresse>")
+                    "zevbox auth omlx --url {}{model} {}",
+                    or(&p.url, lang.t(Msg::PhAddress)),
+                    lang.t(Msg::KeyOnStdin)
                 )
             }
-            Action::ToolsAdd if p.packages.is_empty() => "zevbox tools add <paquet>…".to_string(),
-            Action::ToolsRemove if p.tool.is_none() => "zevbox tools remove <paquet>".to_string(),
+            Action::ToolsAdd if p.packages.is_empty() => {
+                format!("zevbox tools add {}…", lang.t(Msg::PhPackage))
+            }
+            Action::ToolsRemove if p.tool.is_none() => {
+                format!("zevbox tools remove {}", lang.t(Msg::PhPackage))
+            }
             Action::Shell => format!(
                 "zevbox shell {} --project {}",
                 or(&p.agent, "<agent>"),
-                or(&p.project, "<projet>")
+                or(&p.project, lang.t(Msg::PhProject))
             ),
             _ => self
                 .invocations(p)
@@ -666,12 +672,12 @@ pub fn root() -> Menu {
         })
     };
     Menu {
-        label: "zevbox",
-        description: "",
+        label: Msg::Root,
+        description: Msg::Root,
         children: vec![
             menu(
-                "Agents en cours",
-                "Chaque agent que Zed démarre tourne dans sa propre VM Linux, qui ne voit que le projet ouvert. Ici : voir les agents en cours, en arrêter un ou tous (le thread ouvert dans Zed est alors coupé), et lire le journal d'une session pour comprendre un problème.",
+                Msg::MenuAgents,
+                Msg::MenuAgentsDesc,
                 vec![
                     leaf(Action::Status),
                     leaf(Action::StopOne),
@@ -680,8 +686,8 @@ pub fn root() -> Menu {
                 ],
             ),
             menu(
-                "Mises à jour",
-                "Une mise à jour construit une image neuve par agent : dernière Ubuntu, dernière version de l'agent, vos outils ajoutés. Elle est testée avant d'être activée, et la version précédente est gardée pour y revenir. Rien ne se met à jour tout seul : seulement quand vous le demandez ici.",
+                Msg::MenuUpdates,
+                Msg::MenuUpdatesDesc,
                 vec![
                     leaf(Action::UpdateCheck),
                     leaf(Action::UpdateAll),
@@ -690,8 +696,8 @@ pub fn root() -> Menu {
                 ],
             ),
             menu(
-                "Connexion des agents",
-                "Chaque agent se connecte une fois : Claude à votre abonnement Claude, Antigravity à votre compte Google, oMLX à votre propre serveur de modèles. Les jetons restent dans le dossier d'état de zevbox : ni votre ~/.claude ni le trousseau macOS ne sont utilisés.",
+                Msg::MenuAuth,
+                Msg::MenuAuthDesc,
                 vec![
                     leaf(Action::AuthStatus),
                     leaf(Action::AuthClaude),
@@ -700,8 +706,8 @@ pub fn root() -> Menu {
                 ],
             ),
             menu(
-                "Outils Linux",
-                "Les VM des agents ont déjà Node, Python, git, ripgrep, jq, curl et les outils de compilation. S'il faut un autre paquet Ubuntu (apt), ajoutez-le ici : il est intégré aux images et présent à chaque session. Ce que l'agent installe lui-même disparaît à la session suivante.",
+                Msg::MenuTools,
+                Msg::MenuToolsDesc,
                 vec![
                     leaf(Action::ToolsList),
                     leaf(Action::ToolsAdd),
@@ -709,8 +715,8 @@ pub fn root() -> Menu {
                 ],
             ),
             menu(
-                "Diagnostic et ménage",
-                "Vérifier que tout est en ordre (le diagnostic ne change rien) et libérer de la place : restes d'agents arrêtés, anciens journaux et, si vous le demandez, anciennes images.",
+                Msg::MenuCare,
+                Msg::MenuCareDesc,
                 vec![
                     leaf(Action::Doctor),
                     leaf(Action::Clean),
@@ -718,8 +724,8 @@ pub fn root() -> Menu {
                 ],
             ),
             menu(
-                "Zed",
-                "zevbox ajoute ses agents (« zevbox · Claude », …) au menu des agents de Zed en écrivant dans ~/.config/zed/settings.json, avec une sauvegarde avant chaque changement. Ici : voir ce qui serait écrit, installer ces entrées ou les retirer.",
+                Msg::MenuZed,
+                Msg::MenuZedDesc,
                 vec![
                     leaf(Action::ZedDryRun),
                     leaf(Action::ZedInstall),
@@ -787,7 +793,7 @@ mod tests {
     #[test]
     fn tree_has_the_menus_of_section_5_in_order() {
         let root = root();
-        let labels: Vec<_> = root.children.iter().map(Entry::label).collect();
+        let labels: Vec<_> = root.children.iter().map(|e| e.label(Lang::Fr)).collect();
         assert_eq!(
             labels,
             [
@@ -924,16 +930,18 @@ mod tests {
     #[test]
     fn first_login_of_an_uninstalled_agent_says_it_builds() {
         let mut s = snap(&[]);
-        assert_eq!(Action::AuthOmlx.cost_note(&s), None);
+        assert_eq!(Action::AuthOmlx.cost_note(&s, Lang::Fr), None);
         s.agents.iter_mut().for_each(|a| a.version = None);
         for a in [
             Action::AuthClaude,
             Action::AuthAntigravity,
             Action::AuthOmlx,
         ] {
-            assert!(a.cost_note(&s).is_some_and(|n| n.contains("construit")));
+            assert!(a
+                .cost_note(&s, Lang::Fr)
+                .is_some_and(|n| n.contains("construit")));
         }
-        assert_eq!(Action::Doctor.cost_note(&s), None);
+        assert_eq!(Action::Doctor.cost_note(&s, Lang::Fr), None);
     }
 
     #[test]
@@ -941,21 +949,38 @@ mod tests {
         let root = root();
         for entry in &root.children {
             if let Entry::Menu(m) = entry {
-                assert!(m.description.chars().count() >= 150, "{}", m.label);
-                let panel = menu_panel(m);
+                assert!(
+                    Lang::Fr.t(m.description).chars().count() >= 150,
+                    "{:?}",
+                    m.label
+                );
+                let panel = menu_panel(m, Lang::Fr);
                 assert_eq!(panel.len(), 3 + m.children.len());
             }
         }
         for a in all_actions(&root) {
-            assert!(a.description().chars().count() >= 100, "{a:?} is too short");
-            assert!(a.description().chars().count() <= 450, "{a:?} is too long");
+            for lang in [Lang::En, Lang::Fr] {
+                let n = a.description(lang).chars().count();
+                assert!((100..=450).contains(&n), "{a:?} {lang:?}: {n} chars");
+                assert!(!a.label(lang).is_empty());
+            }
+            assert_ne!(a.label(Lang::En), a.label(Lang::Fr), "{a:?}");
         }
+        let en = Action::UpdateAll.panel(&Params::default(), &snap(&[]), Lang::En);
+        assert_eq!(
+            en.last(),
+            Some(&(Tone::Dim, "Command: zevbox update".to_string()))
+        );
+        assert_eq!(
+            Action::AuthStatus.preview(&Params::default(), Lang::En),
+            "zevbox auth <agent> --status (for each agent)"
+        );
     }
 
     #[test]
     fn leaf_panel_ends_with_the_command_and_shows_the_connection() {
         let p = Params::default();
-        let panel = Action::UpdateAll.panel(&p, &snap(&[]));
+        let panel = Action::UpdateAll.panel(&p, &snap(&[]), Lang::Fr);
         assert_eq!(
             panel.last(),
             Some(&(Tone::Dim, "Commande : zevbox update".to_string()))
@@ -963,12 +988,12 @@ mod tests {
         assert!(panel
             .iter()
             .any(|(t, l)| *t == Tone::Dim && l.contains("réseau")));
-        let connected = Action::AuthClaude.panel(&p, &snap(&["claude"]));
+        let connected = Action::AuthClaude.panel(&p, &snap(&["claude"]), Lang::Fr);
         assert!(connected.contains(&(Tone::Good, "État : connecté".to_string())));
-        let not = Action::AuthClaude.panel(&p, &snap(&[]));
+        let not = Action::AuthClaude.panel(&p, &snap(&[]), Lang::Fr);
         assert!(not.contains(&(Tone::Bad, "État : non connecté".to_string())));
         assert!(!Action::Doctor
-            .panel(&p, &snap(&[]))
+            .panel(&p, &snap(&[]), Lang::Fr)
             .iter()
             .any(|(_, l)| l.starts_with("État")));
     }
@@ -1040,7 +1065,9 @@ mod tests {
             Action::Setup,
         ] {
             assert_eq!(a.confirm_rule(), ConfirmRule::Never, "{a:?}");
-            assert!(a.confirmation(&Params::default(), &snap(&[])).is_none());
+            assert!(a
+                .confirmation(&Params::default(), &snap(&[]), Lang::Fr)
+                .is_none());
         }
     }
 
@@ -1052,8 +1079,8 @@ mod tests {
             (Action::AuthAntigravity, "antigravity"),
             (Action::AuthOmlx, "omlx"),
         ] {
-            assert!(action.confirmation(&p, &snap(&[])).is_none());
-            let c = action.confirmation(&p, &snap(&[id]));
+            assert!(action.confirmation(&p, &snap(&[]), Lang::Fr).is_none());
+            let c = action.confirmation(&p, &snap(&[id]), Lang::Fr);
             assert!(
                 c.is_some_and(|c| c.question.contains("déjà connecté")),
                 "{action:?}"
@@ -1064,7 +1091,7 @@ mod tests {
     #[test]
     fn confirmation_names_the_consequence() {
         let p = Params::default();
-        let c = Action::StopAll.confirmation(&p, &snap(&[]));
+        let c = Action::StopAll.confirmation(&p, &snap(&[]), Lang::Fr);
         assert_eq!(
             c.map(|c| c.consequence),
             Some("Les threads ouverts dans Zed seront coupés.".to_string())
@@ -1084,7 +1111,9 @@ mod tests {
         assert!(!inv[0].args.iter().any(|a| a.contains("sk-secret-123")));
         assert!(!inv[0].display().contains("sk-secret-123"));
         assert!(!format!("{inv:?}").contains("sk-secret-123"));
-        assert!(!Action::AuthOmlx.preview(&p).contains("sk-secret-123"));
+        assert!(!Action::AuthOmlx
+            .preview(&p, Lang::Fr)
+            .contains("sk-secret-123"));
         assert_eq!(
             inv[0].stdin.as_ref().map(Secret::expose),
             Some("sk-secret-123\n")
@@ -1103,17 +1132,17 @@ mod tests {
     #[test]
     fn preview_shows_placeholders_then_choices() {
         let mut p = Params::default();
-        assert_eq!(Action::StopOne.preview(&p), "zevbox stop <id>");
-        assert_eq!(Action::Logs.preview(&p), "zevbox logs [<id>]");
+        assert_eq!(Action::StopOne.preview(&p, Lang::Fr), "zevbox stop <id>");
+        assert_eq!(Action::Logs.preview(&p, Lang::Fr), "zevbox logs [<id>]");
         assert_eq!(
-            Action::Shell.preview(&p),
+            Action::Shell.preview(&p, Lang::Fr),
             "zevbox shell <agent> --project <projet>"
         );
         p.agent = Some("omlx".to_string());
         assert_eq!(
-            Action::UpdateAgent.preview(&p),
+            Action::UpdateAgent.preview(&p, Lang::Fr),
             "zevbox update --agent omlx"
         );
-        assert_eq!(Action::Status.preview(&p), "zevbox status");
+        assert_eq!(Action::Status.preview(&p, Lang::Fr), "zevbox status");
     }
 }

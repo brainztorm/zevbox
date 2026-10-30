@@ -3,6 +3,7 @@
 //! and the output view. Pure: keys go in, [`Effect`]s come out; the terminal and
 //! the child processes live in `mod.rs` and `runner.rs`.
 
+use super::i18n::{Lang, Msg};
 use super::menu::{
     self, Action, AgentSet, Confirmation, Entry, InstanceChoice, Invocation, Menu, PanelLine,
     Params, Secret, Step, TextField,
@@ -31,9 +32,9 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn new(action: Action, params: &Params) -> Self {
+    pub fn new(action: Action, params: &Params, lang: Lang) -> Self {
         Self {
-            title: action.label().to_string(),
+            title: action.label(lang).to_string(),
             invocations: action.invocations(params),
             interactive: action.is_interactive(),
         }
@@ -65,7 +66,7 @@ pub struct TextInput {
     /// Enter on an empty value is accepted.
     pub optional: bool,
     /// Why the last Enter was refused (shown under the field).
-    pub error: Option<&'static str>,
+    pub error: Option<Msg>,
 }
 
 /// Masked fields show `•` only, even in `{:?}` (I9).
@@ -150,13 +151,13 @@ impl Outcome {
     }
 
     /// `✓ terminé` / `✗ échec (code N)` (§7).
-    pub fn label(self) -> String {
+    pub fn label(self, lang: Lang) -> String {
         match self {
-            Outcome::Success => "✓ terminé".to_string(),
-            Outcome::Failed(Some(code)) => format!("✗ échec (code {code})"),
-            Outcome::Failed(None) => "✗ échec (arrêtée par un signal)".to_string(),
-            Outcome::Interrupted => "✗ échec (interrompue)".to_string(),
-            Outcome::CannotStart => "✗ échec (impossible de lancer la commande)".to_string(),
+            Outcome::Success => lang.t(Msg::Done).to_string(),
+            Outcome::Failed(Some(code)) => lang.f(Msg::FailedCode, &[&code.to_string()]),
+            Outcome::Failed(None) => lang.t(Msg::FailedSignal).to_string(),
+            Outcome::Interrupted => lang.t(Msg::Interrupted).to_string(),
+            Outcome::CannotStart => lang.t(Msg::CannotStart).to_string(),
         }
     }
 }
@@ -225,6 +226,8 @@ impl ConfirmDialog {
 }
 
 pub struct App {
+    /// Interface language (`--lang`, else the locale).
+    pub lang: Lang,
     pub root: Menu,
     /// Indices of the opened submenus.
     pub path: Vec<usize>,
@@ -256,8 +259,9 @@ fn is_ctrl_c(key: &KeyEvent) -> bool {
 }
 
 impl App {
-    pub fn new(snap: Snapshot) -> Self {
+    pub fn new(snap: Snapshot, lang: Lang) -> Self {
         Self {
+            lang,
             root: menu::root(),
             path: Vec::new(),
             cursors: vec![0],
@@ -284,11 +288,11 @@ impl App {
 
     /// `zevbox › Mises à jour` (§3).
     pub fn path_title(&self) -> String {
-        let mut parts = vec![self.root.label];
+        let mut parts = vec![self.lang.t(self.root.label)];
         let mut menu = &self.root;
         for &i in &self.path {
             if let Some(Entry::Menu(m)) = menu.children.get(i) {
-                parts.push(m.label);
+                parts.push(self.lang.t(m.label));
                 menu = m;
             }
         }
@@ -308,10 +312,10 @@ impl App {
     /// The description shown on the right (menu view, or an action being set up).
     pub fn panel_lines(&self) -> Vec<PanelLine> {
         match &self.view {
-            View::Wizard(w) => w.action.panel(&w.params, &self.snap),
+            View::Wizard(w) => w.action.panel(&w.params, &self.snap, self.lang),
             _ => match self.selected_entry() {
-                Some(Entry::Menu(m)) => menu::menu_panel(m),
-                Some(Entry::Leaf(a)) => a.panel(&Params::default(), &self.snap),
+                Some(Entry::Menu(m)) => menu::menu_panel(m, self.lang),
+                Some(Entry::Leaf(a)) => a.panel(&Params::default(), &self.snap, self.lang),
                 None => Vec::new(),
             },
         }
@@ -498,10 +502,11 @@ impl App {
 
     pub fn picker_for(&self, step: Step) -> Picker {
         let snap = &self.snap;
+        let lang = self.lang;
         let agent_choice = |a: &super::state::AgentState| Choice {
             label: match &a.version {
                 Some(v) => format!("{} {v}", a.display),
-                None => format!("{} (non installé)", a.display),
+                None => lang.f(Msg::AgentNotInstalled, &[a.display]),
             },
             value: a.id.to_string(),
         };
@@ -513,7 +518,7 @@ impl App {
             Step::Instance {
                 allow_latest: false,
             } => Picker {
-                title: "Choisir l'agent à arrêter",
+                title: lang.t(Msg::PickStop),
                 choices: snap
                     .instances
                     .iter()
@@ -523,11 +528,11 @@ impl App {
                     })
                     .collect(),
                 cursor: 0,
-                empty_message: "Aucun agent en cours.",
+                empty_message: lang.t(Msg::NoAgentRunning),
             },
             Step::Instance { allow_latest: true } => {
                 let mut choices = vec![Choice {
-                    label: "La plus récente".to_string(),
+                    label: lang.t(Msg::Latest).to_string(),
                     value: String::new(),
                 }];
                 let mut ids: Vec<&String> = snap.sessions.iter().collect();
@@ -541,7 +546,7 @@ impl App {
                     value: id.clone(),
                 }));
                 Picker {
-                    title: "Choisir la session",
+                    title: lang.t(Msg::PickSession),
                     choices,
                     cursor: 0,
                     empty_message: "",
@@ -556,7 +561,7 @@ impl App {
                             .filter(|a| a.version.is_some())
                             .map(agent_choice)
                             .collect(),
-                        "Aucun agent installé : lancez Première installation.",
+                        lang.t(Msg::NoAgentInstalled),
                     ),
                     AgentSet::WithPrevious => (
                         snap.agents
@@ -564,18 +569,18 @@ impl App {
                             .filter(|a| a.has_previous)
                             .map(agent_choice)
                             .collect(),
-                        "Aucun agent n'a de version précédente.",
+                        lang.t(Msg::NoPrevious),
                     ),
                 };
                 Picker {
-                    title: "Choisir l'agent",
+                    title: lang.t(Msg::PickAgent),
                     choices,
                     cursor: 0,
                     empty_message,
                 }
             }
             Step::Tool => Picker {
-                title: "Choisir l'outil à retirer",
+                title: lang.t(Msg::PickTool),
                 choices: snap
                     .tools
                     .iter()
@@ -585,7 +590,7 @@ impl App {
                     })
                     .collect(),
                 cursor: 0,
-                empty_message: "Aucun outil ajouté.",
+                empty_message: lang.t(Msg::NoTool),
             },
             Step::Text(_) => Picker {
                 title: "",
@@ -711,8 +716,8 @@ impl App {
 
     /// Every parameter is known: confirm (§6) or run.
     fn finish(&mut self, w: Wizard) -> Effect {
-        let job = Job::new(w.action, &w.params);
-        match w.action.confirmation(&w.params, &self.snap) {
+        let job = Job::new(w.action, &w.params, self.lang);
+        match w.action.confirmation(&w.params, &self.snap, self.lang) {
             Some(confirmation) => {
                 // Keep the wizard visible behind the box (its preview is complete).
                 self.view = View::Wizard(Box::new(Wizard {
@@ -758,9 +763,9 @@ impl App {
             KeyCode::PageUp => o.scroll = (o.scroll + page).min(max),
             KeyCode::PageDown => o.scroll = o.scroll.min(max).saturating_sub(page),
             KeyCode::Esc | KeyCode::Left if running => {
-                self.confirm = Some(interrupt_dialog(false));
+                self.confirm = Some(interrupt_dialog(false, self.lang));
             }
-            _ if quit && running => self.confirm = Some(interrupt_dialog(true)),
+            _ if quit && running => self.confirm = Some(interrupt_dialog(true, self.lang)),
             _ if quit => return Effect::Quit,
             KeyCode::Esc | KeyCode::Left | KeyCode::Enter if !running => {
                 self.view = View::Menu;
@@ -802,32 +807,23 @@ impl App {
         }
     }
 
-    /// Bottom line (§3): the keys valid here.
     /// Bottom line (§3): where the keys go, then the keys valid there.
     pub fn keys_hint(&self) -> &'static str {
-        if self.confirm.is_some() {
-            return "Question : ←→ Tab choisir Oui/Non · Entrée valider · Échap = Non";
-        }
-        match &self.view {
-            View::Menu if self.path.is_empty() => {
-                "Menu : ↑↓ choisir · Entrée ouvrir · PgUp/PgDn texte · Échap/q quitter"
+        let msg = if self.confirm.is_some() {
+            Msg::KeysConfirm
+        } else {
+            match &self.view {
+                View::Menu if self.path.is_empty() => Msg::KeysMenuRoot,
+                View::Menu => Msg::KeysMenu,
+                View::Wizard(w) if w.text.is_some() => Msg::KeysText,
+                View::Wizard(_) => Msg::KeysPicker,
+                View::Output(o) if matches!(o.status, RunStatus::Running { .. }) => {
+                    Msg::KeysRunning
+                }
+                View::Output(_) => Msg::KeysDone,
             }
-            View::Menu => {
-                "Menu : ↑↓ choisir · Entrée ouvrir · PgUp/PgDn texte · Échap retour · q quitter"
-            }
-            View::Wizard(w) if w.text.is_some() => {
-                "Saisie : tapez le texte · Entrée valider · Échap retour · Ctrl-C quitter"
-            }
-            View::Wizard(_) => {
-                "Liste à droite : ↑↓ choisir · Entrée valider · Échap retour · q quitter"
-            }
-            View::Output(o) if matches!(o.status, RunStatus::Running { .. }) => {
-                "Sortie à droite : ↑↓ PgUp PgDn défiler · Échap interrompre"
-            }
-            View::Output(_) => {
-                "Sortie à droite : ↑↓ PgUp PgDn défiler · Échap revenir au menu · q quitter"
-            }
-        }
+        };
+        self.lang.t(msg)
     }
 }
 
@@ -840,15 +836,17 @@ pub fn max_scroll(o: &Output, (columns, rows): (usize, usize)) -> usize {
     text::wrapped_rows(o.lines.iter().map(|(_, l)| l.as_str()), columns).saturating_sub(rows)
 }
 
-fn interrupt_dialog(then_quit: bool) -> ConfirmDialog {
+fn interrupt_dialog(then_quit: bool, lang: Lang) -> ConfirmDialog {
     ConfirmDialog::new(
         Confirmation {
-            question: "Interrompre la commande ?".to_string(),
-            consequence: if then_quit {
-                "Elle reçoit SIGTERM (SIGKILL après 5 s), puis la console se ferme.".to_string()
-            } else {
-                "Elle reçoit SIGTERM, puis SIGKILL après 5 s si elle tourne encore.".to_string()
-            },
+            question: lang.t(Msg::InterruptQ).to_string(),
+            consequence: lang
+                .t(if then_quit {
+                    Msg::InterruptQuitC
+                } else {
+                    Msg::InterruptC
+                })
+                .to_string(),
         },
         Purpose::Interrupt { then_quit },
     )
@@ -857,6 +855,7 @@ fn interrupt_dialog(then_quit: bool) -> ConfirmDialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::console::i18n::Lang;
     use crate::console::state::{AgentState, InstanceInfo};
 
     fn key(code: KeyCode) -> KeyEvent {
@@ -916,7 +915,7 @@ mod tests {
 
     #[test]
     fn arrows_wrap_and_enter_opens_a_submenu() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         press(&mut app, &[KeyCode::Up]);
         assert_eq!(app.cursor(), 7, "↑ on the first entry goes to the last");
         press(&mut app, &[KeyCode::Down]);
@@ -935,7 +934,7 @@ mod tests {
 
     #[test]
     fn focus_moves_to_the_right_inside_an_action() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         assert_eq!(app.focus(), Focus::Menu);
         press(&mut app, &[KeyCode::Enter]);
         assert_eq!(app.focus(), Focus::Menu, "a submenu is still the menu");
@@ -952,7 +951,7 @@ mod tests {
 
     #[test]
     fn every_key_hint_fits_in_80_columns() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let mut hints = vec![app.keys_hint()];
         press(&mut app, &[KeyCode::Enter]);
         hints.push(app.keys_hint());
@@ -970,11 +969,24 @@ mod tests {
         for h in hints {
             assert!(text::width(h) <= 78, "{h}");
         }
+        for msg in [
+            Msg::KeysConfirm,
+            Msg::KeysMenuRoot,
+            Msg::KeysMenu,
+            Msg::KeysText,
+            Msg::KeysPicker,
+            Msg::KeysRunning,
+            Msg::KeysDone,
+        ] {
+            for lang in [Lang::En, Lang::Fr] {
+                assert!(text::width(lang.t(msg)) <= 78, "{lang:?} {msg:?}");
+            }
+        }
     }
 
     #[test]
     fn page_keys_scroll_a_long_description_and_arrows_reset_it() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         app.output_body = (20, 5);
         press(&mut app, &[KeyCode::PageDown]);
         assert_eq!(app.desc_scroll, 5);
@@ -993,7 +1005,7 @@ mod tests {
 
     #[test]
     fn stderr_lines_are_marked() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::Doctor);
         app.push_line(LineKind::Err, "zevbox: oops".to_string());
         match &app.view {
@@ -1003,15 +1015,51 @@ mod tests {
     }
 
     #[test]
+    fn english_outcomes_pickers_and_confirmations() {
+        assert_eq!(Outcome::Success.label(Lang::En), "✓ done");
+        assert_eq!(
+            Outcome::Failed(Some(3)).label(Lang::En),
+            "✗ failed (code 3)"
+        );
+        assert_eq!(
+            Outcome::Interrupted.label(Lang::En),
+            "✗ failed (interrupted)"
+        );
+        assert_eq!(
+            Outcome::CannotStart.label(Lang::En),
+            "✗ failed (could not start the command)"
+        );
+        let mut s = snap();
+        s.instances.clear();
+        let mut app = App::new(s, Lang::En);
+        let p = app.picker_for(Step::Instance { allow_latest: true });
+        assert_eq!(p.choices[0].label, "The most recent");
+        let p = app.picker_for(Step::Instance {
+            allow_latest: false,
+        });
+        assert_eq!(p.empty_message, "No agent running.");
+        let _ = app.open_action(Action::StopAll);
+        let c = app.confirm.as_ref().map(|d| d.confirmation.clone());
+        assert_eq!(
+            c.map(|c| (c.question, c.consequence)),
+            Some((
+                "Stop all agents?".to_string(),
+                "The threads open in Zed will be cut.".to_string()
+            ))
+        );
+        assert!(app.keys_hint().starts_with("Question:"));
+    }
+
+    #[test]
     fn q_and_ctrl_c_quit_from_the_menu() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         assert_eq!(press(&mut app, &[KeyCode::Char('q')]), Effect::Quit);
         assert_eq!(app.handle_key(ctrl_c()), Effect::Quit);
     }
 
     #[test]
     fn read_only_leaf_runs_at_once() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let job = started(press(&mut app, &[KeyCode::Enter, KeyCode::Enter]));
         assert_eq!(job.invocations[0].args, ["status"]);
         assert!(!job.interactive);
@@ -1020,7 +1068,7 @@ mod tests {
 
     #[test]
     fn stop_one_picks_an_instance_then_confirms_with_no_by_default() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         press(&mut app, &[KeyCode::Enter, KeyCode::Down, KeyCode::Enter]);
         assert!(matches!(&app.view, View::Wizard(w) if w.picker.is_some()));
         assert_eq!(press(&mut app, &[KeyCode::Enter]), Effect::None);
@@ -1059,7 +1107,7 @@ mod tests {
     fn empty_picker_says_so_and_goes_back() {
         let mut s = snap();
         s.instances.clear();
-        let mut app = App::new(s);
+        let mut app = App::new(s, Lang::Fr);
         press(&mut app, &[KeyCode::Enter, KeyCode::Down, KeyCode::Enter]);
         match &app.view {
             View::Wizard(w) => {
@@ -1075,11 +1123,11 @@ mod tests {
 
     #[test]
     fn logs_offers_the_latest_first() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         press(&mut app, &[KeyCode::Enter, KeyCode::Up, KeyCode::Enter]);
         let job = started(press(&mut app, &[KeyCode::Enter]));
         assert_eq!(job.invocations[0].args, ["logs"]);
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::Logs);
         press(&mut app, &[KeyCode::Down, KeyCode::Down]);
         let job = started(press(&mut app, &[KeyCode::Enter]));
@@ -1088,7 +1136,7 @@ mod tests {
 
     #[test]
     fn rollback_lists_only_agents_with_a_previous_release() {
-        let app = App::new(snap());
+        let app = App::new(snap(), Lang::Fr);
         let p = app.picker_for(Step::Agent(AgentSet::WithPrevious));
         let ids: Vec<_> = p.choices.iter().map(|c| c.value.as_str()).collect();
         assert_eq!(ids, ["claude"]);
@@ -1099,7 +1147,7 @@ mod tests {
 
     #[test]
     fn omlx_url_is_prefilled_key_masked_and_never_in_argv() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         // Connexion des agents › Connecter oMLX.
         press(
             &mut app,
@@ -1146,7 +1194,7 @@ mod tests {
         for a in &mut s.agents {
             a.authenticated = false;
         }
-        let mut app = App::new(s);
+        let mut app = App::new(s, Lang::Fr);
         let _ = app.open_action(Action::AuthOmlx);
         press(&mut app, &[KeyCode::Enter, KeyCode::Enter]);
         match &app.view {
@@ -1162,7 +1210,7 @@ mod tests {
 
     #[test]
     fn shell_project_is_prefilled_with_the_current_directory() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::Shell);
         let job = started(press(&mut app, &[KeyCode::Enter, KeyCode::Enter]));
         assert!(job.interactive);
@@ -1179,7 +1227,7 @@ mod tests {
 
     #[test]
     fn tools_add_splits_names_and_confirms() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::ToolsAdd);
         type_text(&mut app, " git  jq ");
         press(&mut app, &[KeyCode::Enter]);
@@ -1194,7 +1242,7 @@ mod tests {
 
     #[test]
     fn escape_during_a_run_asks_before_interrupting() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::Doctor);
         assert!(app.is_running());
         press(&mut app, &[KeyCode::Esc]);
@@ -1216,7 +1264,7 @@ mod tests {
 
     #[test]
     fn quit_during_a_run_interrupts_first() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::Doctor);
         assert_eq!(app.handle_key(ctrl_c()), Effect::None);
         press(&mut app, &[KeyCode::Tab]);
@@ -1226,7 +1274,7 @@ mod tests {
 
     #[test]
     fn scrolling_counts_wrapped_rows_and_stops_at_the_top() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         app.output_body = (10, 4);
         let _ = app.open_action(Action::Logs);
         let _ = app.handle_key(key(KeyCode::Enter));
@@ -1253,7 +1301,7 @@ mod tests {
         press(&mut app, &[KeyCode::PageDown]);
         assert_eq!(scroll(&app), 0);
         // Short output: nothing to scroll.
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         app.output_body = (40, 10);
         let _ = app.open_action(Action::Status);
         app.push_line(LineKind::Out, "one".to_string());
@@ -1263,7 +1311,7 @@ mod tests {
 
     #[test]
     fn text_field_refuses_a_leading_dash_and_says_why() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::ToolsAdd);
         type_text(&mut app, "git -y");
         press(&mut app, &[KeyCode::Enter]);
@@ -1283,7 +1331,7 @@ mod tests {
     fn omlx_model_is_prefilled_with_the_current_default() {
         let mut s = snap();
         s.omlx_model = Some("Qwen3-8B".to_string());
-        let mut app = App::new(s);
+        let mut app = App::new(s, Lang::Fr);
         let _ = app.open_action(Action::AuthOmlx);
         press(&mut app, &[KeyCode::Enter, KeyCode::Enter]); // URL, key kept
         match &app.view {
@@ -1299,7 +1347,7 @@ mod tests {
 
     #[test]
     fn debug_of_a_masked_field_hides_the_key() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::AuthOmlx);
         press(&mut app, &[KeyCode::Enter]);
         type_text(&mut app, "sk-hidden");
@@ -1312,7 +1360,7 @@ mod tests {
 
     #[test]
     fn output_scrolls_and_keeps_a_bounded_history() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::Status);
         for i in 0..(MAX_OUTPUT_LINES + 3) {
             app.push_line(LineKind::Out, i.to_string());

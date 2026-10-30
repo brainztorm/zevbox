@@ -506,7 +506,7 @@ mod tests {
             Some(&RunEvent::Finished(Outcome::CannotStart))
         );
         assert_eq!(
-            Outcome::CannotStart.label(),
+            Outcome::CannotStart.label(crate::console::i18n::Lang::Fr),
             "✗ échec (impossible de lancer la commande)"
         );
     }

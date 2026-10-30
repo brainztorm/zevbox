@@ -14,6 +14,7 @@
 //! Everything else uses the default colour, or dim gray for secondary text.
 
 use super::app::{App, Focus, LineKind, Output, RunStatus, View};
+use super::i18n::{Lang, Msg};
 use super::menu::{Entry, PanelLine, Tone};
 use super::text;
 use ratatui::layout::{Constraint, Layout, Position, Rect};
@@ -24,7 +25,6 @@ use ratatui::Frame;
 
 pub const MIN_WIDTH: u16 = 80;
 pub const MIN_HEIGHT: u16 = 20;
-pub const TOO_SMALL: &str = "Agrandissez la fenêtre (80 × 20 minimum)";
 /// Fits « ▸ Vérifier s'il y a des mises à jour » and leaves 40 columns on the
 /// right at the 80-column minimum.
 const LEFT_WIDTH: u16 = 40;
@@ -104,19 +104,20 @@ pub fn draw(frame: &mut Frame, app: &App) {
             height: 1.min(area.height),
             ..area
         };
-        frame.render_widget(Paragraph::new(TOO_SMALL).centered(), middle);
+        frame.render_widget(Paragraph::new(app.lang.t(Msg::TooSmall)).centered(), middle);
         return;
     }
     let [top, left, right, bottom] = regions(area);
     let focus = app.focus();
 
-    let full = app.snap.banner_parts(false);
+    let lang = app.lang;
+    let full = app.snap.banner_parts(false, lang);
     // One leading space, then the text.
     let fits = full.iter().map(|(_, t)| text::width(t)).sum::<usize>() < usize::from(top.width);
     let parts = if fits {
         full
     } else {
-        app.snap.banner_parts(true)
+        app.snap.banner_parts(true, lang)
     };
     let mut banner = vec![Span::raw(" ")];
     banner.extend(
@@ -130,11 +131,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     );
     draw_menu(frame, app, left, focus == Focus::Menu);
     match &app.view {
-        View::Output(o) => draw_output(frame, o, right),
+        View::Output(o) => draw_output(frame, o, right, lang),
         View::Wizard(w) if w.picker.is_some() => draw_picker(frame, app, right),
-        View::Wizard(w) => draw_description(frame, app, w.action.label(), right, true),
+        View::Wizard(w) => draw_description(frame, app, w.action.label(lang), right, true),
         View::Menu => {
-            let title = app.selected_entry().map_or("", Entry::label);
+            let title = app.selected_entry().map_or("", |e| e.label(lang));
             draw_description(frame, app, title, right, false);
         }
     }
@@ -145,11 +146,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     if let View::Wizard(w) = &app.view {
         if let Some(text) = &w.text {
-            draw_text_input(frame, text, area);
+            draw_text_input(frame, text, area, lang);
         }
     }
     if let Some(dialog) = &app.confirm {
-        draw_confirm(frame, dialog, area);
+        draw_confirm(frame, dialog, area, lang);
     }
 }
 
@@ -198,8 +199,8 @@ fn draw_menu(frame: &mut Frame, app: &App, area: Rect, focused: bool) {
         .children
         .iter()
         .map(|e| match e {
-            Entry::Menu(m) => format!("{} ›", m.label),
-            Entry::Leaf(a) => a.label().to_string(),
+            Entry::Menu(m) => format!("{} ›", app.lang.t(m.label)),
+            Entry::Leaf(a) => a.label(app.lang).to_string(),
         })
         .collect();
     let lines = list_rows(
@@ -236,9 +237,9 @@ fn draw_description(frame: &mut Frame, app: &App, title: &str, area: Rect, focus
     let start = app.desc_scroll.min(max);
     let more = match (start > 0, start < max) {
         (false, false) => None,
-        (true, false) => Some(" ↑ PgUp "),
-        (false, true) => Some(" ↓ PgDn : suite "),
-        (true, true) => Some(" ↑ PgUp · ↓ PgDn "),
+        (true, false) => Some(app.lang.t(Msg::MoreAbove)),
+        (false, true) => Some(app.lang.t(Msg::MoreBelow)),
+        (true, true) => Some(app.lang.t(Msg::MoreBoth)),
     };
     let block = match more {
         Some(m) => block.title_bottom(Span::styled(m, Style::new().fg(DIM))),
@@ -257,7 +258,7 @@ fn draw_picker(frame: &mut Frame, app: &App, area: Rect) {
     let Some(picker) = &w.picker else {
         return;
     };
-    let block = panel(w.action.label(), true);
+    let block = panel(w.action.label(app.lang), true);
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let columns = usize::from(inner.width);
@@ -271,7 +272,8 @@ fn draw_picker(frame: &mut Frame, app: &App, area: Rect) {
     let footer = wrap_panel(
         &[(
             Tone::Dim,
-            format!("Commande : {}", w.action.preview(&w.params)),
+            app.lang
+                .f(Msg::CommandLine, &[&w.action.preview(&w.params, app.lang)]),
         )],
         columns,
     );
@@ -287,9 +289,12 @@ fn draw_picker(frame: &mut Frame, app: &App, area: Rect) {
     if left > 1 {
         lines.push(Line::default());
         lines.extend(
-            wrap_panel(&[(Tone::Body, w.action.description().to_string())], columns)
-                .into_iter()
-                .take(left - 1),
+            wrap_panel(
+                &[(Tone::Body, w.action.description(app.lang).to_string())],
+                columns,
+            )
+            .into_iter()
+            .take(left - 1),
         );
     }
     let used = lines.len();
@@ -307,14 +312,16 @@ fn draw_picker(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(Paragraph::new(footer), cmd);
 }
 
-fn draw_output(frame: &mut Frame, o: &Output, area: Rect) {
+fn draw_output(frame: &mut Frame, o: &Output, area: Rect, lang: Lang) {
     let (status, status_style) = match o.status {
         RunStatus::Running {
             interrupting: false,
-        } => ("en cours…".to_string(), Style::new()),
-        RunStatus::Running { interrupting: true } => ("interruption…".to_string(), Style::new()),
+        } => (lang.t(Msg::Running).to_string(), Style::new()),
+        RunStatus::Running { interrupting: true } => {
+            (lang.t(Msg::Interrupting).to_string(), Style::new())
+        }
         RunStatus::Done(outcome) => (
-            outcome.label(),
+            outcome.label(lang),
             Style::new().fg(if outcome.is_success() { GOOD } else { BAD }),
         ),
     };
@@ -354,7 +361,7 @@ fn draw_output(frame: &mut Frame, o: &Output, area: Rect) {
         .collect();
     frame.render_widget(Paragraph::new(lines), body);
     let scrolled = if o.scroll.min(max_scroll) > 0 {
-        format!("   (↑ {} lignes)", o.scroll.min(max_scroll))
+        lang.f(Msg::ScrolledUp, &[&o.scroll.min(max_scroll).to_string()])
     } else {
         String::new()
     };
@@ -378,11 +385,11 @@ fn popup(area: Rect, width: u16, height: u16) -> Rect {
     }
 }
 
-fn draw_text_input(frame: &mut Frame, text: &super::app::TextInput, area: Rect) {
+fn draw_text_input(frame: &mut Frame, text: &super::app::TextInput, area: Rect, lang: Lang) {
     use super::menu::TextField;
     let rect = popup(area, 66, 7);
     frame.render_widget(Clear, rect);
-    let block = panel(text.field.prompt(), true);
+    let block = panel(lang.t(text.field.prompt()), true);
     let inner = block.inner(rect);
     frame.render_widget(block, rect);
 
@@ -402,14 +409,14 @@ fn draw_text_input(frame: &mut Frame, text: &super::app::TextInput, area: Rect) 
     }
     let cursor_column: String = shown[start..text.cursor.min(shown.len())].iter().collect();
     let hint = match text.field {
-        TextField::Key if text.optional => "Entrée sans rien taper : garder la clé actuelle.",
-        TextField::Key => "La clé n'est ni affichée ni journalisée.",
-        TextField::Model => "Entrée sans rien taper : le plus petit modèle du serveur.",
-        TextField::Packages => "Exemple : ripgrep jq",
+        TextField::Key if text.optional => lang.t(Msg::HintKeepKey),
+        TextField::Key => lang.t(Msg::HintKeyHidden),
+        TextField::Model => lang.t(Msg::HintModel),
+        TextField::Packages => lang.t(Msg::HintPackages),
         _ => "",
     };
     let last = match text.error {
-        Some(error) => Line::styled(error, Style::new().fg(BAD)),
+        Some(error) => Line::styled(lang.t(error), Style::new().fg(BAD)),
         None => Line::styled(hint, Style::new().fg(DIM)),
     };
     let lines = vec![
@@ -428,13 +435,13 @@ fn draw_text_input(frame: &mut Frame, text: &super::app::TextInput, area: Rect) 
 
 /// « Êtes-vous sûr ? »: red frame (an action with an impact), the focused
 /// button in blue.
-fn draw_confirm(frame: &mut Frame, dialog: &super::app::ConfirmDialog, area: Rect) {
+fn draw_confirm(frame: &mut Frame, dialog: &super::app::ConfirmDialog, area: Rect, lang: Lang) {
     let rect = popup(area, 62, 10);
     frame.render_widget(Clear, rect);
     let block = Block::bordered()
         .border_style(Style::new().fg(BAD))
         .title(Span::styled(
-            " Êtes-vous sûr ? ",
+            format!(" {} ", lang.t(Msg::AreYouSure)),
             Style::new().fg(BAD).add_modifier(Modifier::BOLD),
         ));
     let inner = block.inner(rect);
@@ -464,9 +471,9 @@ fn draw_confirm(frame: &mut Frame, dialog: &super::app::ConfirmDialog, area: Rec
     frame.render_widget(Paragraph::new(lines), text);
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            button("[ Oui ]", dialog.yes_selected),
+            button(lang.t(Msg::Yes), dialog.yes_selected),
             Span::raw("   "),
-            button("[ Non ]", !dialog.yes_selected),
+            button(lang.t(Msg::No), !dialog.yes_selected),
         ]))
         .centered(),
         buttons,
@@ -477,6 +484,7 @@ fn draw_confirm(frame: &mut Frame, dialog: &super::app::ConfirmDialog, area: Rec
 mod tests {
     use super::*;
     use crate::console::app::{App, Outcome};
+    use crate::console::i18n::Lang;
     use crate::console::menu::Action;
     use crate::console::state::{AgentState, InstanceInfo, Snapshot};
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -542,7 +550,7 @@ mod tests {
 
     #[test]
     fn screen_has_banner_two_panels_and_keys() {
-        let app = App::new(snap());
+        let app = App::new(snap(), Lang::Fr);
         let screen = render(&app, 80, 24);
         let lines: Vec<&str> = screen.lines().collect();
         assert!(lines[0].contains("zevbox ─ Claude 0.99.1 · Antigravity 0.99.1"));
@@ -567,7 +575,7 @@ mod tests {
 
     #[test]
     fn the_panel_with_the_keys_is_blue() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         // Menu: left border blue, right border dim.
         let b = buffer(&app, 80, 24);
         assert_eq!(b[(0, 1)].fg, FOCUS, "left top-left corner");
@@ -600,19 +608,19 @@ mod tests {
 
     #[test]
     fn banner_colours_installed_green_and_missing_red() {
-        let app = App::new(snap());
+        let app = App::new(snap(), Lang::Fr);
         let b = buffer(&app, 100, 24);
         // "0.99.1" (Claude) is green, "non installé" (oMLX) red.
         assert_eq!(fg_of(&b, 0, "0.99.1"), Some(GOOD));
         assert_eq!(fg_of(&b, 0, "non installé"), Some(BAD));
         assert_eq!(fg_of(&b, 0, "Claude"), Some(Color::Reset));
-        let b = buffer(&App::new(Snapshot::default()), 80, 24);
+        let b = buffer(&App::new(Snapshot::default(), Lang::Fr), 80, 24);
         assert_eq!(fg_of(&b, 0, "zevbox n'est pas"), Some(BAD));
     }
 
     #[test]
     fn leaf_shows_its_description_cost_and_command() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         key(&mut app, KeyCode::Down);
         key(&mut app, KeyCode::Enter);
         key(&mut app, KeyCode::Down); // Tout mettre à jour
@@ -626,7 +634,7 @@ mod tests {
     fn long_description_scrolls_with_page_keys() {
         // At the 80×20 minimum, find an entry whose description is longer than
         // the panel (menus and leaves of every level).
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         app.output_body = output_body_size(80, 20);
         let mut found = None;
         for top in 0..app.root.children.len() {
@@ -667,7 +675,7 @@ mod tests {
 
     #[test]
     fn auth_leaf_shows_the_connection_in_colour() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         key(&mut app, KeyCode::Down);
         key(&mut app, KeyCode::Down);
         key(&mut app, KeyCode::Enter);
@@ -688,26 +696,93 @@ mod tests {
     }
 
     #[test]
+    fn english_screen_has_english_labels() {
+        let mut app = App::new(snap(), Lang::En);
+        let screen = render(&app, 80, 24);
+        let lines: Vec<&str> = screen.lines().collect();
+        assert!(lines[0].contains("zevbox ─ Claude 0.99.1"), "{screen}");
+        assert!(lines[0].contains("not installed"), "{screen}");
+        assert!(screen.contains("▸ Running agents ›"), "{screen}");
+        assert!(screen.contains("First-time setup"));
+        assert!(screen.contains("Contains:"));
+        assert!(lines[23].contains("Menu: ↑↓ choose"), "{screen}");
+        assert!(!screen.contains("Agents en cours"));
+        // Updates › Update everything: description, cost, command.
+        key(&mut app, KeyCode::Down);
+        key(&mut app, KeyCode::Enter);
+        key(&mut app, KeyCode::Down);
+        let screen = render(&app, 80, 24);
+        assert!(screen.contains("zevbox › Updates"), "{screen}");
+        assert!(screen.contains("Builds a new image"), "{screen}");
+        assert!(screen.contains("Command: zevbox update"), "{screen}");
+        // Its « Are you sure? » box.
+        key(&mut app, KeyCode::Enter);
+        let screen = render(&app, 80, 24);
+        assert!(screen.contains("Are you sure?"), "{screen}");
+        assert!(screen.contains("Update everything?"));
+        assert!(screen.contains("[ Yes ]   [ No ]"));
+        assert!(screen.lines().nth(23).unwrap().contains("Question: ←→ Tab"));
+        // Output and result.
+        let _ = app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+        let _ = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(render(&app, 80, 24).contains("running…"));
+        app.finished(Outcome::Failed(Some(2)));
+        assert!(render(&app, 80, 24).contains("✗ failed (code 2)"));
+        app.finished(Outcome::Success);
+        assert!(render(&app, 80, 24).contains("✓ done"));
+        // Too small, not installed.
+        assert!(render(&app, 70, 24).contains("Enlarge the window (80 × 20 minimum)"));
+        let screen = render(&App::new(Snapshot::default(), Lang::En), 80, 24);
+        assert!(screen.contains("zevbox is not installed: run First-time setup"));
+    }
+
+    #[test]
+    fn english_picker_and_text_field() {
+        let mut app = App::new(snap(), Lang::En);
+        let _ = app.open_action(Action::StopOne);
+        let screen = render(&app, 80, 24);
+        assert!(screen.contains("Choose the agent to stop"), "{screen}");
+        assert!(screen.contains("Command: zevbox stop <id>"));
+        assert!(screen
+            .lines()
+            .nth(23)
+            .unwrap()
+            .contains("List on the right:"));
+        let _ = app.open_action(Action::ToolsAdd);
+        key(&mut app, KeyCode::Char('-'));
+        key(&mut app, KeyCode::Enter);
+        let screen = render(&app, 80, 24);
+        assert!(screen.contains("Tools to add"), "{screen}");
+        assert!(
+            screen.contains("A value cannot start with \"-\"."),
+            "{screen}"
+        );
+    }
+
+    #[test]
     fn banner_when_not_installed() {
-        let app = App::new(Snapshot::default());
+        let app = App::new(Snapshot::default(), Lang::Fr);
         let screen = render(&app, 80, 24);
         assert!(screen.contains("zevbox n'est pas installé : lancez Première installation"));
     }
 
     #[test]
     fn too_small_terminal_asks_for_a_bigger_window() {
-        let app = App::new(snap());
+        let app = App::new(snap(), Lang::Fr);
         for (w, h) in [(79, 24), (80, 19), (40, 10)] {
             let screen = render(&app, w, h);
-            assert!(screen.contains(TOO_SMALL), "{w}x{h}:\n{screen}");
+            assert!(
+                screen.contains(Lang::Fr.t(Msg::TooSmall)),
+                "{w}x{h}:\n{screen}"
+            );
             assert!(!screen.contains("Agents en cours"));
         }
-        assert!(!render(&app, 80, 20).contains(TOO_SMALL));
+        assert!(!render(&app, 80, 20).contains(Lang::Fr.t(Msg::TooSmall)));
     }
 
     #[test]
     fn confirm_box_is_red_with_a_blue_focused_button() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         key(&mut app, KeyCode::Enter);
         key(&mut app, KeyCode::Down);
         key(&mut app, KeyCode::Down);
@@ -743,7 +818,7 @@ mod tests {
 
     #[test]
     fn masked_key_is_never_drawn() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::AuthOmlx);
         key(&mut app, KeyCode::Char('h'));
         key(&mut app, KeyCode::Enter);
@@ -758,7 +833,7 @@ mod tests {
 
     #[test]
     fn output_shows_lines_and_coloured_result() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         let _ = app.open_action(Action::Doctor);
         app.push_line(LineKind::Info, "$ zevbox doctor".to_string());
         app.push_line(LineKind::Out, "container: ok".to_string());
@@ -785,7 +860,7 @@ mod tests {
 
     #[test]
     fn longest_labels_and_paths_fit_at_80_columns() {
-        let mut app = App::new(snap());
+        let mut app = App::new(snap(), Lang::Fr);
         key(&mut app, KeyCode::Down);
         key(&mut app, KeyCode::Enter); // Mises à jour
         let screen = render(&app, 80, 24);
@@ -807,7 +882,7 @@ mod tests {
     fn dash_error_and_first_login_note_are_shown() {
         let mut s = snap();
         s.agents.iter_mut().for_each(|a| a.version = None);
-        let mut app = App::new(s);
+        let mut app = App::new(s, Lang::Fr);
         key(&mut app, KeyCode::Down);
         key(&mut app, KeyCode::Down);
         key(&mut app, KeyCode::Enter);
