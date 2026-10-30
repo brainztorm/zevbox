@@ -220,6 +220,19 @@ pub fn parse_image_list_json(text: &str) -> Result<Vec<ImageInfo>, ContainerErro
         .collect()
 }
 
+/// Digest (`sha256:…`) of the image named `reference` in `container image list
+/// --format json` (`configuration.descriptor.digest`), names compared with
+/// [`image_matches`]. `None` if the image is not listed.
+pub fn parse_image_digest(text: &str, reference: &str) -> Result<Option<String>, ContainerError> {
+    Ok(json_array(text)?.iter().find_map(|i| {
+        let name = str_at(i, "/configuration/name")?;
+        if !image_matches(&name, reference) {
+            return None;
+        }
+        str_at(i, "/configuration/descriptor/digest").filter(|d| d.starts_with("sha256:"))
+    }))
+}
+
 /// Parses `container system status --format json`.
 pub fn parse_system_status_json(text: &str) -> Result<SystemStatus, ContainerError> {
     let v: Value =
@@ -378,6 +391,26 @@ impl ContainerCli {
                 may_target(c) && belongs_to(homes.get(&c.name).map(String::as_str), state_root)
             })
             .collect())
+    }
+
+    /// Pulls `reference` (arm64 only) and returns it pinned by digest,
+    /// `<reference>@sha256:…`, for the lock and `FROM` (DECISIONS 2026-10-30).
+    pub async fn pull_pinned(&self, reference: &str) -> Result<String, ContainerError> {
+        self.exec(&[
+            "image",
+            "pull",
+            "--progress",
+            "none",
+            "--platform",
+            "linux/arm64",
+            reference,
+        ])
+        .await?;
+        let text = self.exec(&["image", "list", "--format", "json"]).await?;
+        let digest = parse_image_digest(&text, reference)?.ok_or_else(|| {
+            ContainerError::BadJson(format!("{reference} is not listed after the pull"))
+        })?;
+        Ok(format!("{reference}@{digest}"))
     }
 
     pub async fn image_list(&self) -> Result<Vec<ImageInfo>, ContainerError> {
@@ -686,5 +719,33 @@ mod ownership_tests {
         let canonical = std::fs::canonicalize(tmp.path()).unwrap();
         let home = canonical.join("state/claude");
         assert!(belongs_to(home.to_str(), tmp.path()));
+    }
+}
+
+#[cfg(test)]
+mod image_digest_tests {
+    use super::*;
+
+    // Shape of `container image list --format json` (container 1.5, trimmed).
+    const LIST: &str = r#"[
+      {"configuration": {"name": "docker.io/library/ubuntu:rolling",
+        "descriptor": {"digest": "sha256:aaa111", "mediaType": "x"}}},
+      {"configuration": {"name": "docker.io/zevbox/claude:claude-1",
+        "descriptor": {"digest": "sha256:bbb222"}}}
+    ]"#;
+
+    #[test]
+    fn digest_of_the_named_image() {
+        assert_eq!(
+            parse_image_digest(LIST, "docker.io/library/ubuntu:rolling").unwrap(),
+            Some("sha256:aaa111".to_string())
+        );
+        // Short and long names designate the same image (image_matches).
+        assert_eq!(
+            parse_image_digest(LIST, "ubuntu:rolling").unwrap(),
+            Some("sha256:aaa111".to_string())
+        );
+        assert_eq!(parse_image_digest(LIST, "ubuntu:26.04").unwrap(), None);
+        assert!(parse_image_digest("not json", "x").is_err());
     }
 }

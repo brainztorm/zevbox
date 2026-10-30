@@ -522,7 +522,7 @@ Une **release** = un agent + des versions figées + une image construite et test
   "registryManifestUrl": "https://raw.githubusercontent.com/agentclientprotocol/registry/main/claude-acp/agent.json",
   "registryManifestSha256": "…",
   "agentVersion": "0.89.1",
-  "baseImage": "node:22-bookworm-slim@sha256:…",
+  "baseImage": "docker.io/library/ubuntu:rolling@sha256:…",
   "aptPackages": ["ripgrep"],
   "npmPackage": "@agentclientprotocol/claude-agent-acp@0.89.1",
   "archiveUrl": null,
@@ -538,9 +538,9 @@ Une **release** = un agent + des versions figées + une image construite et test
 Pipeline `update` (aussi utilisé par `tools add/remove`, qui résolvent donc le registre comme `update` ; amendé le 2026-10-30, backlog 1 abandonné) :
 
 1. **Résoudre** : `curl --fail --silent --show-error --location --max-time 60 <url>` du manifeste (sortie lue directement, sha256 calculé). Valider : `id` attendu (`claude-acp` / `antigravity-acp`), présence de `distribution.npx.package` (Claude) ou de `distribution.binary["linux-aarch64"]` avec `archive` et `cmd` (Antigravity). Champ manquant → erreur explicite `registry schema changed: <champ>` ; l'agent est déclaré indisponible et la release active reste en place. Ne jamais fabriquer une URL à partir d'un numéro de version. Ne jamais utiliser `preview`.
-2. **Base** : `baseImage` = `node:22-bookworm-slim` figée par digest. Digest vérifié le 2026-10-13 avec `container image list --format json` (DECISIONS) ; constante `release::BASE_IMAGE`.
+2. **Base** (amendé le 2026-10-30, décision 👤 : Ubuntu courante, non LTS, au lieu de `node:22-bookworm-slim` figée le 2026-10-13) : à la première construction de chaque `update`, `container image pull --platform linux/arm64 docker.io/library/ubuntu:rolling` (constante `release::BASE_IMAGE_TAG`), puis lecture de son empreinte dans `container image list --format json` (`configuration.descriptor.digest`) ; `baseImage` = `docker.io/library/ubuntu:rolling@sha256:…`. La base suit donc les versions d'Ubuntu à chaque `update` ; échec du `pull` → `<Agent>: cannot fetch the base image …`, agent en échec.
 3. **Contexte de build** dans `releases/<id>/context/` : `Containerfile` (depuis `include_str!("../assets/Containerfile")`), `zevbox-release.json` (le lock sans `smokeTest`), et selon l'agent :
-   - Claude : `package.json` minimal `{"private":true,"dependencies":{"@agentclientprotocol/claude-agent-acp":"<version>"}}` (npm le réécrit en `^<version>` : l'exactitude vient du `package-lock.json` et de `npm ci`) + `package-lock.json`, généré en lançant `container run --rm --mount type=bind,source=<context>,target=/w -w /w <baseImage> npm install --package-lock-only --ignore-scripts <paquet@version>`. Le lock est conservé dans la release.
+   - Claude : `package.json` minimal `{"private":true,"dependencies":{"@agentclientprotocol/claude-agent-acp":"<version exacte>"}}`. Depuis le 2026-10-30, plus de `package-lock.json` préparé sur le Mac : `npm install` résout les dépendances **pendant la construction**, avec le Node de l'image (la base Ubuntu n'a pas Node avant l'étape `base`).
    - Antigravity : télécharger l'archive dans `releases/<id>/context/agy.zip`, calculer son sha256 et l'écrire dans `archiveSha256`.
    - oMLX (2026-10-29) : comme Claude (même étape `claude`, choisie par `agents::build_target`) ; le lock a `agentCommand` = l'adaptateur, `authCommand` = `[]` (l'auth se fait sur le Mac) et `authMarker` = `.claude/settings.json` (authentifié = URL et clé présentes).
 4. **Build** : `container build -f <context>/Containerfile --target <agent> --tag zevbox/<agent>:<id> --build-arg BASE_IMAGE=<baseImage> --build-arg ZEVBOX_UID=<uid> --build-arg ZEVBOX_GID=<gid> --build-arg APT_PACKAGES="<paquets validés>" [--build-arg AGY_SHA256=<sha>] <context>`. stdout et stderr du build → `releases/<id>/build.log`.
@@ -554,39 +554,56 @@ Pipeline `update` (aussi utilisé par `tools add/remove`, qui résolvent donc le
 
 `rollback` : refuse si `previous` est nul ou si son image n'existe plus ; sinon échange `current` et `previous`. Les instances en cours ne sont pas touchées ; le prochain lancement utilise la release restaurée.
 
-### 8.8 `assets/Containerfile` (squelette à compléter et vérifier)
+### 8.8 `assets/Containerfile` (contenu réel, base Ubuntu depuis le 2026-10-30)
 
 ```dockerfile
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS base
 ARG ZEVBOX_UID
 ARG ZEVBOX_GID
+# Each name is validated by zevbox (config::validate_apt_package) before being passed.
 ARG APT_PACKAGES=""
+ENV DEBIAN_FRONTEND=noninteractive
+# Base: current Ubuntu (DECISIONS 2026-10-30). Security updates at every build, and
+# the everyday tools of the agents' work (Node, npm, Python, compilers) included.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates git curl jq unzip python3 procps less ${APT_PACKAGES} \
+ && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends ca-certificates git curl jq unzip procps less \
+      nodejs npm python3 python3-pip python3-venv python-is-python3 build-essential ripgrep \
+      ${APT_PACKAGES} \
  && rm -rf /var/lib/apt/lists/*
-RUN (getent group nobody || groupadd -r nobody) \
+# Ubuntu ships a user `ubuntu` (uid 1000): free the host uid if it is taken.
+RUN (! getent passwd ${ZEVBOX_UID} >/dev/null || userdel "$(getent passwd ${ZEVBOX_UID} | cut -d: -f1)") \
+ && (getent group nobody || groupadd -r nobody) \
  && (getent group ${ZEVBOX_GID} || groupadd -g ${ZEVBOX_GID} agent) \
  && useradd -u ${ZEVBOX_UID} -g ${ZEVBOX_GID} -M -d /home/agent -s /bin/bash agent \
  && mkdir -p /home/agent && chown ${ZEVBOX_UID}:${ZEVBOX_GID} /home/agent
+# /home/agent is hidden by the state mount at runtime: install nothing there.
 COPY zevbox-release.json /etc/zevbox-release.json
 
 FROM base AS claude
-COPY package.json package-lock.json /opt/zevbox/claude/
-RUN cd /opt/zevbox/claude && npm ci \
+COPY package.json /opt/zevbox/claude/
+# package.json names the exact adapter version; npm resolves its dependencies here,
+# with the image's Node. No --omit=optional: the native Claude binary is an
+# optional dependency (F6).
+RUN cd /opt/zevbox/claude && npm install --no-audit --no-fund \
  && test -x node_modules/.bin/claude-agent-acp
 
 FROM base AS antigravity
 ARG AGY_SHA256
 COPY agy.zip /tmp/agy.zip
 RUN echo "${AGY_SHA256}  /tmp/agy.zip" | sha256sum -c - \
- && mkdir -p /opt/zevbox/antigravity && unzip -q /tmp/agy.zip -d /opt/zevbox/antigravity \
- && rm /tmp/agy.zip && chmod +x /opt/zevbox/antigravity/agy_acp_server.par
+ && mkdir -p /opt/zevbox/antigravity \
+ && unzip -q /tmp/agy.zip -d /opt/zevbox/antigravity \
+ && rm /tmp/agy.zip \
+ && chmod +x /opt/zevbox/antigravity/agy_acp_server.par
 ```
 - `BASE_IMAGE` est passé en `--build-arg BASE_IMAGE=<baseImage du lock>` (§8.7, point 4).
 - Rien n'est installé dans `/home/agent` (il est masqué par le montage d'état).
 - `APT_PACKAGES` : chaque nom est validé par zevbox avec `^[a-z0-9][a-z0-9+.-]{0,62}$` avant d'être passé. C'est la seule chose qui empêche une injection dans le `RUN`.
-- Pas de `npm install …@latest`. Pas de `--omit=optional` (F6).
+- Pas de `npm install …@latest` : `package.json` donne la version exacte. Pas de `--omit=optional` (F6).
+- Outils de base installés d'office (décision 👤 du 2026-10-30) : Node et npm, Python 3 avec `pip`, `venv` et `python` → `python3`, `build-essential`, `ripgrep`, `git`, `curl`, `jq`, `unzip`, `procps`, `less` ; `apt-get upgrade` à chaque construction (correctifs de sécurité). Ubuntu protège le Python du système (PEP 668) : `pip install` se fait dans un `python -m venv`.
+- L'utilisateur `ubuntu` (uid 1000) de l'image est supprimé si l'uid de l'hôte est déjà pris.
 - Vérifié le 2026-10-14 (DECISIONS, étape 14) : dans le zip Antigravity, `agy_acp_server.par` est à la racine de l'archive.
 
 `tools.json` : `{"schemaVersion":1,"apt":["ripgrep"]}`. `tools add` ignore les doublons (« no new tools to add », code 0 si rien de neuf) et refuse les noms invalides (code 1, rien de modifié) — aligné sur le code le 2026-10-29. L'ajout d'un outil ne crée jamais de montage.
@@ -687,7 +704,7 @@ Chaque étape : implémenter → `make verify STEP=N` → `STEP N: OK` → ✅ +
 - Porte : `make verify STEP=10` (ajoute `make test-integration`).
 
 ### Étape 11 — `update`, `rollback` (réseau, vrai build)
-- Implémenter §8.7 (résolution via `/usr/bin/curl`, contexte de build, `container build --tag`, smoke test, promotion). VÉRIFIER le digest de `node:22-bookworm-slim` et le consigner. Ajouter des tests pour la logique pure (validation du contexte, échec → release active inchangée).
+- Implémenter §8.7 (résolution via `/usr/bin/curl`, contexte de build, `container build --tag`, smoke test, promotion). VÉRIFIER le digest de `node:22-bookworm-slim` et le consigner. Ajouter des tests pour la logique pure (validation du contexte, échec → release active inchangée). (Historique : base remplacée par `ubuntu:rolling`, résolue à chaque `update`, le 2026-10-30.)
 - Preuves manuelles : `zevbox update --check` ; `zevbox update --agent claude` → release promue ; `container run --rm <image> uname -s` = Linux ; mise à jour volontairement cassée → release active inchangée ; 2e release puis `zevbox rollback`.
 - Porte : `make verify STEP=11` + preuves dans `PROGRESS.md`.
 

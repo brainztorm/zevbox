@@ -134,7 +134,7 @@ Four key components:
    - sizes the VM from `config.json` (`resources`, default 4 CPUs and `4G` of memory).
 4. **Release manager (`src/release.rs`)**
    - fetches and verifies the official ACP registry manifests;
-   - builds Linux images from a Debian base (`node:22-bookworm-slim`) pinned by SHA-256 digest;
+   - builds Linux images from the current Ubuntu release (`ubuntu:rolling`, pulled again at every `update` and pinned by its SHA-256 digest in the release lock), with Node, Python and build tools installed;
    - runs *smoke tests* before promoting a release.
 
 ```mermaid
@@ -260,7 +260,7 @@ zevbox uses an immutable release pipeline: each agent version gets a unique time
 ```mermaid
 flowchart LR
     Registry["official ACP registry\n(GitHub agent.json)"] --> Fetch["manifest resolution\n(curl HTTPS + SHA-256)"]
-    Fetch --> Prepare["build context\nContainerfile + release.json\npackage-lock / agy.zip"]
+    Fetch --> Prepare["build context\nContainerfile + release.json\npackage.json / agy.zip\n(base: ubuntu:rolling, pinned)"]
     Prepare --> Build["Apple Container build\nimage: zevbox/<agent>:<id>"]
     Build --> Smoke["smoke test in the VM\n1. uname -s == Linux\n2. dpkg check (tools)\n3. /etc/zevbox-release.json present"]
     Smoke --> Promote["promotion (active.json)\ncurrent = new release\nprevious = old release"]

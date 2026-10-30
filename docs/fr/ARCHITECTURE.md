@@ -110,7 +110,7 @@ L'architecture repose sur quatre composants clés :
    - Dimensionne la VM d'après `config.json` (`resources`, par défaut 4 CPU et `4G` de mémoire).
 4. **Le Gestionnaire de Releases (`src/release.rs`)** :
    - Télécharge et vérifie les manifestes officiels des registres ACP.
-   - Construit les images Linux basées sur une image Debian (`node:22-bookworm-slim`) figée par empreinte cryptographique SHA-256.
+   - Construit les images Linux à partir de la version courante d'Ubuntu (`ubuntu:rolling`, retéléchargée à chaque `update` et figée par son empreinte SHA-256 dans le lock de la release), avec Node, Python et les outils de compilation installés.
    - Exécute des tests de fumée (*smoke tests*) avant toute promotion.
 
 ```mermaid
@@ -235,7 +235,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     Registry["Registre ACP Officiel\n(GitHub agent.json)"] --> Fetch["Résolution du Manifeste\n(curl HTTPS + SHA-256)"]
-    Fetch --> Prepare["Préparation du Contexte\nContainerfile + release.json\npackage-lock / agy.zip"]
+    Fetch --> Prepare["Préparation du Contexte\nContainerfile + release.json\npackage.json / agy.zip\n(base : ubuntu:rolling, figée)"]
     Prepare --> Build["Build Apple Container\nImage: zevbox/<agent>:<id>"]
     Build --> Smoke["Smoke Test dans la VM\n1. uname -s == Linux\n2. Vérification dpkg (outils)\n3. Présence /etc/zevbox-release.json"]
     Smoke --> Promote["Promotion (active.json)\ncurrent = nouvelle release\nprevious = ancienne release"]
