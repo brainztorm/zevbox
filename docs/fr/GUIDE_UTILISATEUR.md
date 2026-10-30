@@ -337,7 +337,7 @@ sequenceDiagram
 | ✅ Ce qu'il faut faire | ❌ Ce qu'il ne faut PAS faire |
 |---|---|
 | **Garder vos projets dans votre dossier personnel ou sur un disque externe**, et committer vous-même le travail de l'agent. | **Ne jamais ouvrir comme projet `$HOME` lui-même, la racine `/`, `~/Library`, un dossier caché `~/.…` ou un dossier système** (rejeté immédiatement par l'invariant I2). |
-| **Utiliser `zevbox tools add <paquet>`** si vous voulez que l'agent dispose d'outils Linux supplémentaires (p. ex. `ripgrep`, `clang`, `tree`) ; cela reconstruit les images des agents installés (réseau requis). | **Ne jamais essayer d'installer des paquets avec `sudo apt` directement pendant une session** (la VM est éphémère et les droits root sont délestés). |
+| **Utiliser `zevbox tools add <paquet>`** si vous voulez que l'agent dispose d'outils Linux supplémentaires (p. ex. `ripgrep`, `clang`, `tree`) ; cela reconstruit les images des agents installés comme `zevbox update`, qui passent donc aussi à leur dernière version (réseau requis). | **Ne jamais essayer d'installer des paquets avec `sudo apt` directement pendant une session** (la VM est éphémère et les droits root sont délestés). |
 | **Lancer `zevbox stop`** en fin de journée pour libérer toutes les instances d'arrière-plan. | **Ne jamais lancer `container stop --all` à la main** (cela arrêterait vos conteneurs personnels hors zevbox). |
 | **Faire un `zevbox doctor`** en cas de comportement inattendu pour voir immédiatement la cause. | **Ne jamais modifier à la main les clés `zevbox · ...` dans les réglages de Zed** (utilisez `zevbox zed install` ou `zevbox zed uninstall`). |
 

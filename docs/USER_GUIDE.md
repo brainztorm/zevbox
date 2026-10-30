@@ -364,7 +364,7 @@ sequenceDiagram
 | ✅ Do | ❌ Don't |
 |---|---|
 | **Keep your projects in your home folder or on an external disk**, and commit the agent's work yourself. | **Don't open `$HOME` itself, `/`, `~/Library`, hidden `~/.…` folders or system folders as a project** (rejected immediately by I2). |
-| **Use `zevbox tools add <package>`** to give the agent extra Linux tools (e.g. `ripgrep`, `clang`, `tree`); it rebuilds the images of the installed agents (network required). | **Don't `sudo apt install` inside a session** (the VM is ephemeral and capabilities are dropped). |
+| **Use `zevbox tools add <package>`** to give the agent extra Linux tools (e.g. `ripgrep`, `clang`, `tree`); it rebuilds the images of the installed agents like `zevbox update`, so they also move to their latest version (network required). | **Don't `sudo apt install` inside a session** (the VM is ephemeral and capabilities are dropped). |
 | **Run `zevbox stop`** at the end of the day to free background instances. | **Never run `container stop --all` by hand** (it would stop your own non-zevbox containers). |
 | **Run `zevbox doctor`** when something looks odd. | **Don't hand-edit the `zevbox · …` keys in Zed's settings** (use `zevbox zed install` / `zevbox zed uninstall`). |
 

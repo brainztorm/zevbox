@@ -1,8 +1,10 @@
 # Spécification — `zevbox tools add/remove` reconstruit les images aux versions actuelles
 
 - **Backlog** : `docs/DECISIONS.md`, point 1 (« R3 — `tools add/remove` sans résolution du registre », revue ARGON 3.1).
-- **Statut** : spécification du 2026-10-29, relue contre le code (revue adverse, 18 remarques
-  intégrées). Pas encore implémentée.
+- **Statut** : **ABANDONNÉE le 2026-10-30 (décision 👤)** : le client ACP bouge peu et fait peu de chose, le
+  relais refuse toute méthode non auditée et `rollback` reste possible ; une mise à jour du client au
+  passage d'un `tools add/remove` est acceptée. Conservée pour mémoire, ne pas implémenter.
+  (Spécification du 2026-10-29, relue contre le code, 18 remarques intégrées.)
 - **Contrat visé** : `zevbox_plan_V2.md` §8.7, qui dit déjà « Pipeline `update` (et `tools add/remove`,
   qui réutilisent les versions actuelles au lieu de résoudre) ». Le code ne le fait pas : cette
   spécification le met en conformité et précise ce que le plan laisse dans le vague.
