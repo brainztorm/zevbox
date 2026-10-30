@@ -147,7 +147,7 @@ Documentation en français : **[docs/fr/](docs/fr/README.md)**.
   model, which Claude Code keeps using for small background requests. The switch is immediate;
   the first prompt then waits while the server loads the model. The default mode is **Bypass
   permissions**: the agent never asks (it only acts inside its VM and your project).
-- **Don't remember commands**: `zevbox console` opens a full-screen keyboard menu (French interface) over the commands below: arrows to choose, Enter to run, Esc to go back, `q` to quit; it asks "Êtes-vous sûr ?" before anything with an impact.
+- **Don't remember commands**: `zevbox console` opens a full-screen keyboard menu (English or French, from your locale or `--lang en|fr`) over the commands below: arrows to choose, Enter to run, Esc to go back, `q` to quit; it asks "Are you sure?" before anything with an impact.
 - **Interactive shell in the agent's VM**: `zevbox shell claude`
 - **What the VMs already have**: current Ubuntu with Node/npm, Python 3 (`pip`, `venv`), `build-essential`, `git`, `ripgrep`, `curl`, `jq`.
 - **Extra Linux tools (apt packages) in the VMs**: `zevbox tools add tree clang`
@@ -175,7 +175,7 @@ Documentation en français : **[docs/fr/](docs/fr/README.md)**.
 | `zevbox update [--check] [--agent <agent>]` | Checks for or builds a new agent release from the official ACP registry, runs the smoke test and promotes it. Without `--agent`: Claude and Antigravity, plus oMLX if it is installed. Exits with code 1 if any agent's update failed (it then changes nothing for that agent). After a build, the same image cleanup as `clean --images` runs, and the release folders/archives are always tidied. |
 | `zevbox rollback [--agent <agent>]` | Swaps the active release (`current`) with the previous one; refuses, with the fix to run, if the previous release's image no longer exists. |
 | `zevbox tools list` / `add <pkgs…>` / `remove <pkgs…>` | Manages extra Ubuntu (apt) packages (`tools.json`) and rebuilds the active agent images like `update` does, so each agent also moves to its latest version. |
-| `zevbox console` | Full-screen keyboard menu over the other commands (French interface; needs an interactive terminal, exit code 2 otherwise): commands on the left, what they do and the equivalent `zevbox …` line on the right. It reimplements nothing: each action runs `zevbox <command>` as a child process (no shell), shows its output live, and asks "Êtes-vous sûr ?" (default **Non**) before stopping agents, updating, rolling back, adding or removing tools, `clean --images` or `zed uninstall`. `shell`, `setup` and the Claude/Antigravity sign-ins get the real terminal. Works before `setup` (no `config.json` needed). Never offers `launch`. See the user guide. |
+| `zevbox console` | Full-screen keyboard menu over the other commands, in English or French (`--lang en|fr`; default from `LC_ALL`, `LC_MESSAGES` or `LANG`: `fr…` gives French, anything else English; needs an interactive terminal, exit code 2 otherwise): commands on the left, what they do and the equivalent `zevbox …` line on the right. It reimplements nothing: each action runs `zevbox <command>` as a child process (no shell), shows its output live, and asks "Are you sure?" (default **No**) before stopping agents, updating, rolling back, adding or removing tools, `clean --images` or `zed uninstall`. `shell`, `setup` and the Claude/Antigravity sign-ins get the real terminal. Works before `setup` (no `config.json` needed). Never offers `launch`. See the user guide. |
 
 ---
 

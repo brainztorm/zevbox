@@ -138,8 +138,12 @@ pub enum Command {
         #[command(subcommand)]
         action: ToolsAction,
     },
-    /// Full-screen keyboard menu over the other commands (French interface)
-    Console,
+    /// Full-screen keyboard menu over the other commands (English or French)
+    Console {
+        /// Interface language (default: from LC_ALL, LC_MESSAGES or LANG; fr* = French)
+        #[arg(long, value_enum)]
+        lang: Option<crate::console::i18n::Lang>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -176,7 +180,10 @@ pub fn run() -> u8 {
     // file: stdout carries JSON-RPC only and stderr belongs to Zed, I6) and
     // `console` (stderr lines would tear its full screen).
     if std::env::var_os("RUST_LOG").is_some()
-        && !matches!(cli.command, Command::Launch { .. } | Command::Console)
+        && !matches!(
+            cli.command,
+            Command::Launch { .. } | Command::Console { .. }
+        )
     {
         let _ = tracing_subscriber::fmt()
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
@@ -216,7 +223,7 @@ async fn dispatch(command: Command) -> anyhow::Result<u8> {
             | Command::Setup
             | Command::Launch { .. }
             | Command::Auth { .. }
-            | Command::Console
+            | Command::Console { .. }
     ) && !paths.config_file().exists()
     {
         crate::ui::err(
@@ -246,6 +253,6 @@ async fn dispatch(command: Command) -> anyhow::Result<u8> {
         Command::Rollback { agent } => update::run_rollback(agent).await,
         Command::Tools { action } => tools::run(action).await,
         // Starts without config.json: « Première installation » runs `setup`.
-        Command::Console => crate::console::run().await,
+        Command::Console { lang } => crate::console::run(lang).await,
     }
 }

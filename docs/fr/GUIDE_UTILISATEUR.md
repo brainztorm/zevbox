@@ -352,11 +352,14 @@ sequenceDiagram
 Si vous préférez ne pas retenir les commandes et leurs options, lancez :
 
 ```bash
-zevbox console
+zevbox console              # langue d'après votre locale
+zevbox console --lang fr    # ou --lang en
 ```
 
-Un menu plein écran s'ouvre dans votre terminal (l'interface est en français ; la sortie des
-commandes reste en anglais). Il exige un terminal interactif et fonctionne aussi avant
+Un menu plein écran s'ouvre dans votre terminal, **en français ou en anglais** : `--lang fr|en`,
+sinon d'après la première valeur non vide de `LC_ALL`, `LC_MESSAGES` et `LANG` (une valeur qui
+commence par `fr`, comme `fr_FR.UTF-8`, donne le français ; tout le reste, ou rien, l'anglais). La
+sortie des commandes reste en anglais. Il exige un terminal interactif et fonctionne aussi avant
 `zevbox setup`. Les commandes sont à gauche ; à droite, une explication en clair de l'entrée
 surlignée (ce qu'elle fait, quand s'en servir, ce qu'elle change et ce qu'elle ne touche pas, par
 exemple qu'arrêter un agent coupe son thread ouvert dans Zed), la durée, la nécessité du réseau et

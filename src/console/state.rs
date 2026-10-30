@@ -2,6 +2,7 @@
 //! (docs/SPEC_console.md §2, §3). Read only: every change goes through a
 //! `zevbox …` command; this module never writes.
 
+use super::i18n::{Lang, Msg};
 use super::menu::Tone;
 use crate::paths::Paths;
 
@@ -117,8 +118,8 @@ impl Snapshot {
     }
 
     /// The top line (§3): active version of each agent and number of instances.
-    pub fn banner(&self) -> String {
-        self.banner_parts(false)
+    pub fn banner(&self, lang: Lang) -> String {
+        self.banner_parts(false, lang)
             .into_iter()
             .map(|(_, t)| t)
             .collect()
@@ -127,12 +128,9 @@ impl Snapshot {
     /// The banner in pieces, each with its meaning: installed versions are OK
     /// (green), « non installé » asks for attention (red). `compact` shortens
     /// the running count (« 2 en cours ») when the full line does not fit.
-    pub fn banner_parts(&self, compact: bool) -> Vec<(Tone, String)> {
+    pub fn banner_parts(&self, compact: bool, lang: Lang) -> Vec<(Tone, String)> {
         if !self.installed {
-            return vec![(
-                Tone::Bad,
-                "zevbox n'est pas installé : lancez Première installation".to_string(),
-            )];
+            return vec![(Tone::Bad, lang.t(Msg::BannerNotInstalled).to_string())];
         }
         let mut parts = vec![(Tone::Body, "zevbox ─ ".to_string())];
         for (i, a) in self.agents.iter().enumerate() {
@@ -142,14 +140,14 @@ impl Snapshot {
             parts.push((Tone::Body, format!("{} ", a.display)));
             parts.push(match &a.version {
                 Some(v) => (Tone::Good, v.clone()),
-                None => (Tone::Bad, "non installé".to_string()),
+                None => (Tone::Bad, lang.t(Msg::NotInstalled).to_string()),
             });
         }
         let running = match (self.instances.len(), compact) {
-            (0, false) => "aucun agent en cours".to_string(),
-            (1, false) => "1 agent en cours".to_string(),
-            (n, false) => format!("{n} agents en cours"),
-            (n, true) => format!("{n} en cours"),
+            (0, false) => lang.t(Msg::RunningNone).to_string(),
+            (1, false) => lang.t(Msg::RunningOne).to_string(),
+            (n, false) => lang.f(Msg::RunningMany, &[&n.to_string()]),
+            (n, true) => lang.f(Msg::RunningShort, &[&n.to_string()]),
         };
         parts.push((Tone::Body, format!(" ─ {running}")));
         parts
@@ -206,7 +204,7 @@ mod tests {
             ..Snapshot::default()
         };
         assert_eq!(
-            snap.banner(),
+            snap.banner(Lang::Fr),
             "zevbox ─ Claude 0.99.1 · Antigravity non installé ─ aucun agent en cours"
         );
         snap.instances = vec![
@@ -217,10 +215,12 @@ mod tests {
             };
             2
         ];
-        assert!(snap.banner().ends_with("─ 2 agents en cours"));
-        let parts = snap.banner_parts(false);
+        assert!(snap.banner(Lang::Fr).ends_with("─ 2 agents en cours"));
+        let parts = snap.banner_parts(false, Lang::Fr);
         assert_eq!(
-            snap.banner_parts(true).last().map(|(_, t)| t.as_str()),
+            snap.banner_parts(true, Lang::Fr)
+                .last()
+                .map(|(_, t)| t.as_str()),
             Some(" ─ 2 en cours")
         );
         assert!(parts.contains(&(Tone::Good, "0.99.1".to_string())));
@@ -228,10 +228,30 @@ mod tests {
     }
 
     #[test]
+    fn banner_in_english() {
+        let snap = Snapshot {
+            installed: true,
+            agents: vec![
+                agent("claude", "Claude", Some("0.99.1")),
+                agent("omlx", "oMLX", None),
+            ],
+            ..Snapshot::default()
+        };
+        assert_eq!(
+            snap.banner(Lang::En),
+            "zevbox ─ Claude 0.99.1 · oMLX not installed ─ no agent running"
+        );
+        assert_eq!(
+            Snapshot::default().banner(Lang::En),
+            "zevbox is not installed: run First-time setup"
+        );
+    }
+
+    #[test]
     fn banner_without_config_points_to_setup() {
         let snap = Snapshot::default();
         assert_eq!(
-            snap.banner(),
+            snap.banner(Lang::Fr),
             "zevbox n'est pas installé : lancez Première installation"
         );
     }
