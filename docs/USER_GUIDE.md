@@ -359,6 +359,21 @@ sequenceDiagram
 
 ---
 
+### What is in the agent's VM, and when it is updated
+
+- **The system**: the current Ubuntu release (not an LTS), chosen for recent Python, Node and
+  compilers.
+- **Tools already installed**, because agents use them all the time: Node and npm, Python 3
+  (`pip`, `venv`, `python`), `build-essential` (gcc, make), `git`, `ripgrep`, `curl`, `jq`,
+  `unzip`. Anything the agent installs itself during a session is gone at the next one: for a
+  tool you want to keep, use `zevbox tools add <package>`. For Python packages, the agent
+  creates a `python -m venv` environment (Ubuntu refuses `pip install` on the system Python).
+- **When it is updated**: only when you run `zevbox update` (or `zevbox tools add/remove`).
+  It then takes the latest Ubuntu and the latest version of each agent, tests the new image,
+  and keeps the previous one for `zevbox rollback`. Opening a thread in Zed never updates
+  anything: it starts the image already built. Run `zevbox update --check` from time to time
+  to see whether a new agent version is out.
+
 ## 6. Do / don't
 
 | ✅ Do | ❌ Don't |
