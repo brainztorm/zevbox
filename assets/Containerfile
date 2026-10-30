@@ -7,10 +7,18 @@ ARG ZEVBOX_UID
 ARG ZEVBOX_GID
 # Each name is validated by zevbox (config::validate_apt_package) before being passed.
 ARG APT_PACKAGES=""
+ENV DEBIAN_FRONTEND=noninteractive
+# Base: current Ubuntu (DECISIONS 2026-10-30). Security updates at every build, and
+# the everyday tools of the agents' work (Node, npm, Python, compilers) included.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates git curl jq unzip python3 procps less ${APT_PACKAGES} \
+ && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends ca-certificates git curl jq unzip procps less \
+      nodejs npm python3 python3-pip python3-venv python-is-python3 build-essential ripgrep \
+      ${APT_PACKAGES} \
  && rm -rf /var/lib/apt/lists/*
-RUN (getent group nobody || groupadd -r nobody) \
+# Ubuntu ships a user `ubuntu` (uid 1000): free the host uid if it is taken.
+RUN (! getent passwd ${ZEVBOX_UID} >/dev/null || userdel "$(getent passwd ${ZEVBOX_UID} | cut -d: -f1)") \
+ && (getent group nobody || groupadd -r nobody) \
  && (getent group ${ZEVBOX_GID} || groupadd -g ${ZEVBOX_GID} agent) \
  && useradd -u ${ZEVBOX_UID} -g ${ZEVBOX_GID} -M -d /home/agent -s /bin/bash agent \
  && mkdir -p /home/agent && chown ${ZEVBOX_UID}:${ZEVBOX_GID} /home/agent
@@ -18,9 +26,11 @@ RUN (getent group nobody || groupadd -r nobody) \
 COPY zevbox-release.json /etc/zevbox-release.json
 
 FROM base AS claude
-COPY package.json package-lock.json /opt/zevbox/claude/
-# No --omit=optional: the native Claude binary is an optional dependency (F6).
-RUN cd /opt/zevbox/claude && npm ci \
+COPY package.json /opt/zevbox/claude/
+# package.json names the exact adapter version; npm resolves its dependencies here,
+# with the image's Node. No --omit=optional: the native Claude binary is an
+# optional dependency (F6).
+RUN cd /opt/zevbox/claude && npm install --no-audit --no-fund \
  && test -x node_modules/.bin/claude-agent-acp
 
 FROM base AS antigravity

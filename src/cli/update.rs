@@ -6,7 +6,7 @@ use crate::paths::Paths;
 use crate::release::{
     build_image, fetch_manifest, load_active, new_release_id, parse_antigravity_manifest,
     parse_claude_manifest, prepare_context, promote, rollback, run_smoke_test, save_active,
-    save_lock, ReleaseLock, BASE_IMAGE,
+    save_lock, ReleaseLock, BASE_IMAGE_TAG,
 };
 use crate::supervisor::{EXIT_ERROR, EXIT_OK, EXIT_PRECONDITION, EXIT_USAGE};
 
@@ -27,6 +27,8 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
     let mut built = false;
     // Agents whose update failed: the exit code must say so (ARGON review 3.3).
     let mut failures = 0u32;
+    // Pulled once, at the first build (never for --check).
+    let mut base_image: Option<String> = None;
 
     for agent_spec in target_agents {
         let (url, sha, text) = match fetch_manifest(agent_spec.registry_id) {
@@ -134,6 +136,21 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
         let context_dir = paths.release_dir(&release_id).join("context");
         let build_log = paths.release_dir(&release_id).join("build.log");
 
+        if base_image.is_none() {
+            let cli = crate::container::ContainerCli::new(config.container_binary.clone());
+            match cli.pull_pinned(BASE_IMAGE_TAG).await {
+                Ok(pinned) => base_image = Some(pinned),
+                Err(e) => {
+                    crate::ui::err(&format!(
+                        "{}: cannot fetch the base image {BASE_IMAGE_TAG}: {e}. Fix: check the network, then run 'zevbox update' again.",
+                        agent_spec.display
+                    ));
+                    failures += 1;
+                    continue;
+                }
+            }
+        }
+
         let mut lock = ReleaseLock {
             schema_version: 1,
             release_id: release_id.clone(),
@@ -142,7 +159,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
             registry_manifest_url: url,
             registry_manifest_sha256: sha,
             agent_version: version.clone(),
-            base_image: BASE_IMAGE.to_string(),
+            base_image: base_image.clone().unwrap_or_default(),
             apt_packages: tools.apt.clone(),
             npm_package: npm_pkg,
             archive_url: archive_url.clone(),
@@ -154,7 +171,7 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
             smoke_test: None,
         };
 
-        if let Err(e) = prepare_context(&context_dir, &lock, &config.container_binary) {
+        if let Err(e) = prepare_context(&context_dir, &lock) {
             crate::ui::err(&format!(
                 "{}: prepare context failed: {e}",
                 agent_spec.display

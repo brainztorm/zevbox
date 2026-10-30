@@ -9,8 +9,10 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Stdio;
 
-pub const BASE_IMAGE: &str =
-    "node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392";
+/// Base of every agent image (DECISIONS 2026-10-30): the current Ubuntu release,
+/// not an LTS. Each `zevbox update` pulls this tag again and records the digest
+/// it got in the lock (`baseImage`), so the base follows Ubuntu's releases.
+pub const BASE_IMAGE_TAG: &str = "docker.io/library/ubuntu:rolling";
 
 pub const CONTAINERFILE_TEMPLATE: &str = include_str!("../assets/Containerfile");
 
@@ -453,11 +455,7 @@ pub fn fetch_manifest(registry_id: &str) -> Result<(String, String, String), Rel
 }
 
 /// Prepares the build context for an update (§8.7 step 3).
-pub fn prepare_context(
-    context_dir: &Path,
-    lock: &ReleaseLock,
-    container_bin: &Path,
-) -> Result<(), ReleaseError> {
+pub fn prepare_context(context_dir: &Path, lock: &ReleaseLock) -> Result<(), ReleaseError> {
     ensure_private_dir(context_dir)
         .map_err(|e| ReleaseError::Store(format!("failed to create context dir: {e}")))?;
 
@@ -472,8 +470,9 @@ pub fn prepare_context(
 
     let target = crate::agents::build_target(&lock.agent);
     if target == "claude" {
-        let npm_pkg = lock
-            .npm_package
+        // The exact version: npm resolves the dependencies inside the build, with
+        // the image's own Node (DECISIONS 2026-10-30, Ubuntu base).
+        lock.npm_package
             .as_deref()
             .ok_or_else(|| ReleaseError::Store("missing npmPackage in lock".to_string()))?;
         let package_json = serde_json::json!({
@@ -486,33 +485,6 @@ pub fn prepare_context(
             .map_err(|e| ReleaseError::Store(format!("failed to serialize package.json: {e}")))?;
         write_atomic(&context_dir.join("package.json"), &pkg_bytes)
             .map_err(|e| ReleaseError::Store(format!("failed to write package.json: {e}")))?;
-
-        let out = std::process::Command::new(container_bin)
-            .args([
-                "run",
-                "--rm",
-                "--mount",
-                &format!("type=bind,source={},target=/w", context_dir.display()),
-                "-w",
-                "/w",
-                &lock.base_image,
-                "npm",
-                "install",
-                "--package-lock-only",
-                "--ignore-scripts",
-                npm_pkg,
-            ])
-            .output()
-            .map_err(|e| {
-                ReleaseError::Build(format!("failed to generate package-lock.json: {e}"))
-            })?;
-
-        if !out.status.success() {
-            return Err(ReleaseError::Build(format!(
-                "npm install --package-lock-only failed: {}",
-                String::from_utf8_lossy(&out.stderr)
-            )));
-        }
     } else if target == "antigravity" {
         let archive_url = lock
             .archive_url

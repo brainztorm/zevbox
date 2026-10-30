@@ -148,7 +148,8 @@ Documentation en français : **[docs/fr/](docs/fr/README.md)**.
   the first prompt then waits while the server loads the model. The default mode is **Bypass
   permissions**: the agent never asks (it only acts inside its VM and your project).
 - **Interactive shell in the agent's VM**: `zevbox shell claude`
-- **Extra Linux tools (apt packages) in the VMs**: `zevbox tools add ripgrep clang`
+- **What the VMs already have**: current Ubuntu with Node/npm, Python 3 (`pip`, `venv`), `build-essential`, `git`, `ripgrep`, `curl`, `jq`.
+- **Extra Linux tools (apt packages) in the VMs**: `zevbox tools add tree clang`
 - **Check and diagnose**: `zevbox status` · `zevbox doctor`
 - **Stop every running instance**: `zevbox stop`
 
@@ -172,7 +173,7 @@ Documentation en français : **[docs/fr/](docs/fr/README.md)**.
 | `zevbox logs [ID] [--path]` | Shows the last 200 lines of the most recent session log, or of the given ID. `--path` prints the log file path. Each launch writes its journal there: the container's stderr plus zevbox's own events (`launch agent=… container=…`, `blocked method=<m> dir=<d>` for every refused ACP method, `shutdown …`) at level `info` (`RUST_LOG=debug` for more; for the other commands `RUST_LOG` prints to stderr). Names, paths and ids only: never a prompt, a file's content or a token (I9). `zevbox doctor` lists the refused methods found in the journals of the last 7 days. |
 | `zevbox update [--check] [--agent <agent>]` | Checks for or builds a new agent release from the official ACP registry, runs the smoke test and promotes it. Without `--agent`: Claude and Antigravity, plus oMLX if it is installed. Exits with code 1 if any agent's update failed (it then changes nothing for that agent). After a build, the same image cleanup as `clean --images` runs, and the release folders/archives are always tidied. |
 | `zevbox rollback [--agent <agent>]` | Swaps the active release (`current`) with the previous one; refuses, with the fix to run, if the previous release's image no longer exists. |
-| `zevbox tools list` / `add <pkgs…>` / `remove <pkgs…>` | Manages extra Debian packages (`tools.json`) and rebuilds the active agent images like `update` does, so each agent also moves to its latest version. |
+| `zevbox tools list` / `add <pkgs…>` / `remove <pkgs…>` | Manages extra Ubuntu (apt) packages (`tools.json`) and rebuilds the active agent images like `update` does, so each agent also moves to its latest version. |
 
 ---
 
