@@ -231,6 +231,41 @@ impl Invocation {
     }
 }
 
+/// Kind of a line of the description panel; the drawing picks the colour
+/// (one meaning per colour, docs/SPEC_console.md §3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tone {
+    Body,
+    /// Secondary text: duration, network, the `Commande :` line.
+    Dim,
+    /// OK: « connecté ».
+    Good,
+    /// Attention: « non connecté ».
+    Bad,
+}
+
+/// One logical line of the description panel (wrapped when drawn).
+pub type PanelLine = (Tone, String);
+
+fn line(tone: Tone, text: impl Into<String>) -> PanelLine {
+    (tone, text.into())
+}
+
+/// Right panel of a submenu: its explanation and what it contains.
+pub fn menu_panel(menu: &Menu) -> Vec<PanelLine> {
+    let mut lines = vec![
+        line(Tone::Body, menu.description),
+        line(Tone::Body, ""),
+        line(Tone::Dim, "Contient :"),
+    ];
+    lines.extend(
+        menu.children
+            .iter()
+            .map(|c| line(Tone::Body, format!("  · {}", c.label()))),
+    );
+    lines
+}
+
 /// When a leaf asks « Êtes-vous sûr ? » (§6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfirmRule {
@@ -276,31 +311,34 @@ impl Action {
         }
     }
 
+    /// Plain-words explanation for a non-expert (feedback 👤 2026-10-30): what it
+    /// does, when to use it, what it changes and what it leaves alone. Facts
+    /// from the commands themselves and docs/USER_GUIDE.md.
     pub fn description(self) -> &'static str {
         match self {
-            Action::Status => "Liste les agents lancés par Zed : identifiant, agent, projet, état.",
-            Action::StopOne => "Arrête un agent choisi dans la liste : sa VM est arrêtée et supprimée.",
-            Action::StopAll => "Arrête tous les agents zevbox en cours et supprime leurs VM.",
-            Action::Logs => "Affiche la fin du journal d'une session (noms, chemins, tailles ; jamais le contenu des messages).",
-            Action::UpdateCheck => "Compare les versions installées avec celles du registre ACP, sans rien changer.",
-            Action::UpdateAll => "Télécharge les nouvelles versions, construit et teste les images, puis les active.",
-            Action::UpdateAgent => "Met à jour un seul agent : construction, test, puis activation.",
-            Action::Rollback => "Réactive la release précédente d'un agent.",
-            Action::AuthStatus => "Indique pour chaque agent s'il est connecté.",
-            Action::AuthClaude => "Connexion à votre compte Claude, dans la VM : copiez l'adresse affichée dans le navigateur, puis collez le code.",
-            Action::AuthAntigravity => "Connexion à votre compte Google pour Antigravity, dans la VM.",
-            Action::AuthOmlx => "Relie l'agent oMLX à votre serveur d'inférence : adresse, clé (masquée) et modèle par défaut.",
-            Action::ToolsList => "Liste les paquets apt ajoutés aux images des agents.",
-            Action::ToolsAdd => "Ajoute des paquets apt aux images, puis reconstruit et met à jour les agents installés.",
-            Action::ToolsRemove => "Retire un paquet apt des images, puis reconstruit et met à jour les agents installés.",
-            Action::Doctor => "Vérifie toute l'installation et indique comment corriger chaque problème.",
-            Action::Clean => "Supprime les restes : instances orphelines, anciens journaux et sauvegardes.",
-            Action::CleanImages => "Comme « Faire le ménage », et supprime aussi les images des anciennes versions.",
-            Action::ZedDryRun => "Montre les entrées agent_servers que zevbox écrirait dans les réglages de Zed, sans rien écrire.",
-            Action::ZedInstall => "Ajoute ou met à jour les entrées zevbox dans les réglages de Zed (avec sauvegarde).",
-            Action::ZedUninstall => "Retire les entrées zevbox des réglages de Zed (avec sauvegarde).",
-            Action::Shell => "Ouvre un shell Linux dans une VM jetable identique à celle de l'agent, sur un projet.",
-            Action::Setup => "Installation guidée : dossier d'état, images, connexions, entrées Zed. Peut être relancée sans risque.",
+            Action::Status => "Liste les agents en cours : leur identifiant (8 caractères), leur état, l'agent, le nom de sa VM et le projet ouvert. Un agent « orphan » est un reste qui ne tourne plus : « Faire le ménage » le supprime. Ne change rien.",
+            Action::StopOne => "Arrête l'agent choisi : sa VM est arrêtée puis supprimée. Le thread ouvert dans Zed avec cet agent est coupé. Votre projet n'est pas touché : ce que l'agent y a déjà écrit reste. Ouvrez un nouveau thread dans Zed pour repartir avec une VM neuve.",
+            Action::StopAll => "Arrête tous les agents zevbox de cette installation et supprime leurs VM. Tous les threads ouverts dans Zed avec un agent zevbox sont coupés ; vos projets ne sont pas touchés. Utile en fin de journée pour libérer mémoire et processeur. Vos autres conteneurs ne sont jamais arrêtés.",
+            Action::Logs => "Affiche les 200 dernières lignes du journal d'une session : démarrage, arrêt, méthodes refusées par le filtre, erreurs. Le journal ne contient jamais vos messages ni vos jetons : seulement des noms, chemins, identifiants et tailles. « La plus récente » = la dernière session. Ne change rien.",
+            Action::UpdateCheck => "Demande au registre ACP la dernière version de chaque agent et la compare à la version installée. Ne télécharge rien et ne change rien : à faire de temps en temps pour savoir s'il vaut la peine de « Tout mettre à jour ».",
+            Action::UpdateAll => "Construit une image neuve pour Claude, Antigravity et oMLX s'il est installé : dernière Ubuntu, dernière version de l'agent, vos outils ajoutés. Chaque image est testée avant d'être activée ; l'ancienne devient la version « précédente » (retour possible). Les threads déjà ouverts dans Zed gardent l'ancienne image jusqu'à leur fermeture.",
+            Action::UpdateAgent => "Comme « Tout mettre à jour », pour un seul agent : image neuve (dernière Ubuntu, dernière version de l'agent, vos outils), testée puis activée ; l'ancienne reste la version « précédente ». Installe aussi un agent qui ne l'est pas encore. Les threads déjà ouverts gardent l'ancienne image.",
+            Action::Rollback => "Réactive la version « précédente » de l'agent, celle d'avant la dernière mise à jour. Instantané : rien n'est téléchargé ni reconstruit. Un seul cran : les deux versions sont échangées, donc refaire « Revenir » ramène la plus récente. Les prochains threads ouverts dans Zed utilisent la version choisie.",
+            Action::AuthStatus => "Indique pour Claude, Antigravity et oMLX : « authenticated » (connecté), « not authenticated » (à connecter) ou « unknown » (agent pas encore installé). Ne change rien.",
+            Action::AuthClaude => "La connexion se fait dans une VM jetable qui ne voit aucun de vos dossiers. Une adresse https://claude.com/… s'affiche : ouvrez-la dans le navigateur du Mac (il ne s'ouvre pas tout seul), connectez-vous avec votre abonnement Claude, puis collez le code affiché. Le jeton est rangé dans le dossier d'état de zevbox, jamais dans votre ~/.claude.",
+            Action::AuthAntigravity => "Un petit serveur s'ouvre sur votre Mac (127.0.0.1 seulement) et le navigateur affiche la connexion Google : choisissez votre compte Google AI Pro et autorisez (5 minutes au plus). Le jeton est rangé dans le dossier d'état de zevbox ; le trousseau macOS n'est jamais touché.",
+            Action::AuthOmlx => "Relie l'agent oMLX à votre serveur de modèles (par exemple un Mac Studio) : son adresse, sa clé d'API (masquée, jamais sur la ligne de commande) et le modèle par défaut. Le Mac vérifie l'adresse et la clé et liste les modèles, puis zevbox écrit les réglages et vérifie qu'une VM atteint le serveur. Votre abonnement Claude n'est pas utilisé.",
+            Action::ToolsList => "Liste les paquets Ubuntu (apt) que vous avez ajoutés aux images des agents. Les outils de base (Node, Python, git, ripgrep, jq, curl, compilateurs) n'y figurent pas : ils sont toujours là. Ne change rien.",
+            Action::ToolsAdd => "Ajoute un ou plusieurs paquets Ubuntu (noms apt, par exemple « tree clang »), puis reconstruit l'image de chaque agent installé, ce qui le met aussi à sa dernière version, comme « Tout mettre à jour ». Les paquets sont ensuite là à chaque session. Les threads déjà ouverts gardent l'ancienne image.",
+            Action::ToolsRemove => "Retire un paquet de la liste, puis reconstruit l'image de chaque agent installé, qui passe aussi à sa dernière version. Les threads déjà ouverts dans Zed gardent l'ancienne image jusqu'à leur fermeture.",
+            Action::Doctor => "Vérifie toute l'installation : configuration, Apple Container (présent et démarré), image et connexion de chaque agent, place prise par les images, droits des dossiers, binaire installé, entrées dans Zed, agents orphelins, méthodes refusées par le filtre ces 7 derniers jours. Chaque problème vient avec la commande qui le corrige. Ne change rien.",
+            Action::Clean => "Supprime les restes : agents orphelins et leurs VM, VM zevbox qui ne sont plus enregistrées ; garde les 30 derniers journaux et les 20 dernières sauvegardes des réglages de Zed. Les agents en cours, les images et vos projets ne sont pas touchés.",
+            Action::CleanImages => "Comme « Faire le ménage », et en plus supprime les images des versions plus anciennes que la précédente, la VM de construction des images (son disque grossit avec le temps) et les anciens dossiers de version. La version actuelle et la précédente de chaque agent sont gardées : le retour en arrière reste possible.",
+            Action::ZedDryRun => "Montre les entrées « zevbox · … » qui seraient écrites dans les réglages de Zed, une par agent installé. N'écrit rien.",
+            Action::ZedInstall => "Écrit ou met à jour les entrées « zevbox · … » dans ~/.config/zed/settings.json, une par agent installé. Le reste du fichier, commentaires compris, n'est pas touché, et une sauvegarde est faite avant. Utile si les agents zevbox manquent dans Zed.",
+            Action::ZedUninstall => "Retire les entrées « zevbox · … » des réglages de Zed (une sauvegarde est faite avant) : les agents zevbox disparaissent de Zed. Rien d'autre n'est supprimé : images, connexions et réglages zevbox restent ; « Installer les entrées zevbox » les remet.",
+            Action::Shell => "Ouvre un terminal Linux dans une VM jetable identique à celle de l'agent, sur le projet choisi : vous voyez exactement ce que voit l'agent. Le projet est monté (vos modifications y restent), .git est en lecture seule et .zed masqué. Tout le reste disparaît à la sortie (exit). Le projet doit être dans votre dossier personnel ou sur un disque externe.",
+            Action::Setup => "Installation guidée, à faire une fois au début (sans risque si on la relance) : crée le dossier d'état et la configuration, construit les images de Claude et Antigravity, propose de connecter les agents, ajoute les entrées dans Zed, démarre Apple Container si besoin, puis lance le diagnostic. oMLX, optionnel, se connecte à part.",
         }
     }
 
@@ -359,6 +397,33 @@ impl Action {
 
     /// §6: what asks « Êtes-vous sûr ? ». Read-only leaves, `clean`, `zed install`
     /// and `setup` never do.
+    /// Right panel of a leaf: explanation, connection state (sign-in leaves),
+    /// duration · network, then `Commande : zevbox …` with the choices so far.
+    pub fn panel(self, params: &Params, snap: &Snapshot) -> Vec<PanelLine> {
+        let mut lines = vec![line(Tone::Body, self.description())];
+        if let Some(agent) = self.auth_agent() {
+            lines.push(line(Tone::Body, ""));
+            lines.push(if snap.is_authenticated(agent) {
+                line(Tone::Good, "État : connecté")
+            } else {
+                line(Tone::Bad, "État : non connecté")
+            });
+        }
+        if let Some(cost) = self.cost() {
+            lines.push(line(Tone::Body, ""));
+            lines.push(line(Tone::Dim, cost));
+        }
+        if let Some(note) = self.cost_note(snap) {
+            lines.push(line(Tone::Body, note));
+        }
+        lines.push(line(Tone::Body, ""));
+        lines.push(line(
+            Tone::Dim,
+            format!("Commande : {}", self.preview(params)),
+        ));
+        lines
+    }
+
     /// The agent a « Se connecter » leaf logs in.
     pub fn auth_agent(self) -> Option<&'static str> {
         match self {
@@ -449,7 +514,7 @@ impl Action {
                 ),
                 Action::CleanImages => (
                     "Supprimer les anciennes images ?".to_string(),
-                    "Les images des anciennes versions sont effacées : revenir à l'une d'elles demandera de la reconstruire.".to_string(),
+                    "Les images plus anciennes que la version précédente et la VM de construction sont effacées ; la prochaine mise à jour recrée cette VM.".to_string(),
                 ),
                 Action::ZedUninstall => (
                     "Retirer les entrées zevbox de Zed ?".to_string(),
@@ -606,7 +671,7 @@ pub fn root() -> Menu {
         children: vec![
             menu(
                 "Agents en cours",
-                "Voir, arrêter et suivre les agents que Zed a lancés.",
+                "Chaque agent que Zed démarre tourne dans sa propre VM Linux, qui ne voit que le projet ouvert. Ici : voir les agents en cours, en arrêter un ou tous (le thread ouvert dans Zed est alors coupé), et lire le journal d'une session pour comprendre un problème.",
                 vec![
                     leaf(Action::Status),
                     leaf(Action::StopOne),
@@ -616,7 +681,7 @@ pub fn root() -> Menu {
             ),
             menu(
                 "Mises à jour",
-                "Nouvelles versions des agents : vérifier, installer, revenir en arrière.",
+                "Une mise à jour construit une image neuve par agent : dernière Ubuntu, dernière version de l'agent, vos outils ajoutés. Elle est testée avant d'être activée, et la version précédente est gardée pour y revenir. Rien ne se met à jour tout seul : seulement quand vous le demandez ici.",
                 vec![
                     leaf(Action::UpdateCheck),
                     leaf(Action::UpdateAll),
@@ -626,7 +691,7 @@ pub fn root() -> Menu {
             ),
             menu(
                 "Connexion des agents",
-                "Connecter chaque agent à son compte (Claude, Antigravity) ou à votre serveur (oMLX).",
+                "Chaque agent se connecte une fois : Claude à votre abonnement Claude, Antigravity à votre compte Google, oMLX à votre propre serveur de modèles. Les jetons restent dans le dossier d'état de zevbox : ni votre ~/.claude ni le trousseau macOS ne sont utilisés.",
                 vec![
                     leaf(Action::AuthStatus),
                     leaf(Action::AuthClaude),
@@ -636,7 +701,7 @@ pub fn root() -> Menu {
             ),
             menu(
                 "Outils Linux",
-                "Paquets apt ajoutés aux images des agents.",
+                "Les VM des agents ont déjà Node, Python, git, ripgrep, jq, curl et les outils de compilation. S'il faut un autre paquet Ubuntu (apt), ajoutez-le ici : il est intégré aux images et présent à chaque session. Ce que l'agent installe lui-même disparaît à la session suivante.",
                 vec![
                     leaf(Action::ToolsList),
                     leaf(Action::ToolsAdd),
@@ -645,7 +710,7 @@ pub fn root() -> Menu {
             ),
             menu(
                 "Diagnostic et ménage",
-                "Vérifier l'installation et libérer de la place.",
+                "Vérifier que tout est en ordre (le diagnostic ne change rien) et libérer de la place : restes d'agents arrêtés, anciens journaux et, si vous le demandez, anciennes images.",
                 vec![
                     leaf(Action::Doctor),
                     leaf(Action::Clean),
@@ -654,7 +719,7 @@ pub fn root() -> Menu {
             ),
             menu(
                 "Zed",
-                "Les entrées zevbox dans les réglages de Zed (agent_servers).",
+                "zevbox ajoute ses agents (« zevbox · Claude », …) au menu des agents de Zed en écrivant dans ~/.config/zed/settings.json, avec une sauvegarde avant chaque changement. Ici : voir ce qui serait écrit, installer ces entrées ou les retirer.",
                 vec![
                     leaf(Action::ZedDryRun),
                     leaf(Action::ZedInstall),
@@ -869,6 +934,43 @@ mod tests {
             assert!(a.cost_note(&s).is_some_and(|n| n.contains("construit")));
         }
         assert_eq!(Action::Doctor.cost_note(&s), None);
+    }
+
+    #[test]
+    fn every_entry_has_a_full_description() {
+        let root = root();
+        for entry in &root.children {
+            if let Entry::Menu(m) = entry {
+                assert!(m.description.chars().count() >= 150, "{}", m.label);
+                let panel = menu_panel(m);
+                assert_eq!(panel.len(), 3 + m.children.len());
+            }
+        }
+        for a in all_actions(&root) {
+            assert!(a.description().chars().count() >= 100, "{a:?} is too short");
+            assert!(a.description().chars().count() <= 450, "{a:?} is too long");
+        }
+    }
+
+    #[test]
+    fn leaf_panel_ends_with_the_command_and_shows_the_connection() {
+        let p = Params::default();
+        let panel = Action::UpdateAll.panel(&p, &snap(&[]));
+        assert_eq!(
+            panel.last(),
+            Some(&(Tone::Dim, "Commande : zevbox update".to_string()))
+        );
+        assert!(panel
+            .iter()
+            .any(|(t, l)| *t == Tone::Dim && l.contains("réseau")));
+        let connected = Action::AuthClaude.panel(&p, &snap(&["claude"]));
+        assert!(connected.contains(&(Tone::Good, "État : connecté".to_string())));
+        let not = Action::AuthClaude.panel(&p, &snap(&[]));
+        assert!(not.contains(&(Tone::Bad, "État : non connecté".to_string())));
+        assert!(!Action::Doctor
+            .panel(&p, &snap(&[]))
+            .iter()
+            .any(|(_, l)| l.starts_with("État")));
     }
 
     #[test]

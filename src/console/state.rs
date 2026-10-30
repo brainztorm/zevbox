@@ -2,6 +2,7 @@
 //! (docs/SPEC_console.md §2, §3). Read only: every change goes through a
 //! `zevbox …` command; this module never writes.
 
+use super::menu::Tone;
 use crate::paths::Paths;
 
 /// One agent of `agents::AGENTS` as seen on disk.
@@ -117,24 +118,41 @@ impl Snapshot {
 
     /// The top line (§3): active version of each agent and number of instances.
     pub fn banner(&self) -> String {
+        self.banner_parts(false)
+            .into_iter()
+            .map(|(_, t)| t)
+            .collect()
+    }
+
+    /// The banner in pieces, each with its meaning: installed versions are OK
+    /// (green), « non installé » asks for attention (red). `compact` shortens
+    /// the running count (« 2 en cours ») when the full line does not fit.
+    pub fn banner_parts(&self, compact: bool) -> Vec<(Tone, String)> {
         if !self.installed {
-            return "zevbox n'est pas installé : lancez Première installation".to_string();
+            return vec![(
+                Tone::Bad,
+                "zevbox n'est pas installé : lancez Première installation".to_string(),
+            )];
         }
-        let versions = self
-            .agents
-            .iter()
-            .map(|a| match &a.version {
-                Some(v) => format!("{} {v}", a.display),
-                None => format!("{} non installé", a.display),
-            })
-            .collect::<Vec<_>>()
-            .join(" · ");
-        let running = match self.instances.len() {
-            0 => "aucun agent en cours".to_string(),
-            1 => "1 agent en cours".to_string(),
-            n => format!("{n} agents en cours"),
+        let mut parts = vec![(Tone::Body, "zevbox ─ ".to_string())];
+        for (i, a) in self.agents.iter().enumerate() {
+            if i > 0 {
+                parts.push((Tone::Body, " · ".to_string()));
+            }
+            parts.push((Tone::Body, format!("{} ", a.display)));
+            parts.push(match &a.version {
+                Some(v) => (Tone::Good, v.clone()),
+                None => (Tone::Bad, "non installé".to_string()),
+            });
+        }
+        let running = match (self.instances.len(), compact) {
+            (0, false) => "aucun agent en cours".to_string(),
+            (1, false) => "1 agent en cours".to_string(),
+            (n, false) => format!("{n} agents en cours"),
+            (n, true) => format!("{n} en cours"),
         };
-        format!("zevbox ─ {versions} ─ {running}")
+        parts.push((Tone::Body, format!(" ─ {running}")));
+        parts
     }
 }
 
@@ -200,6 +218,13 @@ mod tests {
             2
         ];
         assert!(snap.banner().ends_with("─ 2 agents en cours"));
+        let parts = snap.banner_parts(false);
+        assert_eq!(
+            snap.banner_parts(true).last().map(|(_, t)| t.as_str()),
+            Some(" ─ 2 en cours")
+        );
+        assert!(parts.contains(&(Tone::Good, "0.99.1".to_string())));
+        assert!(parts.contains(&(Tone::Bad, "non installé".to_string())));
     }
 
     #[test]

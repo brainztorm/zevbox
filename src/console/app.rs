@@ -4,8 +4,8 @@
 //! the child processes live in `mod.rs` and `runner.rs`.
 
 use super::menu::{
-    self, Action, AgentSet, Confirmation, Entry, InstanceChoice, Invocation, Menu, Params, Secret,
-    Step, TextField,
+    self, Action, AgentSet, Confirmation, Entry, InstanceChoice, Invocation, Menu, PanelLine,
+    Params, Secret, Step, TextField,
 };
 use super::state::Snapshot;
 use super::text;
@@ -235,9 +235,20 @@ pub struct App {
     pub confirm: Option<ConfirmDialog>,
     /// Quit once the running command has ended (interrupt then quit).
     pub quit_after_run: bool,
+    /// Rows of the description scrolled with PgUp/PgDn (reset on every move).
+    pub desc_scroll: usize,
     /// Columns and rows of the output body, set by the main loop from the
     /// terminal size (`ui::output_body_size`): scrolling stops at the first row.
     pub output_body: (usize, usize),
+}
+
+/// Panel receiving the keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Focus {
+    /// The menu on the left.
+    Menu,
+    /// The action on the right (choice, text, output, question).
+    Action,
 }
 
 fn is_ctrl_c(key: &KeyEvent) -> bool {
@@ -254,6 +265,7 @@ impl App {
             view: View::Menu,
             confirm: None,
             quit_after_run: false,
+            desc_scroll: 0,
             output_body: (0, 0),
         }
     }
@@ -280,10 +292,44 @@ impl App {
                 menu = m;
             }
         }
-        if let View::Wizard(w) = &self.view {
-            parts.push(w.action.label());
-        }
         parts.join(" › ")
+    }
+
+    /// Which panel receives the keys (drawn with a blue border, §3): the menu on
+    /// the left, or, once an action is open (choice, text, output, question),
+    /// the right panel.
+    pub fn focus(&self) -> Focus {
+        match self.view {
+            View::Menu => Focus::Menu,
+            View::Wizard(_) | View::Output(_) => Focus::Action,
+        }
+    }
+
+    /// The description shown on the right (menu view, or an action being set up).
+    pub fn panel_lines(&self) -> Vec<PanelLine> {
+        match &self.view {
+            View::Wizard(w) => w.action.panel(&w.params, &self.snap),
+            _ => match self.selected_entry() {
+                Some(Entry::Menu(m)) => menu::menu_panel(m),
+                Some(Entry::Leaf(a)) => a.panel(&Params::default(), &self.snap),
+                None => Vec::new(),
+            },
+        }
+    }
+
+    /// Highest useful [`App::desc_scroll`] for the panel size known so far.
+    pub fn desc_max_scroll(&self) -> usize {
+        let (columns, rows) = self.output_body;
+        let lines = self.panel_lines();
+        if columns == 0 {
+            return lines.len();
+        }
+        let total: usize = lines
+            .iter()
+            .map(|(_, l)| text::wrap_words(l, columns).len())
+            .sum();
+        // The description has the output's status row too.
+        total.saturating_sub(rows + 1)
     }
 
     pub fn is_running(&self) -> bool {
@@ -339,6 +385,19 @@ impl App {
 
     fn menu_key(&mut self, key: KeyEvent) -> Effect {
         let len = self.current_menu().children.len().max(1);
+        let page = self.output_body.1.max(1);
+        if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
+            // PgUp/PgDn read a description longer than the panel; the menu keeps
+            // the arrows.
+            let max = self.desc_max_scroll();
+            self.desc_scroll = if key.code == KeyCode::PageDown {
+                (self.desc_scroll + page).min(max)
+            } else {
+                self.desc_scroll.min(max).saturating_sub(page)
+            };
+            return Effect::None;
+        }
+        self.desc_scroll = 0;
         match key.code {
             _ if is_ctrl_c(&key) => Effect::Quit,
             KeyCode::Char('q') => Effect::Quit,
@@ -715,6 +774,11 @@ impl App {
 
     pub fn push_line(&mut self, kind: LineKind, text: String) {
         if let View::Output(o) = &mut self.view {
+            // stderr: same colour as stdout (no fourth colour, §3), marked by « ! ».
+            let text = match kind {
+                LineKind::Err => format!("! {text}"),
+                _ => text,
+            };
             o.lines.push((kind, text));
             if o.lines.len() > MAX_OUTPUT_LINES {
                 o.lines.remove(0);
@@ -739,21 +803,30 @@ impl App {
     }
 
     /// Bottom line (§3): the keys valid here.
+    /// Bottom line (§3): where the keys go, then the keys valid there.
     pub fn keys_hint(&self) -> &'static str {
         if self.confirm.is_some() {
-            return "←→ Tab choisir · Entrée valider · Échap non";
+            return "Question : ←→ Tab choisir Oui/Non · Entrée valider · Échap = Non";
         }
         match &self.view {
             View::Menu if self.path.is_empty() => {
-                "↑↓ choisir · Entrée ouvrir/lancer · Échap quitter · q quitter"
+                "Menu : ↑↓ choisir · Entrée ouvrir · PgUp/PgDn texte · Échap/q quitter"
             }
-            View::Menu => "↑↓ choisir · Entrée ouvrir/lancer · Échap retour · q quitter",
-            View::Wizard(w) if w.text.is_some() => "Entrée valider · Échap retour · Ctrl-C quitter",
-            View::Wizard(_) => "↑↓ choisir · Entrée valider · Échap retour · q quitter",
+            View::Menu => {
+                "Menu : ↑↓ choisir · Entrée ouvrir · PgUp/PgDn texte · Échap retour · q quitter"
+            }
+            View::Wizard(w) if w.text.is_some() => {
+                "Saisie : tapez le texte · Entrée valider · Échap retour · Ctrl-C quitter"
+            }
+            View::Wizard(_) => {
+                "Liste à droite : ↑↓ choisir · Entrée valider · Échap retour · q quitter"
+            }
             View::Output(o) if matches!(o.status, RunStatus::Running { .. }) => {
-                "↑↓ PgUp PgDn défiler · Échap interrompre"
+                "Sortie à droite : ↑↓ PgUp PgDn défiler · Échap interrompre"
             }
-            View::Output(_) => "↑↓ PgUp PgDn défiler · Échap retour · q quitter",
+            View::Output(_) => {
+                "Sortie à droite : ↑↓ PgUp PgDn défiler · Échap revenir au menu · q quitter"
+            }
         }
     }
 }
@@ -858,6 +931,75 @@ mod tests {
         assert_eq!(app.path, [1]);
         assert_eq!(press(&mut app, &[KeyCode::Esc]), Effect::None);
         assert_eq!(press(&mut app, &[KeyCode::Esc]), Effect::Quit);
+    }
+
+    #[test]
+    fn focus_moves_to_the_right_inside_an_action() {
+        let mut app = App::new(snap());
+        assert_eq!(app.focus(), Focus::Menu);
+        press(&mut app, &[KeyCode::Enter]);
+        assert_eq!(app.focus(), Focus::Menu, "a submenu is still the menu");
+        assert!(app.keys_hint().starts_with("Menu :"));
+        press(&mut app, &[KeyCode::Down, KeyCode::Enter]); // Arrêter un agent: picker
+        assert_eq!(app.focus(), Focus::Action);
+        assert!(app.keys_hint().starts_with("Liste à droite :"));
+        press(&mut app, &[KeyCode::Esc]);
+        assert_eq!(app.focus(), Focus::Menu);
+        let _ = app.open_action(Action::Doctor);
+        assert_eq!(app.focus(), Focus::Action);
+        assert!(app.keys_hint().starts_with("Sortie à droite :"));
+    }
+
+    #[test]
+    fn every_key_hint_fits_in_80_columns() {
+        let mut app = App::new(snap());
+        let mut hints = vec![app.keys_hint()];
+        press(&mut app, &[KeyCode::Enter]);
+        hints.push(app.keys_hint());
+        let _ = app.open_action(Action::StopOne);
+        hints.push(app.keys_hint());
+        let _ = app.open_action(Action::ToolsAdd);
+        hints.push(app.keys_hint());
+        let _ = app.open_action(Action::StopAll);
+        hints.push(app.keys_hint());
+        app.confirm = None;
+        let _ = app.open_action(Action::Doctor);
+        hints.push(app.keys_hint());
+        app.finished(Outcome::Success);
+        hints.push(app.keys_hint());
+        for h in hints {
+            assert!(text::width(h) <= 78, "{h}");
+        }
+    }
+
+    #[test]
+    fn page_keys_scroll_a_long_description_and_arrows_reset_it() {
+        let mut app = App::new(snap());
+        app.output_body = (20, 5);
+        press(&mut app, &[KeyCode::PageDown]);
+        assert_eq!(app.desc_scroll, 5);
+        press(
+            &mut app,
+            &[KeyCode::PageDown, KeyCode::PageDown, KeyCode::PageDown],
+        );
+        assert_eq!(app.desc_scroll, app.desc_max_scroll(), "stops at the end");
+        assert!(app.desc_max_scroll() > 0);
+        press(&mut app, &[KeyCode::PageUp]);
+        assert_eq!(app.desc_scroll, app.desc_max_scroll() - 5);
+        assert_eq!(app.cursor(), 0, "PgUp/PgDn never move the menu");
+        press(&mut app, &[KeyCode::Down]);
+        assert_eq!(app.desc_scroll, 0);
+    }
+
+    #[test]
+    fn stderr_lines_are_marked() {
+        let mut app = App::new(snap());
+        let _ = app.open_action(Action::Doctor);
+        app.push_line(LineKind::Err, "zevbox: oops".to_string());
+        match &app.view {
+            View::Output(o) => assert_eq!(o.lines[0].1, "! zevbox: oops"),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]

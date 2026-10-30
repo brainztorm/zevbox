@@ -146,7 +146,7 @@ zevbox/
 │   ├── cli/ (mod.rs complet : clap + dispatch ; un fichier par commande, + auth_omlx.rs)
 │   ├── config.rs  fsutil.rs  tools.rs  instances.rs  container.rs
 │   ├── supervisor.rs  release.rs  zed_settings.rs  omlx.rs  guard.rs
-│   ├── console/ (mod.rs, menu.rs, app.rs, state.rs, ui.rs, runner.rs : `zevbox console`, 2026-10-30)
+│   ├── console/ (mod.rs, menu.rs, app.rs, state.rs, ui.rs, runner.rs, text.rs : `zevbox console`, 2026-10-30)
 │   └── relay/ (mod.rs, policy.rs, jsonrpc.rs)
 └── tests/ 🔒
     ├── common/mod.rs             # TestEnv : état temporaire, lance le vrai binaire avec le faux container
