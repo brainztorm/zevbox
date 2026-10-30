@@ -65,6 +65,9 @@ in the manifest.
   (`policy.rs` = pure security decisions, `jsonrpc.rs` helpers, `mod.rs` I/O loop)
 - `zed_settings.rs` JSONC edits of Zed `agent_servers` · `tools.rs` extra apt packages · `fsutil.rs`
 - `guard.rs` project watcher during `launch` (I13)
+- `console/` `zevbox console`, the full-screen French keyboard menu (`ratatui` + `crossterm`): `menu.rs` pure menu model
+  (labels, confirmations, argv per leaf), `app.rs` state and keys, `ui.rs` rendering, `runner.rs` child processes,
+  `state.rs` banner data. It reimplements no command: it runs `zevbox <cmd>` (spec `docs/SPEC_console.md`)
 
 ## Invariants (details: plan §3) — never weaken them to pass a test
 

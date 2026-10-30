@@ -77,7 +77,7 @@ make install
 ```bash
 zevbox --help
 ```
-*Vous devez voir s'afficher la liste des 14 commandes du projet (plus `help`).*
+*Vous devez voir s'afficher la liste des 15 commandes du projet (plus `help`), dont `console`.*
 
 ---
 
@@ -347,6 +347,57 @@ sequenceDiagram
   Zed ne met jamais rien à jour : il démarre l'image déjà construite. Lancez de temps en temps
   `zevbox update --check` pour savoir si une nouvelle version d'agent est sortie.
 
+### La console : un menu à la place des commandes
+
+Si vous préférez ne pas retenir les commandes et leurs options, lancez :
+
+```bash
+zevbox console
+```
+
+Un menu plein écran s'ouvre dans votre terminal (l'interface est en français ; la sortie des
+commandes reste en anglais). Il exige un terminal interactif et fonctionne aussi avant
+`zevbox setup`. Les commandes sont à gauche ; à droite, une description en clair, la durée, la
+nécessité du réseau et la ligne équivalente (`Commande : zevbox update --check`), pour apprendre
+la vraie commande au passage. Un bandeau en haut indique la version active de chaque agent et le
+nombre d'agents en cours.
+
+| Touche | Effet |
+|---|---|
+| Haut / Bas | se déplacer (la liste boucle) |
+| Entrée ou Droite | ouvrir un sous-menu ou lancer l'action |
+| Échap ou Gauche | revenir en arrière ; au premier niveau, quitter |
+| `q` ou Ctrl-C | quitter (`q` est une lettre normale pendant une saisie de texte) |
+| PgUp / PgDn, Haut / Bas | faire défiler la sortie d'une commande |
+
+Les menus : **Agents en cours** (état, arrêter un agent ou tous, lire le journal d'une session),
+**Mises à jour** (vérifier, tout mettre à jour ou un seul agent, revenir en arrière),
+**Connexion des agents** (état des connexions, Claude, Antigravity, oMLX), **Outils Linux**
+(voir, ajouter, retirer), **Diagnostic et ménage** (`doctor`, `clean`, `clean --images`),
+**Zed** (aperçu, installer, retirer les entrées), **Shell dans une VM** et **Première
+installation** (`setup`). Quand une action demande un choix (un agent, une instance en cours, un
+outil) ou un texte (noms de paquets, adresse, clé et modèle oMLX, projet d'un shell), la console
+le demande d'abord ; la clé oMLX est saisie masquée et transmise à la commande sur son entrée
+standard, jamais sur la ligne de commande (« Connecter oMLX » pré-remplit l'adresse et le modèle
+actuels ; une clé vide garde l'actuelle). Une valeur qui commence par `-` est refusée. `launch`
+n'est pas dans le menu : seul Zed le lance.
+
+Avant tout ce qui a un impact, la console demande **« Êtes-vous sûr ? »** avec la conséquence
+concrète et `[ Oui ] [ Non ]` ; **Non** est sélectionné par défaut, Échap vaut Non, et Gauche,
+Droite ou Tab changent de bouton. Elle demande avant d'arrêter un agent ou tous, de mettre à jour,
+de revenir en arrière, d'ajouter ou retirer un outil, `clean --images`, de retirer les entrées Zed,
+et de refaire la connexion d'un agent déjà connecté. Les actions de lecture, `clean`,
+`zed install` et `setup` s'exécutent sans demander.
+
+Chaque action lance la vraie commande `zevbox <commande>` comme processus enfant ; sa sortie
+s'affiche en direct dans le panneau de droite, et se termine par `✓ terminé`, `✗ échec (code N)`,
+`✗ échec (interrompue)` ou `✗ échec (impossible de lancer la commande)`. Pendant qu'elle tourne,
+Échap propose de l'interrompre : SIGTERM puis SIGKILL après 5 secondes, à la commande et à tout ce
+qu'elle a lancé.
+Les commandes interactives (connexions Claude et Antigravity, shell et `setup`) reçoivent tout le
+terminal : la console s'efface, la commande se déroule normalement, puis « Appuyez sur Entrée pour
+revenir à la console » ramène le menu.
+
 ## 6. Bonnes Pratiques : Ce qu'il faut faire / Ce qu'il ne faut PAS faire
 
 | ✅ Ce qu'il faut faire | ❌ Ce qu'il ne faut PAS faire |
@@ -430,6 +481,7 @@ sequenceDiagram
 
 | Action | Commande exacte |
 |---|---|
+| Ouvrir le menu au clavier (rien à retenir) | `zevbox console` |
 | Diagnostiquer l'état du système | `zevbox doctor` |
 | Construire / mettre à jour les images des agents | `zevbox update` |
 | Se connecter à Claude / à Google (Antigravity) | `zevbox auth claude` / `zevbox auth antigravity` |

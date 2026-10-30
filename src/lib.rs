@@ -6,6 +6,7 @@
 pub mod agents;
 pub mod cli;
 pub mod config;
+pub mod console;
 pub mod container;
 pub mod fsutil;
 pub mod guard;
