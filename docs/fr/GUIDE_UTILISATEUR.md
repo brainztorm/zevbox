@@ -332,6 +332,21 @@ sequenceDiagram
 
 ---
 
+### Ce qu'il y a dans la VM de l'agent, et quand c'est mis à jour
+
+- **Le système** : la version courante d'Ubuntu (pas une LTS), choisie pour avoir Python, Node
+  et des compilateurs récents.
+- **Outils déjà installés**, parce que les agents s'en servent sans arrêt : Node et npm,
+  Python 3 (`pip`, `venv`, `python`), `build-essential` (gcc, make), `git`, `ripgrep`, `curl`,
+  `jq`, `unzip`. Ce que l'agent installe lui-même pendant une session disparaît à la suivante :
+  pour garder un outil, utilisez `zevbox tools add <paquet>`. Pour les paquets Python, l'agent
+  crée un environnement `python -m venv` (Ubuntu refuse `pip install` sur le Python du système).
+- **Quand c'est mis à jour** : seulement quand vous lancez `zevbox update` (ou `zevbox tools
+  add/remove`). zevbox prend alors la dernière Ubuntu et la dernière version de chaque agent,
+  teste la nouvelle image et garde la précédente pour `zevbox rollback`. Ouvrir un thread dans
+  Zed ne met jamais rien à jour : il démarre l'image déjà construite. Lancez de temps en temps
+  `zevbox update --check` pour savoir si une nouvelle version d'agent est sortie.
+
 ## 6. Bonnes Pratiques : Ce qu'il faut faire / Ce qu'il ne faut PAS faire
 
 | ✅ Ce qu'il faut faire | ❌ Ce qu'il ne faut PAS faire |

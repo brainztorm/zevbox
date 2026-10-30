@@ -275,6 +275,23 @@ If a regression shows up, `zevbox rollback --agent <agent>` swaps `current` and 
 
 ---
 
+### The base image: current Ubuntu with the everyday tools (decision of 2026-10-30)
+
+- **Current Ubuntu, not an LTS** (`ubuntu:rolling`): recent Python, Node and compilers, which is
+  what agents expect when they run tests, scripts or builds. The price, a 9-month support
+  window per Ubuntu release, is paid automatically: every `zevbox update` pulls `ubuntu:rolling`
+  again and records its digest in the release lock, so the base moves to the next Ubuntu by
+  itself. `apt-get upgrade` runs at every build (security fixes).
+- **Everyday tools installed in every image**, because agents use them all the time and a
+  VM is disposable (anything installed during a session is gone at the next one): Node and
+  npm, Python 3 with `pip`, `venv` and `python` → `python3`, `build-essential` (gcc, make),
+  `git`, `ripgrep`, `curl`, `jq`, `unzip`, `procps`, `less`. Other tools: `zevbox tools add`.
+- **When the image changes**: only when you run `zevbox update` (or `zevbox tools add/remove`,
+  which rebuilds the same way). Opening a thread in Zed never downloads or rebuilds anything
+  (I10): it starts the image already built, so a launch is fast and always the same.
+- Ubuntu protects its system Python (PEP 668): agents install Python packages in a
+  `python -m venv` environment.
+
 ## 7. Claude vs Antigravity: two authentication flows
 
 Why does Claude sign in from inside the VM while Antigravity needs a host-side step?

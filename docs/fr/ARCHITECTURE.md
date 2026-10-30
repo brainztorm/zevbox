@@ -249,6 +249,26 @@ Si une régression apparaît, la commande `zevbox rollback --agent <agent>` inte
 
 ---
 
+### L'image de base : Ubuntu courante avec les outils de tous les jours (décision du 2026-10-30)
+
+- **Ubuntu courante, pas une LTS** (`ubuntu:rolling`) : Python, Node et compilateurs récents,
+  ce qu'attendent les agents quand ils lancent des tests, des scripts ou des compilations. Le
+  revers, 9 mois de maintenance par version d'Ubuntu, est réglé automatiquement : chaque
+  `zevbox update` retélécharge `ubuntu:rolling` et inscrit son empreinte dans le lock de la
+  release, donc la base passe d'elle-même à l'Ubuntu suivante. `apt-get upgrade` est fait à
+  chaque construction (correctifs de sécurité).
+- **Les outils de tous les jours sont installés dans chaque image**, parce que les agents s'en
+  servent sans arrêt et qu'une VM est jetable (ce qui est installé pendant une session disparaît
+  à la suivante) : Node et npm, Python 3 avec `pip`, `venv` et `python` → `python3`,
+  `build-essential` (gcc, make), `git`, `ripgrep`, `curl`, `jq`, `unzip`, `procps`, `less`.
+  Autres outils : `zevbox tools add`.
+- **Quand l'image change** : seulement quand vous lancez `zevbox update` (ou `zevbox tools
+  add/remove`, qui reconstruit de la même façon). Ouvrir un thread dans Zed ne télécharge ni ne
+  reconstruit jamais rien (I10) : il démarre l'image déjà construite, donc le lancement est
+  rapide et toujours identique.
+- Ubuntu protège le Python du système (PEP 668) : les agents installent leurs paquets Python
+  dans un environnement `python -m venv`.
+
 ## 7. Analyse Détaillée : Claude vs Antigravity
 
 Pourquoi Claude se connecte-t-il depuis l'intérieur de la VM alors qu'Antigravity nécessite une étape côté Mac ?
