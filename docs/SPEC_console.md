@@ -1,6 +1,6 @@
 # Spécification — `zevbox console` : interface plein écran au clavier
 
-- **Statut** : implémentée, fusionnée dans `main` en **version 0.2.0** (2026-10-30). Conception validée
+- **Statut** : implémentée, fusionnée dans `main` en **version 0.2.0** (2026-10-30) ; bilingue anglais/français depuis la **version 0.2.1** (même jour). Conception validée
   par 👤 le 2026-10-30 ; réponses par défaut du §1 acceptées après essai (« c'est très bien »),
   puis retours intégrés (explications, cadre bleu du panneau actif, trois couleurs).
 - **But** : ne plus avoir à retenir les commandes et leurs options. On lance `zevbox console` :
