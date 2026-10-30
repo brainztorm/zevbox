@@ -424,7 +424,7 @@ Codes de sortie : `0` succès, `1` erreur, `2` usage (clap), `3` prérequis manq
 | `zevbox logs [ID] [--path]` | Affiche les 200 dernières lignes du journal de l'instance (par défaut la plus récente) ; `--path` affiche seulement le chemin. **Journal implémenté le 2026-10-21** (revue ARGON 2.4) : `launch` initialise `tracing` vers `logs/<id>.log` (niveau `info`, ou `RUST_LOG` ; jamais stdout, I6) ; événements `launch agent=… release=… container=… project=…`, `blocked method=<m> dir=<d>` (nom nettoyé : 80 caractères `[A-Za-z0-9_./:-]` au plus), `shutdown relay_end=… container_gone=…` ; les autres commandes écrivent sur stderr seulement si `RUST_LOG` est défini. `doctor` (§8.6 point 10) compte les `blocked method=` des journaux. |
 | `zevbox update [--check] [--agent A]` | `--check` : compare la release active aux registres et n'écrit rien. Sans `--check` : candidate → build → smoke test → promotion (§8.7). **Code 1 si la mise à jour d'au moins un agent échoue** (les autres agents sont quand même traités ; amendement 2026-10-21, revue ARGON 3.3). |
 | `zevbox rollback --agent A` (`--agent` obligatoire, code 2 sinon ; aligné sur le code le 2026-10-29) | Échange `current` et `previous` ; **refuse (code 1) si l'image `previous` n'existe plus**, avec « Fix: run 'zevbox update --agent A' » (implémenté le 2026-10-21, revue ARGON 3.2). |
-| `zevbox tools list` / `tools add <paquet-apt>…` / `tools remove <paquet>…` | Modifie `tools.json` puis reconstruit les agents (candidate → tests → promotion). |
+| `zevbox tools list` / `tools add <paquet-apt>…` / `tools remove <paquet>…` | Modifie `tools.json` puis reconstruit chaque agent installé avec le pipeline `update` (candidate → tests → promotion), qui prend aussi la **dernière** version du client ACP (amendé le 2026-10-30, décision 👤 : backlog 1 abandonné ; le relais refuse toute méthode non auditée, et `rollback` reste possible). |
 
 `--agent` accepte `claude`, `antigravity` ou `omlx` ; sans option, la commande s'applique à `claude` et `antigravity`, et à `omlx` seulement s'il a déjà une release (agent optionnel, 2026-10-29). `setup` ne construit pas oMLX et ne le compte pas comme manquant.
 
@@ -535,7 +535,7 @@ Une **release** = un agent + des versions figées + une image construite et test
 }
 ```
 
-Pipeline `update` (et `tools add/remove`, qui réutilisent les versions actuelles au lieu de résoudre) :
+Pipeline `update` (aussi utilisé par `tools add/remove`, qui résolvent donc le registre comme `update` ; amendé le 2026-10-30, backlog 1 abandonné) :
 
 1. **Résoudre** : `curl --fail --silent --show-error --location --max-time 60 <url>` du manifeste (sortie lue directement, sha256 calculé). Valider : `id` attendu (`claude-acp` / `antigravity-acp`), présence de `distribution.npx.package` (Claude) ou de `distribution.binary["linux-aarch64"]` avec `archive` et `cmd` (Antigravity). Champ manquant → erreur explicite `registry schema changed: <champ>` ; l'agent est déclaré indisponible et la release active reste en place. Ne jamais fabriquer une URL à partir d'un numéro de version. Ne jamais utiliser `preview`.
 2. **Base** : `baseImage` = `node:22-bookworm-slim` figée par digest. Digest vérifié le 2026-10-13 avec `container image list --format json` (DECISIONS) ; constante `release::BASE_IMAGE`.

@@ -177,7 +177,7 @@ Documentation in English: **[README.md](../../README.md)**.
 | `zevbox logs [ID] [--path]` | Affiche les 200 dernières lignes du journal de la session la plus récente, ou de l'ID donné. `--path` affiche le chemin du fichier. Chaque lancement y écrit son journal : stderr du conteneur plus les événements de zevbox (`launch agent=… container=…`, `blocked method=<m> dir=<d>` pour chaque méthode ACP refusée, `shutdown …`) au niveau `info` (`RUST_LOG=debug` pour plus ; pour les autres commandes, `RUST_LOG` écrit sur stderr). Uniquement des noms, chemins et identifiants : jamais un prompt, le contenu d'un fichier ni un jeton (I9). `zevbox doctor` liste les méthodes refusées trouvées dans les journaux des 7 derniers jours. |
 | `zevbox update [--check] [--agent <agent>]` | Vérifie ou construit une nouvelle release depuis le registre ACP officiel, exécute le smoke test et la promeut. Sans `--agent` : Claude et Antigravity, plus oMLX s'il est installé. Sort avec le code 1 si la mise à jour d'un agent a échoué (rien n'est alors changé pour cet agent). Après une construction, fait le même ménage d'images que `clean --images`, et range toujours les dossiers et archives de releases. |
 | `zevbox rollback [--agent <agent>]` | Permute la release active (`current`) avec la précédente ; refuse, avec la commande à lancer, si l'image de la release précédente n'existe plus. |
-| `zevbox tools list` / `add <paquets…>` / `remove <paquets…>` | Gère les paquets Debian additionnels (`tools.json`) et reconstruit les images actives. |
+| `zevbox tools list` / `add <paquets…>` / `remove <paquets…>` | Gère les paquets Debian additionnels (`tools.json`) et reconstruit les images actives comme `update`, donc chaque agent passe aussi à sa dernière version. |
 
 ---
 
