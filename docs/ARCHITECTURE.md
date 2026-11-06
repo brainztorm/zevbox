@@ -1,8 +1,8 @@
-# zevbox — Architecture, Operation and Security
+# Zevbox — Architecture, Operation and Security
 
 **English** · [Français](fr/ARCHITECTURE.md)
 
-This document gives a detailed overview of **zevbox**: its design choices, its security model,
+This document gives a detailed overview of **Zevbox**: its design choices, its security model,
 and how the ACP relay and the Apple Container micro-VMs work together.
 
 ---
@@ -11,7 +11,7 @@ and how the ACP relay and the Apple Container micro-VMs work together.
 
 ### The problem with AI agents in the editor
 When an editor such as **Zed** integrates an AI agent through ACP (*Agent Client Protocol* —
-e.g. Claude Code or Google Antigravity; zevbox also offers oMLX, Claude Code on a local model server), the agent normally runs directly on your Mac with all
+e.g. Claude Code or Google Antigravity; Zevbox also offers oMLX, Claude Code on a local model server), the agent normally runs directly on your Mac with all
 of your user privileges. It can therefore:
 
 - read your SSH private keys (`~/.ssh/id_rsa`), cloud credentials (`~/.aws`,
@@ -20,8 +20,8 @@ of your user privileges. It can therefore:
   access);
 - modify personal files unrelated to the project you are working on.
 
-### The solution: zevbox
-zevbox fully isolates the agent inside an ephemeral **Apple Container Linux arm64 micro-VM**,
+### The solution: Zevbox
+Zevbox fully isolates the agent inside an ephemeral **Apple Container Linux arm64 micro-VM**,
 and places a **filtering relay** between Zed and the VM that inspects and neutralises every
 potentially dangerous call.
 
@@ -29,7 +29,7 @@ potentially dangerous call.
 flowchart LR
     subgraph Host ["Host Mac (macOS arm64)"]
         Zed["Zed editor"]
-        Zevbox["zevbox relay (Rust binary)"]
+        Zevbox["Zevbox relay (Rust binary)"]
         UserFS["Mac filesystem\n(~/.ssh, ~/.gemini, …)"]
         ProjectDir["Project directory\n(home folder or external disk)"]
         StateDir["Agent state directory\n(Application Support/zevbox/state)"]
@@ -51,7 +51,7 @@ flowchart LR
 
 ## 2. Why Apple Container micro-VMs?
 
-Choosing **Apple Container micro-VMs** is central to zevbox's confinement strategy. It helps to
+Choosing **Apple Container micro-VMs** is central to Zevbox's confinement strategy. It helps to
 understand the difference between traditional containers, classic virtual machines and Apple's
 native micro-VMs.
 
@@ -69,7 +69,7 @@ flowchart TD
         D2 -.->|"container escape if kernel bug (CVE)"| D3["host compromised"]
     end
 
-    subgraph AppleVM ["3. Apple Container micro-VM (zevbox)"]
+    subgraph AppleVM ["3. Apple Container micro-VM (Zevbox)"]
         A1["agent in a micro-VM"] --> A2["dedicated guest Linux kernel in RAM"]
         A2 --> A3["hardware hypervisor boundary (Apple Virtualization.framework / ARM EL2)"]
         A3 --> A4["macOS kernel protected (nothing outside the 2 mounts)"]
@@ -102,7 +102,7 @@ flowchart TD
 #### 4. Exact permission preservation (`host_uid` / `host_gid`)
 - With classic Docker, files written by a container often end up owned by `root`, locking you
   out of your own files on the Mac.
-- zevbox maps your macOS UID/GID (`id -u` / `id -g`, e.g. 501:20) into the VM. Files created or
+- Zevbox maps your macOS UID/GID (`id -u` / `id -g`, e.g. 501:20) into the VM. Files created or
   modified by the agent immediately belong to your macOS user — no root-squash, no permission
   fixes.
 
@@ -141,7 +141,7 @@ Apart from these four, `zevbox console` (`src/console/`, a `ratatui` + `crosster
 
 ```mermaid
 flowchart TD
-    subgraph SupervisorArea ["zevbox supervisor"]
+    subgraph SupervisorArea ["Zevbox supervisor"]
         Preflight["1. Preflight checks\n- config present\n- project in an allowed zone\n- active release\n- Apple Container runtime running (started if needed)\n- local image available\n- agent authenticated (as auth --status)"]
         Spawn["2. Start the micro-VM\ncontainer run -i --rm --cap-drop ALL …"]
         CleanOrphans["Orphan clean-up (I8)"]
@@ -171,7 +171,7 @@ flowchart TD
 ## 4. The security core: the relay policy
 
 ACP lets the agent ask the editor to act on the machine (for example `fs/read_text_file`,
-`terminal/create`). zevbox's policy removes that attack surface entirely.
+`terminal/create`). Zevbox's policy removes that attack surface entirely.
 
 ### What the relay does with each message
 
@@ -179,7 +179,7 @@ ACP lets the agent ask the editor to act on the machine (for example `fs/read_te
 sequenceDiagram
     autonumber
     participant Zed as Zed editor
-    participant Relay as zevbox relay
+    participant Relay as Zevbox relay
     participant Agent as agent in the VM
 
     Note over Zed,Agent: initialisation
@@ -206,7 +206,7 @@ sequenceDiagram
 
 ### Verdict table
 
-| Direction | ACP method | zevbox action | Reason |
+| Direction | ACP method | Zevbox action | Reason |
 |---|---|---|---|
 | **Client → Agent** | `initialize` | **Rewritten** | disables every host capability (`fs`, `terminal`, `auth.terminal` all false). |
 | **Client → Agent** | `authenticate` | **Forwarded** only for an auth method kept in the `initialize` response, else error -32602 | terminal auth methods are removed, so no authentication code runs on the host. |
@@ -256,7 +256,7 @@ flowchart TD
 
 ## 6. Versioning: releases, build and rollback
 
-zevbox uses an immutable release pipeline: each agent version gets a unique timestamped id
+Zevbox uses an immutable release pipeline: each agent version gets a unique timestamped id
 (`<agent>-YYYYMMDD-HHMMSS`) and a lock file (`lock.json`).
 
 ```mermaid
@@ -318,7 +318,7 @@ flowchart TD
     end
 ```
 
-zevbox therefore runs Antigravity's OAuth 2.0 **PKCE flow on the host** (`zevbox auth
+Zevbox therefore runs Antigravity's OAuth 2.0 **PKCE flow on the host** (`zevbox auth
 antigravity`): a one-shot HTTP listener on `127.0.0.1:<random port>` receives Google's redirect,
 the code is exchanged for tokens, and the result is written to
 `state/antigravity/.gemini/antigravity-acp/{settings.json,acp_token.json}` (`0600`) — the
@@ -328,7 +328,7 @@ published on the VM and the macOS keychain is never touched.
 | | Claude Code | Google Antigravity |
 |---|---|---|
 | **ACP component** | npm package (`@agentclientprotocol/claude-agent-acp`) | hermetic Python executable archive (`agy_acp_server.par`) |
-| **Authentication** | interactive console CLI (`--cli auth login`) in the VM | OAuth 2.0 PKCE run by zevbox on the Mac |
+| **Authentication** | interactive console CLI (`--cli auth login`) in the VM | OAuth 2.0 PKCE run by Zevbox on the Mac |
 | **Works from a network-isolated VM** | **yes** (no local server needed) | **no** — hence the host-side flow |
 | **Token location (in the VM)** | `/home/agent/.claude/.credentials.json` | `/home/agent/.gemini/antigravity-acp/acp_token.json` |
 | **Counts as authenticated** (`auth --status`, `doctor`, and the `launch` preflight) | the credentials file exists | `acp_token.json` holds a non-empty refresh token |
@@ -384,15 +384,15 @@ Checked automatically on every build (`scripts/check-invariants.sh` and the test
 never relaxed:
 
 1. **I1 — Exactly two mounts**: the project directory and the agent's state directory. Personal folders (`$HOME`, `~/.ssh`, `~/.gemini`, …) are never mounted.
-2. **I2 — Projects in allowed zones**: the canonical project must be strictly inside the home folder (not `~/Library`, not a hidden `~/.…` folder) or on a disk under `/Volumes`; picking a zevbox agent in Zed is the consent, there is no project list.
+2. **I2 — Projects in allowed zones**: the canonical project must be strictly inside the home folder (not `~/Library`, not a hidden `~/.…` folder) or on a disk under `/Volumes`; picking a Zevbox agent in Zed is the consent, there is no project list.
 3. **I3 — Host filesystem and terminal blocked**: no `fs/*` or `terminal/*` call ever reaches Zed.
 4. **I4 — Bidirectional filtering by id**: only listed methods are routed; responses are matched to their pending request.
 5. **I5 — Confined working directory**: `cwd` is always the project root, with no extra directories and `mcpServers` empty.
 6. **I6 — Pure JSON-RPC on stdout**: nothing but strict JSON-RPC is written to stdout, to keep Zed stable.
 7. **I7 — Zero host shell**: `/bin/sh`, `bash` or `zsh` are never spawned on the Mac.
-8. **I8 — Surgical container targeting**: `stop` and `delete` only target verified containers (`zevbox-` prefix and the zevbox label); `--all` is banned. `clean`, `status` and `doctor` only count as unregistered the containers whose `/home/agent` mount is under their own state root, so an isolated test never stops the real agents.
+8. **I8 — Surgical container targeting**: `stop` and `delete` only target verified containers (`zevbox-` prefix and the Zevbox label); `--all` is banned. `clean`, `status` and `doctor` only count as unregistered the containers whose `/home/agent` mount is under their own state root, so an isolated test never stops the real agents.
 9. **I9 — Private logs**: no token, password or message content is ever logged.
 10. **I10 — No build or network at launch**: `launch` is instant and downloads nothing.
 11. **I11 — Rust robustness**: zero `unwrap()`, `expect()` or `panic!()` in production code (`src/`).
-12. **I12 — zevbox isolation**: zevbox's own binary, internal files and source code are never mounted into a container. A project may not be, contain or sit inside the source folder the binary was built from (`env!("CARGO_MANIFEST_DIR")`), and a folder whose `Cargo.toml` declares the `zevbox` package is refused.
+12. **I12 — Zevbox isolation**: Zevbox's own binary, internal files and source code are never mounted into a container. A project may not be, contain or sit inside the source folder the binary was built from (`env!("CARGO_MANIFEST_DIR")`), and a folder whose `Cargo.toml` declares the `zevbox` package is refused.
 13. **I13 — Project files the Mac would run**: in the ACP container, `<project>/.zed` is masked by a tmpfs and an existing `<project>/.git` is read-only; `guard.rs` starts watching the project before the container starts (a `.zed` that is a file or a link is refused at launch) and stops the agent if a `.git` appears or changes elsewhere. Zed runs programs named in `.zed/settings.json` and git filters by itself (decision P1 in [DECISIONS](DECISIONS.md), 2026-10-16).

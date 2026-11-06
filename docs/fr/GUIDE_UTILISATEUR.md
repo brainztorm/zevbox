@@ -1,4 +1,4 @@
-# zevbox — Guide utilisateur
+# Zevbox — Guide utilisateur
 
 [English](../USER_GUIDE.md) · **Français**
 
@@ -131,7 +131,7 @@ zevbox auth antigravity
 ```
 
 **Déroulement :**
-1. zevbox ouvre un petit serveur HTTP **sur votre Mac** (`127.0.0.1`, port aléatoire — aucun port n'est publié sur la micro-VM) et affiche l'URL de connexion Google. Si le navigateur ne s'ouvre pas, copiez-la. Zevbox attend le retour de Google pendant 5 minutes.
+1. Zevbox ouvre un petit serveur HTTP **sur votre Mac** (`127.0.0.1`, port aléatoire — aucun port n'est publié sur la micro-VM) et affiche l'URL de connexion Google. Si le navigateur ne s'ouvre pas, copiez-la. Zevbox attend le retour de Google pendant 5 minutes.
 2. Choisissez votre compte **Google AI Pro / One AI Premium** et cliquez sur **Autoriser**.
 3. Le navigateur affiche « Authentification Google réussie ! » ; le terminal affiche `Exchanging authorization code with Google...` puis `Google Antigravity authenticated successfully.`
 4. Les fichiers `settings.json` et `acp_token.json` sont écrits dans `state/antigravity/.gemini/antigravity-acp/` (`0600`). Le trousseau macOS n'est jamais sollicité.
@@ -139,7 +139,7 @@ zevbox auth antigravity
 #### 4c. oMLX (optionnel : un serveur de modèles local sur votre réseau)
 
 Si un serveur [oMLX](https://github.com/jundot/omlx) tourne sur un autre Mac (par exemple un Mac
-Studio), zevbox peut le piloter avec l'adaptateur Claude Code, dans sa propre VM et son propre
+Studio), Zevbox peut le piloter avec l'adaptateur Claude Code, dans sa propre VM et son propre
 dossier d'état (votre abonnement Claude n'intervient pas) :
 
 ```bash
@@ -147,7 +147,7 @@ zevbox auth omlx --url http://192.168.1.8:8000
 ```
 
 **Déroulement :**
-1. La première fois, zevbox construit l'image `zevbox/omlx` (même adaptateur que Claude, 1-3 min).
+1. La première fois, Zevbox construit l'image `zevbox/omlx` (même adaptateur que Claude, 1-3 min).
 2. Il demande la clé API du serveur (saisie masquée ; `echo "$CLE" | zevbox auth omlx --url …`
    marche aussi) et liste les modèles du serveur **depuis le Mac**.
 3. Il écrit `state/omlx/.claude/settings.json` (`0600`) : l'URL et la clé, la liste des modèles
@@ -181,16 +181,16 @@ authenticated
 ---
 
 ### Étape 5 : Savoir Où Peuvent Être Vos Projets
-Il n'y a rien à enregistrer : quand vous choisissez **`zevbox · Claude`**, **`zevbox · Antigravity`** ou **`zevbox · oMLX`** avec **+** dans une fenêtre Zed, ce choix vaut consentement, et zevbox utilise le dossier ouvert dans cette fenêtre (premier dossier racine). Il vérifie seulement que ce dossier est dans une zone autorisée (invariant I2) :
+Il n'y a rien à enregistrer : quand vous choisissez **`zevbox · Claude`**, **`zevbox · Antigravity`** ou **`zevbox · oMLX`** avec **+** dans une fenêtre Zed, ce choix vaut consentement, et Zevbox utilise le dossier ouvert dans cette fenêtre (premier dossier racine). Il vérifie seulement que ce dossier est dans une zone autorisée (invariant I2) :
 
 - **autorisé** : tout dossier de votre dossier personnel, p. ex. `~/code/mon-app`, ou d'un disque externe, p. ex. `/Volumes/Data/travail/app` ;
-- **refusé** : `~/Library`, les dossiers cachés comme `~/.ssh` ou `~/.config`, votre dossier personnel lui-même, `/`, les dossiers système, `/Applications`, `/opt/homebrew` et les dossiers de zevbox. Le Mac exécute tout seul certains fichiers de ces dossiers : un agent qui y écrirait pourrait agir sur votre Mac.
+- **refusé** : `~/Library`, les dossiers cachés comme `~/.ssh` ou `~/.config`, votre dossier personnel lui-même, `/`, les dossiers système, `/Applications`, `/opt/homebrew` et les dossiers de Zevbox. Le Mac exécute tout seul certains fichiers de ces dossiers : un agent qui y écrirait pourrait agir sur votre Mac.
 
 Dans un dossier refusé, Zed affiche `… is not an allowed project: <raison>` (voir Dépannage, problème 2).
 
-> **Pourquoi une seule entrée par agent ?** Les serveurs d'agents de Zed sont un réglage global, visible depuis tous les projets. Les entrées `zevbox · …` n'embarquent donc aucun chemin : au lancement, zevbox prend le dossier ouvert dans Zed.
+> **Pourquoi une seule entrée par agent ?** Les serveurs d'agents de Zed sont un réglage global, visible depuis tous les projets. Les entrées `zevbox · …` n'embarquent donc aucun chemin : au lancement, Zevbox prend le dossier ouvert dans Zed.
 
-> **Git et l'agent.** Dans la VM, le `.git` du projet est en lecture seule et son dossier `.zed` est masqué (I13) : l'agent lit l'historique et modifie vos fichiers, qui apparaissent aussitôt dans votre dossier, mais il ne committe pas. Committez son travail vous-même, ou avec un outil hors zevbox.
+> **Git et l'agent.** Dans la VM, le `.git` du projet est en lecture seule et son dossier `.zed` est masqué (I13) : l'agent lit l'historique et modifie vos fichiers, qui apparaissent aussitôt dans votre dossier, mais il ne committe pas. Committez son travail vous-même, ou avec un outil hors Zevbox.
 
 ---
 
@@ -301,7 +301,7 @@ sequenceDiagram
     autonumber
     actor User as Développeur
     participant Zed as Éditeur Zed
-    participant Zevbox as zevbox
+    participant Zevbox as Zevbox
     participant VM as Micro-VM Claude
 
     User->>Zed: 1. Ouvre le projet dans Zed
@@ -324,7 +324,7 @@ sequenceDiagram
    - Raccourci clavier : `Cmd + Shift + A` (ou menu *View > Toggle Assistant Panel*).
 3. **Sélectionnez le serveur d'agent** :
    - En haut du panneau, menu « New Thread » / choix de l'agent.
-   - Choisissez **`zevbox · Claude`**, **`zevbox · Antigravity`** ou **`zevbox · oMLX`** (si vous l'avez installé) : ce sont les seules entrées zevbox, elles s'appliquent au projet ouvert.
+   - Choisissez **`zevbox · Claude`**, **`zevbox · Antigravity`** ou **`zevbox · oMLX`** (si vous l'avez installé) : ce sont les seules entrées Zevbox, elles s'appliquent au projet ouvert.
 4. **Faites un test dans le chat de Zed** :
    - Tapez ce prompt de validation :
      > *"Peux-tu me dire quel est ton système d'exploitation et lister les fichiers du dossier courant ?"*
@@ -342,7 +342,7 @@ sequenceDiagram
   pour garder un outil, utilisez `zevbox tools add <paquet>`. Pour les paquets Python, l'agent
   crée un environnement `python -m venv` (Ubuntu refuse `pip install` sur le Python du système).
 - **Quand c'est mis à jour** : seulement quand vous lancez `zevbox update` (ou `zevbox tools
-  add/remove`). zevbox prend alors la dernière Ubuntu et la dernière version de chaque agent,
+  add/remove`). Zevbox prend alors la dernière Ubuntu et la dernière version de chaque agent,
   teste la nouvelle image et garde la précédente pour `zevbox rollback`. Ouvrir un thread dans
   Zed ne met jamais rien à jour : il démarre l'image déjà construite. Lancez de temps en temps
   `zevbox update --check` pour savoir si une nouvelle version d'agent est sortie.
@@ -420,7 +420,7 @@ revenir à la console » ramène le menu.
 |---|---|
 | **Garder vos projets dans votre dossier personnel ou sur un disque externe**, et committer vous-même le travail de l'agent. | **Ne jamais ouvrir comme projet `$HOME` lui-même, la racine `/`, `~/Library`, un dossier caché `~/.…` ou un dossier système** (rejeté immédiatement par l'invariant I2). |
 | **Utiliser `zevbox tools add <paquet>`** si vous voulez que l'agent dispose d'outils Linux supplémentaires (p. ex. `clang`, `tree` ; Node, Python, `build-essential` et `ripgrep` sont déjà là, sur Ubuntu courante) ; cela reconstruit les images des agents installés comme `zevbox update`, qui passent donc aussi à leur dernière version (réseau requis). | **Ne jamais essayer d'installer des paquets avec `sudo apt` directement pendant une session** (la VM est éphémère et les droits root sont délestés). |
-| **Lancer `zevbox stop`** en fin de journée pour libérer toutes les instances d'arrière-plan. | **Ne jamais lancer `container stop --all` à la main** (cela arrêterait vos conteneurs personnels hors zevbox). |
+| **Lancer `zevbox stop`** en fin de journée pour libérer toutes les instances d'arrière-plan. | **Ne jamais lancer `container stop --all` à la main** (cela arrêterait vos conteneurs personnels hors Zevbox). |
 | **Faire un `zevbox doctor`** en cas de comportement inattendu pour voir immédiatement la cause. | **Ne jamais modifier à la main les clés `zevbox · ...` dans les réglages de Zed** (utilisez `zevbox zed install` ou `zevbox zed uninstall`). |
 
 ---
@@ -449,7 +449,7 @@ revenir à la console » ramène le menu.
 - **Solution** : renommez-le ou supprimez-le (un vrai dossier `.zed` convient), puis ouvrez un nouveau thread.
 
 ### Problème 2b : Zed affiche `zevbox: stopped the agent: it created or changed git metadata at <chemin>`
-- **Cause** : L'agent a créé (ou modifié) un dépôt git dans le projet. Les réglages git peuvent faire lancer des programmes à Zed ou à git sur votre Mac : zevbox a donc arrêté l'agent (I13).
+- **Cause** : L'agent a créé (ou modifié) un dépôt git dans le projet. Les réglages git peuvent faire lancer des programmes à Zed ou à git sur votre Mac : Zevbox a donc arrêté l'agent (I13).
 - **Solution** : Vérifiez ce chemin et supprimez-le avant d'utiliser git ou de rouvrir le projet dans Zed.
 
 ---
@@ -467,7 +467,7 @@ revenir à la console » ramène le menu.
 ---
 
 ### Problème 4 : Zed affiche `Apple Container system is not running`
-- **Cause** : Le service Apple Container est arrêté (typiquement juste après un redémarrage) et zevbox n'a pas réussi à le démarrer seul. Le message se termine par un détail technique.
+- **Cause** : Le service Apple Container est arrêté (typiquement juste après un redémarrage) et Zevbox n'a pas réussi à le démarrer seul. Le message se termine par un détail technique.
 - **Solution** : Dans un terminal, démarrez-le, puis ouvrez un **nouveau** thread dans Zed :
   ```bash
   container system start

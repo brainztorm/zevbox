@@ -59,8 +59,8 @@ Défauts du même chemin, corrigés dans le même changement :
 - **`baseImage` vient du lock, le gabarit `assets/Containerfile` vient du binaire.** L'image de base
   porte Node et le système : la changer peut changer le comportement de l'agent, donc elle reste celle
   de la release active (seul `update` la renouvelle, avec `release::BASE_IMAGE`). Le gabarit, lui,
-  porte les protections de zevbox (utilisateur, droits, vérification d'empreinte) : il suit le code de
-  zevbox installé, y compris pour une reconstruction.
+  porte les protections de Zevbox (utilisateur, droits, vérification d'empreinte) : il suit le code de
+  Zevbox installé, y compris pour une reconstruction.
 
 ## 3. Comportement exigé
 
@@ -92,7 +92,7 @@ qu'un fichier illisible donne le message de T-01 et le code 1.
 3. **T-05** — Calculer la nouvelle liste avec `ToolsFile::add` / `remove`, inchangés :
    - `add` valide tous les noms d'abord ; un nom invalide → `zevbox: '<nom>' is not a valid apt package name`, code 1, rien de modifié ;
    - `remove` ne valide pas : un nom inconnu ou invalide est simplement ignoré.
-4. **T-06** — Déterminer les **agents à reconstruire** : chaque entrée de `active.json` connue de zevbox
+4. **T-06** — Déterminer les **agents à reconstruire** : chaque entrée de `active.json` connue de Zevbox
    (`AgentArg::from_id`), oMLX compris s'il est installé, **dans l'ordre de la table `agents::AGENTS`**
    (claude, antigravity, omlx), pas l'ordre alphabétique de la `BTreeMap`.
 5. **T-07** — **Liste inchangée** (aucun paquet ajouté ou retiré) :
@@ -262,7 +262,7 @@ Pour une reconstruction, dans `releases/<nouvel id>/context/` :
     en échec, `<Display>: smoke test failed: the image holds adapter version <lu>, expected <agentVersion>.`
   - Antigravity : la preuve est la vérification d'empreinte de l'archive (T-33 et `sha256sum -c`
     pendant la construction) ; pas de contrôle supplémentaire.
-  - (`/etc/zevbox-release.json` n'est pas une preuve : zevbox l'écrit lui-même depuis le lock.)
+  - (`/etc/zevbox-release.json` n'est pas une preuve : Zevbox l'écrit lui-même depuis le lock.)
 - `tools remove` : pas de test d'absence du paquet retiré (il peut rester présent comme dépendance
   d'un autre).
 

@@ -1,4 +1,4 @@
-# Exploration, Expérimentations et Architecture : Intégration de Google Antigravity (Gemini) dans zevbox
+# Exploration, Expérimentations et Architecture : Intégration de Google Antigravity (Gemini) dans Zevbox
 
 > **Guide de reprise de tâche pour agent IA ou développeur :**
 > Ce document consigne l'intégralité du contexte technique, des hypothèses explorées, des tests réalisés en direct (réussites et échecs), ainsi que la feuille de route exacte pour finaliser l'intégration d'Antigravity dans `zevbox`.

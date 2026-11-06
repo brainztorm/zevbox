@@ -20,11 +20,11 @@ ACP v1 permet à un agent de demander au **client**, donc à Zed, de lire ou d�
 
 Sur macOS, Claude Code conserve normalement ses identifiants dans le Trousseau. Linux utilise un fichier de credentials. Monter le dossier macOS `~/.claude` dans Linux ne transfère donc pas nécessairement une connexion valide. [Source](https://code.claude.com/docs/en/authentication)
 
-**Modification obligatoire : utiliser un état d’authentification Linux dédié à zevbox, séparé de la configuration Claude du Mac.** Ne jamais exporter automatiquement le Trousseau, copier tous les réglages personnels ou afficher des tokens dans les journaux. [Source](https://code.claude.com/docs/en/authentication)
+**Modification obligatoire : utiliser un état d’authentification Linux dédié à Zevbox, séparé de la configuration Claude du Mac.** Ne jamais exporter automatiquement le Trousseau, copier tous les réglages personnels ou afficher des tokens dans les journaux. [Source](https://code.claude.com/docs/en/authentication)
 
 ### 2.3. L’existence de `~/.gemini` ne prouve rien pour Antigravity ACP
 
-La découverte de `~/.gemini` ne démontre pas que l’adaptateur Antigravity ACP y stocke son authentification. Le manifeste officiel permet d’identifier son téléchargement et sa commande, **pas de déduire le dossier de credentials à partir de son nom**. L’authentification doit être vérifiée dans l’environnement Linux de zevbox. [Source](https://github.com/agentclientprotocol/registry/blob/main/antigravity-acp/agent.json)
+La découverte de `~/.gemini` ne démontre pas que l’adaptateur Antigravity ACP y stocke son authentification. Le manifeste officiel permet d’identifier son téléchargement et sa commande, **pas de déduire le dossier de credentials à partir de son nom**. L’authentification doit être vérifiée dans l’environnement Linux de Zevbox. [Source](https://github.com/agentclientprotocol/registry/blob/main/antigravity-acp/agent.json)
 
 ### 2.4. Le paquet Claude doit être résolu depuis le registre actuel
 
@@ -52,7 +52,7 @@ Le dispositif doit empêcher les processus agents d’accéder directement aux f
 
 Le projet monté reste accessible en lecture-écriture : l’agent peut y modifier ou supprimer des fichiers. Les identifiants de son compte restent accessibles à son runtime. Le réseau nécessaire aux services IA reste disponible ; **le conteneur n’empêche pas, à lui seul, l’exfiltration du code monté ni l’accès à des services réseau joignables**. [Source](https://github.com/apple/container/blob/1.5.0/docs/command-reference.md)
 
-Le dossier contenant le binaire zevbox, sa configuration, sa politique de sécurité et ses versions actives **ne doit pas être monté dans le conteneur**. Autrement, l’agent pourrait modifier les règles qui gouvernent son prochain lancement. Cette exigence complète le périmètre défini par les montages. [Source](https://github.com/apple/container/blob/1.5.0/docs/command-reference.md)
+Le dossier contenant le binaire Zevbox, sa configuration, sa politique de sécurité et ses versions actives **ne doit pas être monté dans le conteneur**. Autrement, l’agent pourrait modifier les règles qui gouvernent son prochain lancement. Cette exigence complète le périmètre défini par les montages. [Source](https://github.com/apple/container/blob/1.5.0/docs/command-reference.md)
 
 Les contenus volontairement transmis depuis Zed restent transmis à l’agent : pièces jointes, texte collé, fichiers mentionnés ou contexte de conversation. **Ne pas joindre de fichier sensible extérieur au projet sous prétexte que le processus est conteneurisé.** [Source](https://github.com/agentclientprotocol/claude-agent-acp)
 
@@ -401,7 +401,7 @@ container run -i --rm \
 
 ### Arrêt et nettoyage
 
-Développer les commandes suivantes ; `stop --project` vise uniquement les instances enregistrées pour ce projet. `clean` supprime les résidus zevbox arrêtés, pas les projets, états d’authentification ou images conservées pour rollback. [Source](https://github.com/apple/container/blob/1.5.0/docs/command-reference.md)
+Développer les commandes suivantes ; `stop --project` vise uniquement les instances enregistrées pour ce projet. `clean` supprime les résidus Zevbox arrêtés, pas les projets, états d’authentification ou images conservées pour rollback. [Source](https://github.com/apple/container/blob/1.5.0/docs/command-reference.md)
 
 ```bash
 zevbox stop IDENTIFIANT
@@ -425,7 +425,7 @@ Sur fin de stdin, signal d’arrêt (`SIGINT`, `SIGTERM`) ou erreur fatale, le s
 
 ### Modification JSONC
 
-Développer `zevbox zed install --settings CHEMIN`. Sauvegarder le fichier avec un horodatage précis et son empreinte dans `~/Library/Application Support/zevbox/backups/` ; calculer les modifications, vérifier qu’il n’a pas changé entre-temps, appliquer une édition JSONC minimale via `jsonc-parser` et écrire atomiquement. Ne modifier que les entrées zevbox gérées par l’outil. [Source](https://zed.dev/docs/languages/json) [Source](https://zed.dev/docs/ai/external-agents)
+Développer `zevbox zed install --settings CHEMIN`. Sauvegarder le fichier avec un horodatage précis et son empreinte dans `~/Library/Application Support/zevbox/backups/` ; calculer les modifications, vérifier qu’il n’a pas changé entre-temps, appliquer une édition JSONC minimale via `jsonc-parser` et écrire atomiquement. Ne modifier que les entrées Zevbox gérées par l’outil. [Source](https://zed.dev/docs/languages/json) [Source](https://zed.dev/docs/ai/external-agents)
 
 Exemple du bloc attendu pour le projet `myproject` : [Source](https://zed.dev/docs/ai/external-agents)
 
@@ -565,7 +565,7 @@ Pour libérer les ressources et arrêter formellement les micro-VMs associées a
 |---|---|
 | Processus, mémoire et système Linux modifié à l’exécution | Disparaissent |
 | Fichiers écrits dans le projet monté | Persistent sur le Mac |
-| Authentification et état dans le dossier zevbox dédié | Persistent |
+| Authentification et état dans le dossier Zevbox dédié | Persistent |
 | Outils inclus dans l’image | Disponibles au prochain lancement |
 | Outils installés seulement dans le conteneur jetable | Ne sont pas conservés |
 | Images et sauvegardes de release | Restent jusqu’à un nettoyage explicite |

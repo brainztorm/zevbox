@@ -1,8 +1,8 @@
-# zevbox — User Guide
+# Zevbox — User Guide
 
 **English** · [Français](fr/GUIDE_UTILISATEUR.md)
 
-This guide walks you through installing, configuring, checking and using **zevbox** with the
+This guide walks you through installing, configuring, checking and using **Zevbox** with the
 **Zed** editor on macOS. At the end you will have verified, not assumed, that the agent runs in
 an isolated Linux micro-VM and cannot see your Mac.
 
@@ -58,7 +58,7 @@ source ~/.zshrc
 ---
 
 ### Step 2: build and install the binary
-From the root of the zevbox checkout (for example `~/code/zevbox`):
+From the root of the Zevbox checkout (for example `~/code/zevbox`):
 
 ```bash
 make install
@@ -146,9 +146,9 @@ zevbox auth antigravity
 ```
 
 **What happens:**
-1. zevbox starts a tiny HTTP server **on your Mac** (`127.0.0.1`, random port — no port is
+1. Zevbox starts a tiny HTTP server **on your Mac** (`127.0.0.1`, random port — no port is
    published on the micro-VM) and prints the Google sign-in URL. If the browser does not open,
-   paste it. zevbox waits up to 5 minutes for Google to redirect back.
+   paste it. Zevbox waits up to 5 minutes for Google to redirect back.
 2. Choose your **Google AI Pro / One AI Premium** account and click **Allow**.
 3. The browser shows a success page; the terminal prints
    `Exchanging authorization code with Google...` then
@@ -159,7 +159,7 @@ zevbox auth antigravity
 #### 4c. oMLX (optional: a local model server on your network)
 
 If an [oMLX](https://github.com/jundot/omlx) server runs on another Mac (for example a Mac
-Studio), zevbox can drive it with the Claude Code adapter, in its own VM and state folder (your
+Studio), Zevbox can drive it with the Claude Code adapter, in its own VM and state folder (your
 Claude subscription is not involved):
 
 ```bash
@@ -167,7 +167,7 @@ zevbox auth omlx --url http://192.168.1.8:8000
 ```
 
 **What happens:**
-1. The first time, zevbox builds the `zevbox/omlx` image (same adapter as Claude, 1–3 min).
+1. The first time, Zevbox builds the `zevbox/omlx` image (same adapter as Claude, 1–3 min).
 2. It asks for the server's API key (hidden input; `echo "$KEY" | zevbox auth omlx --url …` also
    works) and lists the server's models **from the Mac**.
 3. It writes `state/omlx/.claude/settings.json` (`0600`): the URL and key, the model list (the
@@ -201,13 +201,13 @@ authenticated
 
 ### Step 5: know where your projects can be
 There is nothing to register: when you pick **`zevbox · Claude`**, **`zevbox · Antigravity`** or
-**`zevbox · oMLX`** with **+** in a Zed window, that choice is your consent, and zevbox uses the folder open in that
+**`zevbox · oMLX`** with **+** in a Zed window, that choice is your consent, and Zevbox uses the folder open in that
 window (first root folder). It only checks that the folder is in an allowed zone (invariant I2):
 
 - **allowed**: any folder inside your home folder, e.g. `~/code/my-app`, or on an external disk,
   e.g. `/Volumes/Data/work/app`;
 - **refused**: `~/Library`, hidden folders such as `~/.ssh` or `~/.config`, your home folder
-  itself, `/`, system folders, `/Applications`, `/opt/homebrew`, and zevbox's own folders.
+  itself, `/`, system folders, `/Applications`, `/opt/homebrew`, and Zevbox's own folders.
   The Mac runs some files of these folders by itself, so an agent writing there could act on
   your Mac.
 
@@ -215,12 +215,12 @@ In a refused folder, Zed shows `… is not an allowed project: <reason>` (see Tr
 problem 2).
 
 > **Why one entry per agent?** Zed's agent servers are a global setting, visible from every
-> project. The `zevbox · …` entries therefore carry no path: at launch, zevbox takes the folder
+> project. The `zevbox · …` entries therefore carry no path: at launch, Zevbox takes the folder
 > open in Zed.
 
 > **Git and the agent.** Inside the VM, the project's `.git` is read-only and its `.zed` folder
 > is masked (I13): the agent reads the history and edits your files, which appear in your folder
-> immediately, but it cannot commit. Commit its work yourself, or with any tool outside zevbox.
+> immediately, but it cannot commit. Commit its work yourself, or with any tool outside Zevbox.
 
 ---
 
@@ -328,7 +328,7 @@ sequenceDiagram
     autonumber
     actor User as Developer
     participant Zed as Zed editor
-    participant Zevbox as zevbox
+    participant Zevbox as Zevbox
     participant VM as Claude micro-VM
 
     User->>Zed: 1. opens the project in Zed
@@ -349,7 +349,7 @@ sequenceDiagram
    ```
 2. **Open the agent panel**: `Cmd + Shift + A` (or *View > Toggle Assistant Panel*).
 3. **Pick the agent server**: at the top of the panel, in the "New Thread" / agent menu, choose
-   **`zevbox · Claude`**, **`zevbox · Antigravity`** or **`zevbox · oMLX`**. These are the only zevbox entries; they
+   **`zevbox · Claude`**, **`zevbox · Antigravity`** or **`zevbox · oMLX`**. These are the only Zevbox entries; they
    apply to the open project.
 4. **Try it**:
    > *"Which operating system are you running on? List the files in the current directory."*
@@ -478,7 +478,7 @@ then "Press Enter to return to the console" brings the menu back.
 
 ### Problem 2b: Zed shows `zevbox: stopped the agent: it created or changed git metadata at <path>`
 - **Cause**: the agent created (or changed) a git repository inside the project. Git settings can
-  make Zed or git run programs on your Mac, so zevbox stopped the agent (I13).
+  make Zed or git run programs on your Mac, so Zevbox stopped the agent (I13).
 - **Fix**: review that path and delete it before using git or reopening the project in Zed.
 
 ### Problem 3: Zed shows `zevbox: this agent is bound to <A>; this session asked for <B>`
@@ -494,7 +494,7 @@ then "Press Enter to return to the console" brings the menu back.
   thread.
 
 ### Problem 4: Zed shows `Apple Container system is not running`
-- **Cause**: the Apple Container runtime is stopped (typically right after a reboot) and zevbox could not start it by itself. The message ends with a technical detail.
+- **Cause**: the Apple Container runtime is stopped (typically right after a reboot) and Zevbox could not start it by itself. The message ends with a technical detail.
 - **Fix**: in a terminal, then start a **new** thread in Zed:
   ```bash
   container system start
