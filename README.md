@@ -143,7 +143,7 @@ Codex is a standard agent, like Claude and Antigravity; oMLX alone is optional. 
 
 On an existing installation, `setup` adds Codex through the global update: it also rebuilds the other standard agents, and oMLX if installed. `zevbox update --agent codex` builds Codex alone. The console offers “Sign in to Codex” as an interactive action, with confirmation when already signed in.
 
-Codex keeps its history and databases in `state/codex/.codex`: prompts persist there, never in Zevbox’s journals. Its own sandbox runs inside the VM, without network by default; `ps` does not work inside it. The user confirmed sign-in and operation in Zed on 2026-11-06. Detailed permission, cancellation and session-resumption scenarios remain unverified in C4.
+Codex keeps its history and databases in `state/codex/.codex`: prompts persist there, never in Zevbox’s journals. Its own sandbox runs inside the VM, without network by default; `ps` does not work inside it. The user confirmed sign-in and operation in Zed on 2026-11-06. C4 was closed by explicit user acceptance on 2026-11-06. Detailed permission, cancellation and session-resumption scenarios were not individually verified; this acceptance does not add test evidence.
 
 Account-free qualification on 2026-11-06 verified the image, relay, shutdown, cancelled login with a synthetic cache and EN/FR console navigation; evidence and limits are in [PROGRESS.md](docs/PROGRESS.md). Global `setup` remains unvalidated because the existing Antigravity download timed out at 120 seconds.
 
@@ -184,7 +184,7 @@ Account-free qualification on 2026-11-06 verified the image, relay, shutdown, ca
 | `zevbox shell <agent> [--project <path>]` | Interactive Bash in a disposable VM identical to the agent's, including the I13 protections (`.zed` masked, an existing `.git` read-only). Without `--project`, the current directory must be in an allowed zone (exit code 3 otherwise). |
 | `zevbox logs [ID] [--path]` | Shows the last 200 lines of the most recent session log, or of the given ID. `--path` prints the log file path. Each launch writes its journal there: the container's stderr plus Zevbox's own events (`launch agent=… container=…`, `blocked method=<m> dir=<d>` for every refused ACP method, `shutdown …`) at level `info` (`RUST_LOG=debug` for more; for the other commands `RUST_LOG` prints to stderr). Names, paths and ids only: never a prompt, a file's content or a token (I9). `zevbox doctor` lists the refused methods found in the journals of the last 7 days. |
 | `zevbox update [--check] [--agent <agent>]` | Checks for or builds a new agent release from the official ACP registry, runs the smoke test and promotes it. Without `--agent`: Claude, Antigravity and Codex, plus oMLX if it is installed. Exits with code 1 if any agent's update failed (it then changes nothing for that agent). After a build, the same image cleanup as `clean --images` runs, and the release folders/archives are always tidied. |
-| `zevbox rollback [--agent <agent>]` | Swaps the active release (`current`) with the previous one; refuses, with the fix to run, if the previous release's image no longer exists. |
+| `zevbox rollback --agent <agent>` | Swaps the active release (`current`) with the previous one; refuses, with the fix to run, if the previous release's image no longer exists. |
 | `zevbox tools list` / `add <pkgs…>` / `remove <pkgs…>` | Manages extra Ubuntu (apt) packages (`tools.json`) and rebuilds the active agent images like `update` does, so each agent also moves to its latest version. |
 | `zevbox console` | Full-screen keyboard menu over the other commands, in English or French (`--lang en|fr`; default from `LC_ALL`, `LC_MESSAGES` or `LANG`: `fr…` gives French, anything else English; needs an interactive terminal, exit code 2 otherwise): commands on the left, what they do and the equivalent `zevbox …` line on the right. It reimplements nothing: each action runs `zevbox <command>` as a child process (no shell), shows its output live, and asks "Are you sure?" (default **No**) before stopping agents, updating, rolling back, adding or removing tools, `clean --images` or `zed uninstall`. `shell`, `setup` and the Claude/Antigravity/Codex sign-ins get the real terminal. Works before `setup` (no `config.json` needed). Never offers `launch`. See the user guide. |
 
@@ -276,6 +276,10 @@ invariants and workflow — it is written for AI coding agents but is the best s
 for humans too. Design history lives in `docs/DECISIONS.md`, `docs/PROGRESS.md` and the plans
 `zevbox_plan_V2.md` (current contract) / `zevbox_plan_V1.md` (superseded); these working
 documents are in French. User documentation is bilingual: English here and in `docs/`, French under `docs/fr/`.
+
+## Contributors
+
+- **Codex (OpenAI)** — AI contributor to implementation, code review and documentation.
 
 ## License
 

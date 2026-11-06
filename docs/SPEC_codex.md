@@ -7,12 +7,12 @@ uniquement le modèle persisté des releases compatibles. Voir
 [SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md) et son
 [plan d’exécution](PLAN_codex_auth_concurrency.md). Binaire corrigé déployé
 localement par `make install`, puis retour utilisateur positif dans Zed.
-Cela ne clôt pas C4 ni ne prouve les effets distants de connexions simultanées.
+Cette correction ne prouve pas les effets distants de connexions simultanées. C4 a été clôturée séparément sur acceptation explicite de l’utilisateur le 2026-11-06.
 
-Qualification C4 reprise le 2026-11-06 : gates séquentielles, image et relais réels réussis ; connexion et fonctionnement dans Zed confirmés par l’utilisateur, scénarios détaillés encore à vérifier. Setup global non validé (expiration Antigravity préexistante) ; voir [PROGRESS.md](PROGRESS.md). C0–C3 conservées, C4 non acceptée.
+Qualification C4 reprise le 2026-11-06 : gates séquentielles, image et relais réels réussis ; connexion et fonctionnement dans Zed confirmés par l’utilisateur, scénarios détaillés non vérifiés individuellement. Setup global non validé (expiration Antigravity préexistante) ; voir [PROGRESS.md](PROGRESS.md). C0–C3 conservées ; C4 désormais clôturée sur acceptation explicite, avec ces limites de preuve.
 
 Statut : conception retenue et précisée par l'humain le 2026-11-06 ; faits
-techniques mesurés en VM le même jour (§8.1) ; C0 à C3 validées ; acceptation C4 encore à faire. La
+techniques mesurés en VM le même jour (§8.1) ; C0 à C3 validées ; C4 clôturée sur acceptation explicite. La
 connexion doit être simple et fiable, sans exclusivité ChatGPT imposée ; ACP doit
 rester à jour et compatible avec le Zed utilisé. Le plan d'exécution associé est
 [PLAN_codex.md](PLAN_codex.md).
@@ -225,7 +225,7 @@ qualification, pas d'un principe : les autres méthodes passent toujours par le
 filtrage commun, et le masquage est à requalifier si Zed transmet un jour une clé.
 Il n'y a pas de refus global d'`authenticate`, et un cache API valide reste accepté.
 
-Un parcours clé API non guidé existe, à qualifier en C4 seulement si l'humain le
+Un parcours clé API non guidé existe, à requalifier seulement si l’humain le
 souhaite : `zevbox shell codex --project <PATH>`, puis
 `/opt/zevbox/codex/node_modules/.bin/codex login --with-api-key`, la clé étant lue
 sur l'entrée standard. Mesuré avec une clé synthétique : cache écrit en mode
@@ -237,7 +237,7 @@ L'adaptateur possède une journalisation du trafic App Server. Dans le paquet
 néanmoins écrire des erreurs brutes sur stderr, donc dans le journal Zevbox.
 Mesuré sur un échec provoqué (clé synthétique refusée) : le journal reçoit la pile
 d'erreur de l'adaptateur avec l'identifiant de session, sans le texte du prompt ni
-la clé. Vérifier aussi les éventuels exports de télémétrie en C4 ; ne pas supprimer
+la clé. Lors d’une requalification, vérifier aussi les éventuels exports de télémétrie ; ne pas supprimer
 tout stderr pour dissimuler une fuite. L'historique privé que Codex persiste dans
 son propre état (`.codex/sessions`, bases SQLite) contient les prompts ; il est
 distinct des journaux Zevbox et se documente comme l'état des autres agents.
@@ -312,6 +312,8 @@ supprime donc `/usr/bin/bwrap`. Au démarrage, Codex consigne
 
 ## 7. Critères d'acceptation
 
+C4 est clôturée sur décision explicite du 2026-11-06. Cette matrice reste la référence de qualification ; les scénarios sans preuve sont acceptés comme limites de la livraison, pas déclarés réussis (PLAN §7).
+
 | Domaine | Résultat requis |
 |---|---|
 | Installation | Codex standard dès l'activation publique ; `setup` et `update` l'incluent sans sélection explicite ; quick start `auth codex` ; migration d'une installation existante et relance sans release manquante vérifiées. |
@@ -373,7 +375,7 @@ adaptateur 2.5.0, moteur `codex-cli` 0.165.0.
 
 Les mesures du §8.1 couvrent l'installation Linux arm64, les droits du cache, le
 comportement sans capacités hôte, le sandbox et la journalisation. La connexion et le fonctionnement dans Zed ont ensuite été confirmés par
-l’utilisateur le 2026-11-06 ; les scénarios détaillés C4 restent à vérifier.
+l’utilisateur le 2026-11-06 ; les scénarios détaillés non vérifiés sont conservés comme limites de preuve après la clôture C4.
 La lecture des sources ne remplace pas ces essais.
 
 ## 9. Parité et différences avec Claude et Antigravity
@@ -381,7 +383,7 @@ La lecture des sources ne remplace pas ces essais.
 La parité porte sur les services rendus par Zevbox. Elle n'impose pas aux trois
 moteurs les mêmes modèles, algorithmes, commandes internes ou formats d'état.
 Les éléments ci-dessous distinguent les différences prévues des compatibilités
-qui restent à prouver en C0–C4.
+dont les preuves et limites sont consignées en C0–C4.
 
 | Domaine | Claude actuel | Antigravity actuel | Codex selon ce plan |
 |---|---|---|---|
@@ -424,5 +426,5 @@ conditions d'acceptation, pas une garantie déjà acquise.
 Les ressources VM gardent les réglages communs de Zevbox. Cela ne garantit
 aucune égalité de temps de réponse, consommation mémoire, taille d'image ou
 coût d'usage. Ces propriétés et la reprise des sessions doivent être observées
-sur la version qualifiée. L'acceptation C4 doit rapporter les écarts pratiques
+sur la version qualifiée. Le bilan C4 conserve les écarts pratiques
 au lieu de conclure à une identité complète des trois agents.

@@ -30,8 +30,10 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    done. What remains is the section « Backlog » of `docs/DECISIONS.md`; follow
    the « Reste à faire » common rules there (one topic per commit, `make check`
    before each commit, docs updated in the same commit).
-   **Codex extension (C0–C3 validated 2026-11-06; resume at C4)**:
-   C4 resumes on `main`: integration gates run sequentially with no
+   **Codex extension (C0–C3 validated; C4 closed by explicit user acceptance on 2026-11-06)**:
+   No C4 work remains assigned. Unverified scenarios remain documented limits,
+   not additional test evidence. For future requalification on `main`,
+   integration gates run sequentially with no
    concurrent build/update/image cleanup (isolated states share the global runtime).
    Use Codex-only disposable states for independent builds; inventory resources
    before cleanup (`cleanup_isolated.sh` deletes only Codex images). Global setup
@@ -59,7 +61,7 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    by atomic rename; last successful publication wins. Keep release templates
    compatible without rewriting locks or rebuilding images. SIGKILL can leave
    private residues; cleanup failure must not reverse publication success.
-   This correction does not complete C4.
+   C4 was closed separately by explicit user acceptance, not by these tests.
    Codex and its concurrency correction are integrated into `main` (0.2.2).
    Resume from `main`; the merged topic branches are no longer needed.
 2. Rust lives in `/opt/homebrew/opt/rustup/bin` (the Makefile adds it to PATH;

@@ -7,7 +7,8 @@ Tests et gates détaillés dans
 Commit `0d91211` ensuite installé localement avec `make install` ;
 l’utilisateur confirme son essai Zed positif. Les tests de concurrence restent
 des preuves sans compte ; aucun essai fournisseur simultané n’est déduit de ce
-retour. C4 reste ouverte.
+retour. C4 a ensuite été clôturée sur acceptation explicite de l’utilisateur le
+2026-11-06, sans ajout de preuve fournisseur (PLAN Codex §7).
 
 ## 1. Problème et résultat attendu
 

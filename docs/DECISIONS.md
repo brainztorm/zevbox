@@ -39,6 +39,8 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **Clôture C4 et crédit Codex** (demande explicite 👤 après la release 0.2.2) : C4 et backlog 15 clos sur acceptation de la livraison avec les preuves déjà consignées. Les scénarios non vérifiés et le setup global non validé restent des limites documentées ; aucun test supplémentaire ni effet fournisseur n’est déclaré réussi. La décision remplace les anciennes conditions de clôture du plan, sans affaiblir les invariants. Documentation active EN/FR et notes GitHub alignées ; journaux antérieurs conservés comme historique. Codex (OpenAI) ajouté comme contributeur IA dans les README, pour l’implémentation, la revue et la documentation.
+
 - 2026-11-06 — **Version 0.2.2 et publication** (demande 👤) : publier `main`
   et la release GitHub `v0.2.2`, sans binaire joint comme en 0.2.1.
   Contenu : agent Codex standard, auth dédiée et connexions simultanées isolées,
@@ -365,15 +367,7 @@ Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (
 13. ~~**I1 et le dépôt Zevbox**~~ — **✅ décision 👤 (a) du 2026-10-29, faite le même jour** : I1 est respecté. `paths::project_rules` ajoute aux dossiers interdits le dossier source du binaire (`env!("CARGO_MANIFEST_DIR")` : un projet ne peut ni l'être, ni le contenir, ni s'y trouver), et `config::validate_project_path` refuse tout dossier dont le `Cargo.toml` déclare le paquet `zevbox` (copie du dépôt). Risque couvert : un agent qui modifierait le code que l'utilisateur recompile et installe. Preuve : `launch claude` depuis le dépôt → `is not an allowed project: it overlaps a zevbox directory (…)`, code 3, aucun conteneur.
 14. ~~**Test de fumée ACP non implémenté**~~ — **retiré du contrat le 2026-10-29 (décision 👤 : pas utile)**. Le test de fumée reste `uname`, `dpkg -s` et `/etc/zevbox-release.json` ; pas de marquage « failed » d'un lock en échec (aucun lock n'est écrit).
 
-15. **Codex en ACP — conception retenue le 2026-11-06, C0 à C3 validées, C4 en cours** :
-    [spécification](SPEC_codex.md) et [plan d'exécution](PLAN_codex.md).
-    Réutiliser Claude/Antigravity, avec Codex standard (`opt_in: false`), auth
-    native sans exclusivité imposée et ACP actuel compatible. Qualification
-    réelle et revue documentaire complète obligatoires avant acceptation.
-    Les règles communes ci-dessus restent applicables, avec les étapes C0, C1,
-    C2a, C2, C3 et C4 et l'activation/auth groupées en C2 selon le plan Codex.
-    Plan éprouvé le 2026-11-06 : correctifs appliqués et retirés après C3 ; scripts de vérification conservés
-    dans [`codex_annex/`](codex_annex/README.md).
+15. **✅ Codex en ACP — C4 clôturée le 2026-11-06 sur acceptation explicite de l’utilisateur** : C0–C3 validées, version 0.2.2 publiée. Les preuves et limites restent dans [SPEC_codex.md](SPEC_codex.md), [PLAN_codex.md §7](PLAN_codex.md#7-c4-qualification-réelle-et-acceptation-humaine) et PROGRESS. Aucun essai non réalisé n’est déclaré réussi. Scripts de requalification conservés dans [`codex_annex/`](codex_annex/README.md).
 
 ## Correction livrée après la revue Codex
 
@@ -382,8 +376,8 @@ Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (
   [SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md) et
   [PLAN_codex_auth_concurrency.md](PLAN_codex_auth_concurrency.md).
   Binaire installé localement, puis retour utilisateur positif dans Zed.
-  La correction ne clôt pas le backlog 15/C4 ; les scénarios détaillés
-  et effets distants restent soumis aux preuves prévues.
+  Le backlog 15/C4 a ensuite été clos sur acceptation explicite de l’utilisateur ;
+  les scénarios détaillés et effets distants non vérifiés restent des limites de preuve.
 
 ## Idées reportées
 

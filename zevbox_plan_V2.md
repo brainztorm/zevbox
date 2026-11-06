@@ -6,12 +6,13 @@
 > Faits vérifiés le 2026-10-13 sur la machine cible et dans les sources officielles (voir §16).
 > **Un harnais exécutable est fourni** : squelette compilable, 167 tests protégés à l'origine (d'autres ont été ajoutés depuis, §9), faux CLI `container`, faux agent, portes de validation (`make verify STEP=N`). Tous les tests ont été validés contre une implémentation de référence : ils sont réalisables.
 >
-> **Extension prévue le 2026-11-06** : conception Codex retenue dans
+> **Extension livrée le 2026-11-06** : conception Codex retenue dans
 > [docs/SPEC_codex.md](docs/SPEC_codex.md), exécution détaillée dans
 > [docs/PLAN_codex.md](docs/PLAN_codex.md). C0, C1, C2a, C2 et C3 sont validées ; Codex est activé avec son auth dédiée.
 > Connexion et fonctionnement dans Zed confirmés par l’utilisateur le 2026-11-06 ;
-> scénarios détaillés de permissions, annulation, modèles et sessions encore à vérifier en C4.
-> Reprise C4 : tests réels et gate 17 séquentiels, sans construction ni nettoyage
+> C4 clôturée sur son acceptation explicite le même jour. Les scénarios détaillés
+> non vérifiés restent des limites de preuve acceptées (PLAN Codex §7).
+> Requalifications futures : tests réels et gate 17 séquentiels, sans construction ni nettoyage
 > concurrents ; les états `/tmp` partagent le runtime et le builder global.
 > Déploiement local autorisé par `make install`, `update --agent codex`,
 > `zed install`, sans setup global (expiration Antigravity préexistante à 120 s,
@@ -95,7 +96,7 @@ Ces points corrigent le plan v1. Ils sont des exigences.
 | F12 | `--rm` supprime le conteneur après son arrêt, mais archiver un thread Zed ne garantit pas l'arrêt du processus ACP. Un processus ACP peut porter plusieurs sessions. | Ne pas promettre « 1 thread = 1 conteneur ». Fournir `status`, `stop` et `clean`, et un nettoyage automatique des instances orphelines à chaque lancement. |
 | F16 | (2026-10-29) Le réseau d'une VM Apple Container ne sort que par l'interface principale du Mac (route par défaut) : un serveur joint par une autre interface (câble direct) est injoignable depuis la VM, alors que le Mac le joint. | oMLX : le serveur est désigné par son adresse sur le réseau principal ; `auth omlx` et `doctor` testent l'accès **depuis une VM**. |
 | F17 | (2026-10-29) `claude-agent-acp` 0.99 : `~/.claude/settings.json` → `env.ANTHROPIC_BASE_URL` + `env.ANTHROPIC_AUTH_TOKEN` suffisent (pas de connexion claude.ai) ; `availableModels` fixe le sélecteur de modèles de Zed (identifiants bruts) ; le hook `PostModelSwitch` reçoit `from_model`/`to_model`, y compris pour un changement venu de Zed. Le sélecteur garde le `displayName` d'une entrée du SDK « ressemblante » (`applyAvailableModelsAllowlist`, `dist/session-model.js`) : `ANTHROPIC_MODEL`, `model` et `ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL` créent de telles entrées, nommées d'après le modèle du serveur (faux noms dans Zed). Un changement de modèle est confirmé par une requête d'essai au serveur (délai fixe 15 s, « Couldn't confirm model ») sauf pour les identifiants du réglage `modelPicker`, qui portent aussi `supportsAutoMode`. | oMLX = même image que Claude, réglages propres dans `state/omlx` ; modèle par défaut = `ANTHROPIC_DEFAULT_MODEL`, auxiliaire = `ANTHROPIC_SMALL_FAST_MODEL`, aucune autre case de modèle ; `modelPicker` = tous les modèles du serveur ; `permissions.defaultMode` = `bypassPermissions` s'il est absent (décision 👤 du 2026-10-29) ; déchargement du modèle quitté par un hook **dans la VM** (relais et `launch` inchangés, I10). |
-| F18 | (2026-11-06) Codex ACP 2.5.0, moteur 0.165.0, Zed 1.25.3 et ACP v1 qualifiés sans compte en VM : sandbox natif fonctionnel sans `bwrap` système ; `api-key` inutilisable depuis Zed sans transmission de clé. | Image dédiée, login CLI par code d’appareil et filtre ciblé ; acceptation humaine C4 encore requise. |
+| F18 | (2026-11-06) Codex ACP 2.5.0, moteur 0.165.0, Zed 1.25.3 et ACP v1 qualifiés sans compte en VM : sandbox natif fonctionnel sans `bwrap` système ; `api-key` inutilisable depuis Zed sans transmission de clé. | Image dédiée, login CLI par code d’appareil et filtre ciblé ; C4 clôturée sur acceptation humaine explicite le 2026-11-06, limites de preuve conservées. |
 | F13 | Les anciennes règles `.claude/settings.json` (`denyWrite`, `allowWrite`…) ne sont pas une protection fiable ici. | Zevbox n'écrit **jamais** dans le projet de l'utilisateur. |
 
 ---
@@ -801,7 +802,7 @@ Limite connue : deux instances du même agent partagent `state/<agent>` (même c
 
 ---
 
-Pour l’extension Codex, les critères supplémentaires de SPEC §7 et PLAN C4 restent obligatoires : le statut des étapes historiques ci-dessous ne vaut pas acceptation Codex.
+Pour l’extension Codex, les critères de SPEC §7 et PLAN C4 restent la matrice de qualification. C4 est clôturée sur acceptation explicite du 2026-11-06, avec les limites de preuve recensées dans PLAN §7 ; les essais non réalisés ne sont pas déclarés réussis. Les étapes historiques ci-dessous ne constituent pas à elles seules une preuve Codex.
 
 ## 12. Critères d'acceptation finaux (tous requis, chacun avec une preuve dans `PROGRESS.md`)
 

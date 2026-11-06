@@ -1,22 +1,10 @@
 # Plan d'implémentation de Codex en ACP
 
-Sujet distinct livré dans `0d91211` le 2026-11-06 :
-[correction des connexions Codex simultanées](PLAN_codex_auth_concurrency.md),
-selon [sa spécification](SPEC_codex_auth_concurrency.md). Tests multiprocessus
-et gates réussis, binaire corrigé installé localement, retour utilisateur positif
-dans Zed. Cette correction ne clôt pas C4 ; le détail des scénarios humains
-reste à qualifier.
+**Statut au 2026-11-06 : C4 clôturée sur acceptation explicite de l’utilisateur**, après publication de la version 0.2.2. C0–C3 restent validées ; le backlog 15 est clos. Connexion et fonctionnement dans Zed confirmés par l’utilisateur, gates et preuves techniques consignées dans [PROGRESS.md](PROGRESS.md).
 
-Reprise C4 sur `main` depuis l’intégration pour la version 0.2.2 ; C0–C3 conservées,
-aucun ancien correctif à réappliquer. Les instructions de mission de l’humain
-remplacent les anciennes consignes d’exécution contradictoires ci-dessous.
-C4 reste ouverte jusqu’aux preuves obligatoires. Connexion et fonctionnement
-dans Zed confirmés par l’utilisateur le 2026-11-06 ; cela ne valide pas tous les
-scénarios de permissions, annulation et sessions.
+Cette décision accepte la livraison avec les limites de preuve existantes : les cases non cochées du §7 ne deviennent pas des tests réussis. Le setup global reste non validé après l’expiration Antigravity à 120 s. Aucun essai fournisseur ni quota supplémentaire n’est déduit de la clôture.
 
-Statut au 2026-11-06 : plan éprouvé par une répétition complète dans des copies
-jetables (§1.3). C0 à C3 sont validées ; reprise à C4. Rien ici ne vaut
-acceptation C4. Résultat attendu : [SPEC_codex.md](SPEC_codex.md).
+La [correction des connexions simultanées](PLAN_codex_auth_concurrency.md) est livrée dans `0d91211`, intégrée à `main` et publiée en 0.2.2. Les procédures ci-dessous sont conservées comme historique et référence de requalification ; elles ne prescrivent plus une reprise automatique de C4. Cette décision remplace les anciennes conditions de clôture du plan, sans modifier les invariants I1–I13.
 
 L'humain demande la même expérience et les mêmes fonctions de gestion que pour
 Claude et Antigravity, avec Codex standard et une connexion native fiable. Le
@@ -24,7 +12,7 @@ code d'appareil ChatGPT est le parcours guidé retenu, sans exclusivité imposé
 Ce plan complète le contrat V2 pour cette extension ; il n'en retire aucun
 invariant. Il ne demande ni sous-agents ni délégation.
 
-**Procédure de reprise prioritaire.** Préserver les modifications étrangères,
+**Procédure de la mission exécutée (historique).** Préserver les modifications étrangères,
 vérifier les empreintes et `make check`, puis lancer séquentiellement
 `make test-integration` et `make verify STEP=17`. L’état sous `/tmp` partage le
 runtime et le builder global : vérifier les processus concurrents avant les
@@ -65,7 +53,7 @@ est **Zevbox** ; les commandes, chemins, noms d'images et le préfixe géré
 Lire entièrement `AGENTS.md`, `zevbox_plan_V2.md`, `docs/PROGRESS.md`,
 `docs/DECISIONS.md`, `docs/SPEC_codex.md`, puis ce plan. Les étapes historiques
 0–17 restent terminées ; ne pas les recommencer. Reprendre à la première étape
-Codex non validée dans le tableau « Extension Codex » de `docs/PROGRESS.md`.
+Codex non validée dans le tableau « Extension Codex » de `docs/PROGRESS.md` lors de la mission initiale ; aucune reprise C4 n’est désormais requise.
 
 ### 1.2 Avant de commencer
 
@@ -90,7 +78,7 @@ restriction ; ne pas assouplir ces tests.
 ### 1.3 Annexe : ce qui est déjà prouvé
 
 Les correctifs de `docs/codex_annex/` ont été appliqués puis retirés après C3.
-Les quatre scripts restent pour C4 et les requalifications. Les noms de correctifs
+Les quatre scripts restent pour les requalifications. Les noms de correctifs
 et commandes d’application ci-dessous décrivent la procédure exécutée ; ils ne
 sont plus des fichiers présents ni des actions de reprise.
 
@@ -179,8 +167,7 @@ modifier les tests protégés ni contourner un FAIL avec Full access, une capaci
 hôte ou `elicitation/*`. Une panne extérieure ne valide pas le contrôle et
 n’élargit pas le périmètre. Consigner les points impossibles ou dépendants et
 terminer les contrôles indépendants. Une version ACP non filtrée reste refusée ;
-aucune extension de filtre sans audit. C4 ne devient ✅ que si tous les critères
-obligatoires ont une preuve.
+aucune extension de filtre sans audit. La règle initiale exigeait une preuve pour chaque critère obligatoire ; la décision de clôture en tête de document accepte les limites de preuve restantes.
 
 ## 2. Ordre des étapes
 
@@ -482,6 +469,8 @@ Commit : `docs: remove applied Codex patches`.
 
 ## 7. C4 Qualification réelle et acceptation humaine
 
+**Clôturée le 2026-11-06 sur demande explicite de l’utilisateur.** Les listes suivantes conservent l’état des preuves : `[x]` = vérifié, `[ ]` = non vérifié ou seulement partiel, accepté comme limite de cette livraison. Elles ne constituent plus une liste de tâches bloquant la clôture.
+
 Les constructions et diagnostics sans modèle se font par l’exécutant, en installation
 jetable. Le déploiement local ciblé est autorisé (§1). Seuls les gestes personnels
 inaccessibles aux outils et le quota non autorisé nécessitent l’humain ; préparer
@@ -578,11 +567,10 @@ Ces preuves ne cochent pas les cases combinées d’usage Zed et de compte réel
   adaptations partagées ; conserver leurs comptes et réglages.
 - [ ] Comparaison SPEC §9 relue avec les observations réelles. Les fonctions communes sont
   prouvées ; les nuances ne sont pas cachées derrière « même expérience ».
-- [ ] Revue documentaire finale §8.5 terminée.
+- [x] Revue documentaire finale §8.5 terminée (clôture du 2026-11-06).
 
 Noter commandes, versions, résultats, durée d'arrêt et observations, sans prompts, fichiers
-utilisateur, codes de connexion ni secrets. Une fonctionnalité non vérifiée reste en
-attente. Ne pas cocher C4 sur la seule foi d'un test simulé ou d'une réponse `initialize`.
+utilisateur, codes de connexion ni secrets. Une fonctionnalité non vérifiée reste sans preuve. La clôture repose sur la décision humaine consignée en tête de document, pas sur la seule foi d’un test simulé ou d’une réponse `initialize`.
 
 Commit : `docs: record Codex ACP acceptance`, avec des commits séparés pour tout correctif
 révélé par les essais.
@@ -704,4 +692,4 @@ ou une opération courante manque.
 > les fichiers examinés et modifiés. Distingue tests simulés et preuves réelles. Termine avec
 > les preuves et les nuances observées, ou un blocage documenté.
 
-Correction distincte livrée le 2026-11-06 : voir [PLAN concurrence](PLAN_codex_auth_concurrency.md). Le modèle de release reste fixe ; chaque login utilise un HOME privé unique et publie atomiquement. Les mesures C0–C3 ci-dessus restent historiques. C4 reste ouverte.
+Correction distincte livrée le 2026-11-06 : voir [PLAN concurrence](PLAN_codex_auth_concurrency.md). Le modèle de release reste fixe ; chaque login utilise un HOME privé unique et publie atomiquement. Les mesures C0–C3 ci-dessus restent historiques. C4 a été clôturée séparément sur acceptation explicite de l’utilisateur.

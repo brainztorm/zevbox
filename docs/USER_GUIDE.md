@@ -199,7 +199,7 @@ Login uses its unique private directory, then atomically replaces `.codex/auth.j
 
 Codex is standard: `setup` and unselected `update` include it once initialised. A missing standard release triggers the global update: other standard agents and installed oMLX are also rebuilt. `zevbox update --agent codex` builds Codex alone. The console offers “Sign in to Codex” as an interactive action, with confirmation when already signed in.
 
-The native sandbox runs inside the VM, without network by default; `ps` does not work inside it. Model, effort and modes depend on the adapter and account. History and databases persist in `state/codex/.codex`, including prompts, separately from Zevbox’s journals. The user confirmed sign-in and operation in Zed on 2026-11-06. Detailed permission, cancellation and session-resumption scenarios remain unverified in C4.
+The native sandbox runs inside the VM, without network by default; `ps` does not work inside it. Model, effort and modes depend on the adapter and account. History and databases persist in `state/codex/.codex`, including prompts, separately from Zevbox’s journals. The user confirmed sign-in and operation in Zed on 2026-11-06. C4 was closed by explicit user acceptance on 2026-11-06. Detailed permission, cancellation and session-resumption scenarios were not individually verified; this acceptance does not add test evidence.
 
 Account-free qualification on 2026-11-06 verified the image, relay, shutdown, cancelled login with a synthetic cache and EN/FR console navigation; evidence and limits are in [PROGRESS.md](PROGRESS.md). Global `setup` remains unvalidated because the existing Antigravity download timed out at 120 seconds.
 

@@ -4,7 +4,8 @@ Résultat de la répétition du 2026-11-06 ([PLAN_codex.md](../PLAN_codex.md) §
 Les correctifs C1, C2a, C2 et C3 ainsi que le diff protégé ont été appliqués,
 validés et retirés après C3. Le test protégé a été approuvé puis rescellé par
 l’humain. Les commandes d’application du plan restent l’historique d’exécution.
-Les quatre scripts ci-dessous restent pour C4 et les requalifications.
+C4 a été clôturée sur acceptation explicite de l’utilisateur le 2026-11-06.
+Les quatre scripts ci-dessous restent pour les requalifications.
 
 | Fichier | Étape | Usage |
 |---|---|---|
