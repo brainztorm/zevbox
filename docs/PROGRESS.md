@@ -37,7 +37,7 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 
 | Étape | Titre | Statut | Preuve / notes |
 |---|---|---|---|
-| C0 | Vérifier que les versions n'ont pas bougé | ⬜ | Qualification de fond faite le 2026-11-06 (SPEC §8.1, sonde VM). Reste à confirmer adaptateur, Zed et `container` le jour de l'exécution (PLAN §3). |
+| C0 | Vérifier que les versions n'ont pas bougé | ✅ | 2026-11-06 : registre stable `2.5.0 @agentclientprotocol/codex-acp@2.5.0`, Zed `1.25.3`, `container` `1.5.0`, identiques à la qualification. `make check` hors restriction vert : 324 tests réussis, 8 ignorés, `invariants: OK` ; empreintes protégées conformes. |
 | C1 | Image et composants de release sans activation publique | ⬜ | Correctif `C1_image_release.patch` éprouvé : `make check` 329 tests, `verify_image` ALL OK. |
 | C2a | Le relais refuse les versions ACP qu'il ne filtre pas | ⬜ | Correctif `C2a_relay_version.patch` éprouvé : 332 tests. Change le comportement commun du relais. |
 | C2 | Activation standard, auth native et diagnostics | ⬜ | Correctif `C2_activation_auth.patch` éprouvé : deux échecs protégés attendus, puis 343 tests avec le diff protégé. Accord 👤 et rescellement requis. |
@@ -45,6 +45,8 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 | C4 | Qualification réelle, acceptation humaine et revue documentaire | ⬜ | Auth, quota et Zed avec 👤 ; tests simulés insuffisants. Revue finale de tous les documents concernés selon PLAN §8.5. |
 
 ## Journal
+
+- 2026-11-06 — **C0 exécuté** : arbre initial propre ; lectures intégrales requises effectuées. Le contrôle de base restreint échoue sur la socket locale (`Operation not permitted`) et la surveillance de fichiers ; même `make check` hors restriction réussi sans modification. Les commandes de PLAN §3 échouent sous restriction (DNS et lecture de version Zed), puis donnent hors restriction les trois versions attendues. Aucune preuve de connexion, de modèle ou de Zed interactif ; les 8 tests réels restent ignorés. SPEC et DECISIONS inchangées : aucune version nouvelle.
 
 - 2026-11-06 — **Plan Codex éprouvé par sonde VM et répétition** (demande 👤 :
   « que l'agent exécuteur moins intelligent puisse mener les choses sans
