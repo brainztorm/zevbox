@@ -5,6 +5,11 @@ use crate::supervisor::{EXIT_ERROR, EXIT_OK, EXIT_PRECONDITION};
 
 pub use super::auth_omlx::OmlxOptions;
 
+/// Cached Codex login, relative to `state/codex`.
+pub const CODEX_AUTH_MARKER: &str = ".codex/auth.json";
+/// `CODEX_HOME` of the login VM, relative to `state/codex`.
+const CODEX_LOGIN_DIR: &str = ".codex-login";
+
 pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
     run_with(agent, status, OmlxOptions::default()).await
 }
@@ -66,6 +71,9 @@ pub async fn run_with(
     }
     if agent.id() == "omlx" {
         return super::auth_omlx::run(&paths, &config, &lock, omlx).await;
+    }
+    if agent.id() == "codex" {
+        return auth_codex(&paths, &config, &lock);
     }
 
     match ensure_claude_default_model(&paths, &host_claude_settings()) {
@@ -173,21 +181,116 @@ pub fn auth_run_spec(
     lock: &crate::release::ReleaseLock,
     tmp: &std::path::Path,
 ) -> crate::container::RunSpec {
+    login_run_spec("claude", config, paths, lock, tmp)
+}
+
+/// Run spec of a login container: only `tmp` (an empty directory) and
+/// `state/<agent>` are mounted.
+fn login_run_spec(
+    agent: &str,
+    config: &crate::config::Config,
+    paths: &Paths,
+    lock: &crate::release::ReleaseLock,
+    tmp: &std::path::Path,
+) -> crate::container::RunSpec {
     let id8 = crate::container::new_instance_id();
     crate::container::RunSpec {
-        name: format!("zevbox-claude-sh-{id8}"),
+        name: format!("zevbox-{agent}-sh-{id8}"),
         instance_id: format!("auth-{id8}"),
-        agent: "claude".to_string(),
+        agent: agent.to_string(),
         cpus: config.resources.cpus,
         memory: config.resources.memory.clone(),
         uid: config.host_uid,
         gid: config.host_gid,
         project: tmp.to_path_buf(),
-        state_dir: paths.state_dir("claude"),
+        state_dir: paths.state_dir(agent),
         image: lock.image.clone(),
         command: lock.auth_command.clone(),
         interactive: true,
     }
+}
+
+/// `authCommand` of a Codex release: the device-code login of the bundled Codex,
+/// in the separate `CODEX_HOME` kept by [`auth_codex`].
+pub fn codex_login_command(adapter: &str) -> Vec<String> {
+    vec![
+        "env".to_string(),
+        format!("CODEX_HOME=/home/agent/{CODEX_LOGIN_DIR}"),
+        adapter.to_string(),
+        "cli".to_string(),
+        "-c".to_string(),
+        "cli_auth_credentials_store=\"file\"".to_string(),
+        "login".to_string(),
+        "--device-auth".to_string(),
+    ]
+}
+
+/// `zevbox auth codex`. `codex login` starts by revoking and deleting the login it
+/// finds in its `CODEX_HOME`, so it never runs on the real `.codex`: it gets an empty
+/// folder, and its `auth.json` replaces the current one only once it is complete.
+/// A failed or cancelled login therefore leaves the current account working.
+fn auth_codex(
+    paths: &Paths,
+    config: &crate::config::Config,
+    lock: &crate::release::ReleaseLock,
+) -> anyhow::Result<u8> {
+    let login_dir = paths.state_dir("codex").join(CODEX_LOGIN_DIR);
+    if login_dir.exists() {
+        std::fs::remove_dir_all(&login_dir)?; // left by an interrupted login
+    }
+    crate::fsutil::ensure_private_dir(&login_dir)?;
+
+    // I1: same throwaway project as the Claude login.
+    let tmp_root = paths.state_root.join("tmp");
+    crate::fsutil::ensure_private_dir(&tmp_root)?;
+    let tmp = tempfile::Builder::new()
+        .prefix("auth-")
+        .tempdir_in(&tmp_root)?;
+    let tmp_path = std::fs::canonicalize(tmp.path())?;
+    let spec = login_run_spec("codex", config, paths, lock, &tmp_path);
+
+    crate::ui::out(
+        "codex: the browser will NOT open by itself (the login runs inside the VM).\n\
+         1. Open the address printed below in your browser.\n\
+         2. Sign in, then enter the one-time code printed below.",
+    );
+
+    let args = crate::container::run_args(&spec);
+    let mut cmd = std::process::Command::new(&config.container_binary);
+    cmd.args(&args);
+    cmd.stdin(std::process::Stdio::inherit());
+    cmd.stdout(std::process::Stdio::inherit());
+    cmd.stderr(std::process::Stdio::inherit());
+    let exit_status = cmd.status()?;
+
+    let saved = exit_status.success() && keep_codex_login(paths)?;
+    std::fs::remove_dir_all(&login_dir)?;
+    if saved {
+        crate::ui::out(
+            "codex: signed in. Next: open a project in Zed, then choose 'zevbox · Codex' with '+'.",
+        );
+        Ok(EXIT_OK)
+    } else {
+        crate::ui::err(
+            "zevbox: the Codex sign-in did not finish; the previous sign-in, if any, is unchanged. Fix: run 'zevbox auth codex' again. If the page refuses the code, enable device code sign-in in your ChatGPT security settings (workspace: ask an admin).",
+        );
+        Ok(EXIT_ERROR)
+    }
+}
+
+/// Moves the new login over the current one, if it is a complete login.
+fn keep_codex_login(paths: &Paths) -> std::io::Result<bool> {
+    let state = paths.state_dir("codex");
+    let new_login = state.join(CODEX_LOGIN_DIR).join("auth.json");
+    if !has_codex_login(&new_login) {
+        return Ok(false);
+    }
+    let target = state.join(CODEX_AUTH_MARKER);
+    if let Some(dir) = target.parent() {
+        crate::fsutil::ensure_private_dir(dir)?;
+    }
+    std::fs::rename(&new_login, &target)?;
+    Ok(true)
 }
 
 /// The host's own Claude settings, read-only (never mounted).
@@ -470,13 +573,39 @@ fn read_request_head(stream: &mut std::net::TcpStream) -> String {
 /// The one definition of « authenticated », shared by `auth --status`, `setup` and
 /// `doctor`. Claude: the credentials file exists. Antigravity: `acp_token.json`
 /// holds a non-empty `refresh_token` (DECISIONS R5). oMLX: the settings name a
-/// server and a key.
+/// server and a key. Codex: `.codex/auth.json` is a complete native login.
 pub fn is_authenticated(paths: &Paths, agent: &str, auth_marker: &str) -> bool {
     let marker = paths.state_dir(agent).join(auth_marker);
     match agent {
         "antigravity" => has_refresh_token(&marker),
         "omlx" => crate::omlx::is_configured(&marker),
+        "codex" => has_codex_login(&marker),
         _ => marker.exists(),
+    }
+}
+
+/// `auth.json` counts as a login in the formats Codex writes itself: `apikey` with a
+/// key, `chatgpt` with its tokens. Anything else (broken, empty, unknown) does not.
+fn has_codex_login(path: &std::path::Path) -> bool {
+    let Some(v) = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+    else {
+        return false;
+    };
+    let filled = |pointer: &str| {
+        v.pointer(pointer)
+            .and_then(|t| t.as_str())
+            .is_some_and(|t| !t.is_empty())
+    };
+    match v.get("auth_mode").and_then(|m| m.as_str()) {
+        Some("apikey") => filled("/OPENAI_API_KEY"),
+        Some("chatgpt") => {
+            filled("/tokens/id_token")
+                && filled("/tokens/access_token")
+                && filled("/tokens/refresh_token")
+        }
+        _ => false,
     }
 }
 
@@ -563,6 +692,28 @@ fn percent_decode(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_codex_login_replaces_the_old_one_only_when_complete() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(dir.path());
+        let state = paths.state_dir("codex");
+        let new_login = state.join(CODEX_LOGIN_DIR).join("auth.json");
+        let current = state.join(CODEX_AUTH_MARKER);
+        std::fs::create_dir_all(new_login.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(current.parent().unwrap()).unwrap();
+        let old = r#"{"auth_mode":"apikey","OPENAI_API_KEY":"old"}"#;
+        std::fs::write(&current, old).unwrap();
+
+        std::fs::write(&new_login, "{").unwrap();
+        assert!(!keep_codex_login(&paths).unwrap());
+        assert_eq!(std::fs::read_to_string(&current).unwrap(), old);
+
+        let new = r#"{"auth_mode":"apikey","OPENAI_API_KEY":"new"}"#;
+        std::fs::write(&new_login, new).unwrap();
+        assert!(keep_codex_login(&paths).unwrap());
+        assert_eq!(std::fs::read_to_string(&current).unwrap(), new);
+    }
 
     #[test]
     fn base64_url_vectors() {

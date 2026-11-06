@@ -1142,7 +1142,7 @@ mod tests {
         assert_eq!(ids, ["claude"]);
         let p = app.picker_for(Step::Agent(AgentSet::Installed));
         let ids: Vec<_> = p.choices.iter().map(|c| c.value.as_str()).collect();
-        assert_eq!(ids, ["claude", "omlx"]);
+        assert_eq!(ids, ["claude", "omlx", "codex"]);
     }
 
     #[test]

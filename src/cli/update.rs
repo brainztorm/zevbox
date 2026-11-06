@@ -5,8 +5,8 @@ use crate::fsutil::sha256_hex;
 use crate::paths::Paths;
 use crate::release::{
     build_image, fetch_manifest, load_active, new_release_id, parse_antigravity_manifest,
-    parse_claude_manifest, prepare_context, promote, rollback, run_smoke_test, save_active,
-    save_lock, ReleaseLock, BASE_IMAGE_TAG,
+    parse_claude_manifest, parse_codex_manifest, prepare_context, promote, rollback,
+    run_smoke_test, save_active, save_lock, ReleaseLock, BASE_IMAGE_TAG,
 };
 use crate::supervisor::{EXIT_ERROR, EXIT_OK, EXIT_PRECONDITION, EXIT_USAGE};
 
@@ -81,6 +81,24 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                         ".claude/.credentials.json".to_string(),
                     )
                 }
+            } else if agent_spec.build_target == "codex" {
+                let c = match parse_codex_manifest(&text) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        crate::ui::err(&format!("{}: invalid manifest: {e}", agent_spec.display));
+                        failures += 1;
+                        continue;
+                    }
+                };
+                let adapter = "/opt/zevbox/codex/node_modules/.bin/codex-acp".to_string();
+                (
+                    c.version,
+                    Some(c.npm_package),
+                    None,
+                    vec![adapter.clone()],
+                    crate::cli::auth::codex_login_command(&adapter),
+                    crate::cli::auth::CODEX_AUTH_MARKER.to_string(),
+                )
             } else {
                 let a = match parse_antigravity_manifest(&text) {
                     Ok(a) => a,
@@ -213,6 +231,15 @@ pub async fn run_update(check: bool, agent_arg: Option<AgentArg>) -> anyhow::Res
                 lock.smoke_test = Some(smoke);
                 if let Err(e) = save_lock(&paths, &release_id, &lock) {
                     crate::ui::err(&format!("{}: cannot save lock: {e}", agent_spec.display));
+                    failures += 1;
+                    continue;
+                }
+                // Installations made before this agent have no state folder yet.
+                if let Err(e) = crate::fsutil::ensure_private_dir(&paths.state_dir(agent_spec.id)) {
+                    crate::ui::err(&format!(
+                        "{}: cannot create its state folder: {e}",
+                        agent_spec.display
+                    ));
                     failures += 1;
                     continue;
                 }
@@ -352,11 +379,15 @@ mod tests {
         let mut active = ActiveReleases::new();
         assert_eq!(
             ids(agents_to_update(None, &active)),
-            ["claude", "antigravity"]
+            ["claude", "antigravity", "codex"]
         );
         assert_eq!(
             ids(agents_to_update(Some(AgentArg::Omlx), &active)),
             ["omlx"]
+        );
+        assert_eq!(
+            ids(agents_to_update(Some(AgentArg::Codex), &active)),
+            ["codex"]
         );
         active.insert(
             "omlx".into(),
@@ -367,7 +398,7 @@ mod tests {
         );
         assert_eq!(
             ids(agents_to_update(None, &active)),
-            ["claude", "antigravity", "omlx"]
+            ["claude", "antigravity", "omlx", "codex"]
         );
     }
 }

@@ -1,4 +1,4 @@
-//! Relay: only the ACP version it filters goes through. Not in the protected manifest.
+//! Relay rules added for Codex: ACP version and `api-key`. Not in the protected manifest.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use serde_json::{json, Value};
@@ -77,4 +77,37 @@ fn agent_error_to_initialize_is_forwarded_untouched() {
         a2c(&codex(), &mut s, error.clone()),
         Verdict::Forward(error)
     );
+}
+
+#[test]
+fn only_the_api_key_method_of_codex_is_masked() {
+    let mut s = RelayState::default();
+    c2a(&codex(), &mut s, init(json!(1)));
+    let Verdict::Forward(out) = a2c(&codex(), &mut s, answer(json!(1))) else {
+        panic!("not forwarded");
+    };
+    assert_eq!(
+        out["result"]["authMethods"],
+        json!([{"id":"other","name":"Other"}])
+    );
+    let auth =
+        json!({"jsonrpc":"2.0","id":1,"method":"authenticate","params":{"methodId":"api-key"}});
+    match c2a(&codex(), &mut s, auth) {
+        Verdict::ReplyToSender(reply) => assert!(reply["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("zevbox auth codex")),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn other_agents_keep_their_methods() {
+    let claude = Policy::new("/p", "claude");
+    let mut s = RelayState::default();
+    c2a(&claude, &mut s, init(json!(1)));
+    let Verdict::Forward(out) = a2c(&claude, &mut s, answer(json!(1))) else {
+        panic!("not forwarded");
+    };
+    assert_eq!(out["result"]["authMethods"].as_array().unwrap().len(), 2);
 }

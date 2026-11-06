@@ -1,6 +1,6 @@
 # AGENTS.md — guide for AI agents working on Zevbox
 
-Zevbox runs ACP agents (Claude, Antigravity, and oMLX = the Claude adapter on
+Zevbox runs ACP agents (Claude, Antigravity, Codex, and oMLX = the Claude adapter on
 a local model server) for the Zed editor inside Apple Container micro-VMs, with a filtering ACP relay so the agent can never use Zed
 to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
 
@@ -30,7 +30,7 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    done. What remains is the section « Backlog » of `docs/DECISIONS.md`; follow
    the « Reste à faire » common rules there (one topic per commit, `make check`
    before each commit, docs updated in the same commit).
-   **Codex extension (design accepted 2026-11-06, not implemented yet)**:
+   **Codex extension (C0–C2 validated 2026-11-06; resume at C3)**:
    for Codex work, also read `docs/SPEC_codex.md` and `docs/PLAN_codex.md`.
    Reuse Claude/Antigravity, including `opt_in: false`; oMLX alone is optional.
    Native login must be reliable, without a ChatGPT-only restriction or a blanket
@@ -78,6 +78,7 @@ in the manifest.
 - `cli/` clap definitions + one file per command (thin) · `ui.rs` only human stdout/stderr
 - `paths.rs` every location (env overrides for tests) · `config.rs` config.json + project zone rules (I2)
 - `agents.rs` static agent table (`opt_in`: oMLX) · `release.rs` registry, locks, build, promote, rollback
+- `cli/auth.rs` native Claude/Codex login, agent-specific cache validation and Antigravity OAuth
 - `omlx.rs` oMLX settings (server, key, models, unload hook) · `cli/auth_omlx.rs` `zevbox auth omlx`
 - `container.rs` the only module calling the `container` CLI · `instances.rs` instance records
 - `supervisor.rs` `launch`: preflight, start, relay, bounded shutdown · `relay/` ACP relay
@@ -114,6 +115,6 @@ I13 `.zed` masked, existing `.git` read-only in the ACP container, project guard
 ## Never
 
 Use `--all`/`-a` with `container stop|delete`; pass `-t` to the ACP container;
-mount `$HOME`, `~/.claude`, `~/.gemini`, `~/.ssh`; set `ANTHROPIC_API_KEY`
+mount `$HOME`, `~/.claude`, `~/.gemini`, `~/.codex`, `~/.ssh`; set `ANTHROPIC_API_KEY`
 (oMLX uses `ANTHROPIC_AUTH_TOKEN` in `state/omlx` only); put a key in argv or `-e`;
 write to the user's project from Zevbox; point Zed at `target/`.

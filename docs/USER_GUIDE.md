@@ -15,11 +15,11 @@ flowchart TD
     Start(["Start"]) --> Step1["Step 1: check the Mac prerequisites"]
     Step1 --> Step2["Step 2: build and install the binary\nmake install"]
     Step2 --> Step3["Step 3: initialise and build the images\nzevbox setup · zevbox update"]
-    Step3 --> Step4["Step 4: sign in to the agents\nzevbox auth claude · antigravity · omlx"]
+    Step3 --> Step4["Step 4: sign in to the agents\nzevbox auth claude · antigravity · codex · omlx"]
     Step4 --> Step4b["Step 5: open a project in Zed\n(home folder or external disk)"]
     Step4b --> Step5{"Step 6: checks\nzevbox doctor & shell"}
 
-    Step5 -- "all good" --> Step6["Step 7: open Zed\npick zevbox · Claude,\nzevbox · Antigravity or zevbox · oMLX"]
+    Step5 -- "all good" --> Step6["Step 7: open Zed\npick zevbox · Claude,\nzevbox · Antigravity, zevbox · Codex or zevbox · oMLX"]
     Step5 -- "something fails" --> Fix["see Troubleshooting"]
     Fix --> Step5
 
@@ -93,13 +93,13 @@ flowchart LR
     SetupCmd["zevbox setup"] --> DirInit["creates the state directories\n(mode 0700) + config.json"]
     SetupCmd --> ZedSet["adds the zevbox entries\nto Zed settings"]
     SetupCmd --> Doc["runs doctor"]
-    UpdateCmd["zevbox update"] --> Build["downloads Claude and Antigravity\nfrom the official ACP registry\n(oMLX only once installed)"]
-    Build --> Img["builds, smoke-tests and activates\nthe zevbox/claude and zevbox/antigravity images"]
+    UpdateCmd["zevbox update"] --> Build["downloads Claude, Antigravity and Codex\nfrom the official ACP registry\n(oMLX only once installed)"]
+    Build --> Img["builds, smoke-tests and activates\nthe zevbox/claude, zevbox/antigravity and zevbox/codex images"]
 ```
 
 **What they do:**
-1. `setup` creates the private (`0700`) state directories and `config.json`, builds missing
-   releases (like `update`), offers to authenticate each agent that is not signed in (terminal
+1. `setup` creates the private (`0700`) state directories and `config.json`, triggers a global update if a standard
+   release is missing, offers to authenticate each agent that is not signed in (terminal
    only; otherwise it prints the `zevbox auth <agent>` command to run), starts the Apple
    Container runtime if it is stopped, runs `doctor` and prints a per-agent summary. It is
    idempotent: run again, it rebuilds nothing.
@@ -186,10 +186,26 @@ zevbox auth omlx --url http://192.168.1.8:8000
 
 Run it again to change the URL, the key or the default model; `Enter` keeps the current key.
 
+#### 4d. Codex
+
+```bash
+zevbox auth codex
+zevbox auth codex --status
+```
+
+The login runs in a throw-away VM. Open the printed address in the Mac’s browser, sign in with your ChatGPT account and enter the one-time code. This beta feature may need enabling in ChatGPT security settings, or by a workspace admin. Expected completion: `codex: signed in.` A failed or cancelled attempt keeps the current account.
+
+Login uses a separate `.codex-login`, then replaces `.codex/auth.json` only after success. `state/codex` and `.codex` have mode `0700`, the cache `0600`. `--status` accepts a complete ChatGPT or API cache; it checks neither remote validity nor quota. A valid API-key login stored by Codex is accepted, without a Zevbox key prompt or key transmission from Zed. Never mount the Mac’s `~/.codex`.
+
+Codex is standard: `setup` and unselected `update` include it once initialised. A missing standard release triggers the global update: other standard agents and installed oMLX are also rebuilt. `zevbox update --agent codex` builds Codex alone. Dedicated console sign-in arrives in C3; use the terminal until then.
+
+The native sandbox runs inside the VM, without network by default; `ps` does not work inside it. Model, effort and modes depend on the adapter and account. History and databases persist in `state/codex/.codex`, including prompts, separately from Zevbox’s journals. Real sign-in, dialogue, permissions and session resumption in Zed remain to be accepted in C4.
+
 **Check:**
 ```bash
 zevbox auth claude --status
 zevbox auth antigravity --status
+zevbox auth codex --status
 zevbox auth omlx --status      # if you use oMLX
 ```
 *Each must print exactly:*
@@ -200,7 +216,7 @@ authenticated
 ---
 
 ### Step 5: know where your projects can be
-There is nothing to register: when you pick **`zevbox · Claude`**, **`zevbox · Antigravity`** or
+There is nothing to register: when you pick **`zevbox · Claude`**, **`zevbox · Antigravity`**, **`zevbox · Codex`** or
 **`zevbox · oMLX`** with **+** in a Zed window, that choice is your consent, and Zevbox uses the folder open in that
 window (first root folder). It only checks that the folder is in an allowed zone (invariant I2):
 
@@ -241,6 +257,7 @@ zevbox doctor
 [OK  ] architecture         — host architecture is arm64
 [OK  ] agent:claude         — release claude-... (authenticated)
 [OK  ] agent:antigravity    — release antigravity-... (authenticated)
+[OK  ] agent:codex          — release codex-... (authenticated)
 [OK  ] agent:omlx           — optional, not installed (to use it: 'zevbox auth omlx')
 [OK  ] disk                 — 4 zevbox image(s), none from old releases; all container images use … GB
 [OK  ] permissions          — stateRoot and state/* are 0700
@@ -300,7 +317,7 @@ the project is gone.
 grep -C 4 "zevbox · " ~/.config/zed/settings.json
 ```
 
-**Expected:** one block per installed agent (two, or three with oMLX), however many projects you
+**Expected:** one block per installed agent (three standard agents, or four with oMLX), however many projects you
 open:
 ```json
     "zevbox · Claude": {
@@ -314,6 +331,12 @@ open:
       "command": "/Users/<user>/.local/bin/zevbox",
       "args": ["launch", "antigravity"],
       "env": {}
+    },
+    "zevbox · Codex": {
+      "type": "custom",
+      "command": "/Users/<user>/.local/bin/zevbox",
+      "args": ["launch", "codex"],
+      "env": {}
     }
 ```
 
@@ -321,7 +344,7 @@ open:
 
 ## 5. Everyday use in Zed
 
-Everything is set up. The diagram shows Claude; Antigravity and oMLX are identical:
+Everything is set up. The diagram shows Claude; Antigravity, Codex and oMLX follow the same launch path; native features differ (see 4d):
 
 ```mermaid
 sequenceDiagram
@@ -349,7 +372,7 @@ sequenceDiagram
    ```
 2. **Open the agent panel**: `Cmd + Shift + A` (or *View > Toggle Assistant Panel*).
 3. **Pick the agent server**: at the top of the panel, in the "New Thread" / agent menu, choose
-   **`zevbox · Claude`**, **`zevbox · Antigravity`** or **`zevbox · oMLX`**. These are the only Zevbox entries; they
+   **`zevbox · Claude`**, **`zevbox · Antigravity`**, **`zevbox · Codex`** or **`zevbox · oMLX`**. These are the only Zevbox entries; they
    apply to the open project.
 4. **Try it**:
    > *"Which operating system are you running on? List the files in the current directory."*
@@ -452,11 +475,11 @@ then "Press Enter to return to the console" brings the menu back.
 
 ## 7. Troubleshooting
 
-### Problem 1: Zed shows `Claude is not authenticated` (or `Antigravity` / `oMLX is not authenticated`)
+### Problem 1: Zed shows `Claude is not authenticated` (or `Antigravity` / `Codex` / `oMLX is not authenticated`)
 - **Cause**: the agent's token is not in its state directory yet. Launching applies the same test
   as `zevbox auth <agent> --status` (and `doctor`): for Antigravity a non-empty refresh token, for
-  oMLX a server and a key in its settings.
-- **Fix**: in a terminal, run `zevbox auth claude` (or `antigravity`, `omlx`), then check with
+  oMLX a server and a key in its settings; for Codex a complete native cache (4d).
+- **Fix**: in a terminal, run `zevbox auth claude` (or `antigravity`, `codex`, `omlx`), then check with
   `zevbox auth <agent> --status`.
 
 ### Problem 1b: `zevbox auth omlx` says `the Mac reaches <url> but the agent VM does not`
@@ -525,11 +548,14 @@ then "Press Enter to return to the console" brings the menu back.
 | Diagnose the system | `zevbox doctor` |
 | Build / update the agent images | `zevbox update` |
 | Sign in to Claude / Google (Antigravity) | `zevbox auth claude` / `zevbox auth antigravity` |
+| Sign in to Codex | `zevbox auth codex` |
 | Connect a local oMLX server | `zevbox auth omlx --url http://<address>:<port>` |
-| Check sign-in status | `zevbox auth claude --status` / `zevbox auth antigravity --status` / `zevbox auth omlx --status` |
+| Check sign-in status | `zevbox auth claude --status` / `zevbox auth antigravity --status` / `zevbox auth codex --status` / `zevbox auth omlx --status` |
 | Show the running instances | `zevbox status` |
 | Open a Linux test shell | `zevbox shell claude` |
 | Add a Linux tool to the VM | `zevbox tools add tree` |
 | Read recent logs | `zevbox logs` |
 | Stop the running VMs | `zevbox stop` |
 | Clean up stale files | `zevbox clean --images` |
+
+Codex: see section 4d for authentication diagnostics and limits. With four agents the banner may exceed 80 columns: widen the terminal.

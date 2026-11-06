@@ -67,6 +67,7 @@ fn entries_for_builds_names_and_args() {
     let got = entries_for(&AGENTS, BIN);
     let mut expected = my_entries();
     expected.push(entry("zevbox · oMLX", "omlx"));
+    expected.push(entry("zevbox · Codex", "codex"));
     assert_eq!(got, expected);
 }
 
@@ -84,7 +85,7 @@ fn one_entry_per_agent_without_project_suffix() {
 #[test]
 fn every_entry_name_has_managed_prefix() {
     let got = entries_for(&AGENTS, BIN);
-    assert_eq!(got.len(), 3);
+    assert_eq!(got.len(), 4);
     assert!(got.iter().all(|e| e.name.starts_with(MANAGED_PREFIX)));
 }
 

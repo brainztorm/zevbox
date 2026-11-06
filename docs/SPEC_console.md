@@ -38,13 +38,15 @@
   `WORKED EXAMPLE`. Le terminal est **toujours restauré** (mode brut, écran alterné, curseur),
   y compris en cas d'erreur.
 
+Depuis C2, les listes et le statut générique suivent les quatre agents : Claude, Antigravity, oMLX et Codex (trois standards, oMLX seul optionnel). La connexion Codex dédiée arrive en C3 ; jusque-là, utiliser `zevbox auth codex` au terminal. Le compteur reste à 23 actions avant C3.
+
 ## 3. Écran
 
 ```
- zevbox ─ Claude 0.99.1 · Antigravity 1.4.5 · oMLX non installé ─ 2 en cours
+ zevbox ─ Claude 0.99.1 · Antigravity 1.4.5 · oMLX non installé · Codex 2.5.0 ─ 2 en cours
 ┌ zevbox › Mises à jour ───────────────┐┌ Tout mettre à jour ──────────────────┐
 │  Vérifier s'il y a des mises à jour  ││Construit une image neuve pour Claude,│
-│▸ Tout mettre à jour                  ││Antigravity et oMLX s'il est installé…│
+│▸ Tout mettre à jour                  ││Antigravity, Codex ; oMLX si installé…│
 │  Mettre à jour un agent              ││                                      │
 │  Revenir à la version précédente     ││Durée : 1 à 3 min par agent · réseau  │
 │                                      ││Commande : zevbox update              │
@@ -56,6 +58,7 @@ Le croquis est en français ; en anglais, mêmes zones avec les libellés anglai
 choose · Enter open · PgUp/PgDn text · Esc back · q quit », « Command: zevbox update », « N agents
 running » (« N running » abrégé), « not installed ».
 
+- Avec quatre agents le bandeau peut dépasser 80 colonnes : agrandir le terminal pour lire la fin de la ligne.
 - **Bandeau** (haut) : version de la release active de chaque agent installé (`agentVersion`
   du lock), ou « non installé » ; nombre d'instances enregistrées (« N agents en cours », abrégé
   en « N en cours » si la ligne ne tient pas). Rafraîchi au retour d'une commande.

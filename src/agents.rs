@@ -3,7 +3,7 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AgentSpec {
-    /// CLI identifier: "claude" | "antigravity" | "omlx".
+    /// CLI identifier: "claude" | "antigravity" | "omlx" | "codex".
     pub id: &'static str,
     /// Human name used in Zed entry names.
     pub display: &'static str,
@@ -19,7 +19,7 @@ pub struct AgentSpec {
     pub opt_in: bool,
 }
 
-pub const AGENTS: [AgentSpec; 3] = [
+pub const AGENTS: [AgentSpec; 4] = [
     AgentSpec {
         id: "claude",
         display: "Claude",
@@ -43,6 +43,14 @@ pub const AGENTS: [AgentSpec; 3] = [
         image_repo: "zevbox/omlx",
         registry_id: "claude-acp",
         opt_in: true,
+    },
+    AgentSpec {
+        id: "codex",
+        display: "Codex",
+        build_target: "codex",
+        image_repo: "zevbox/codex",
+        registry_id: "codex-acp",
+        opt_in: false,
     },
 ];
 

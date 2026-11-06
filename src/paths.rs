@@ -85,6 +85,7 @@ impl Paths {
             self.state_dir("claude"),
             self.state_dir("antigravity"),
             self.state_dir("omlx"),
+            self.state_dir("codex"),
             self.instances_dir(),
             self.logs_dir(),
             self.backups_dir(),

@@ -39,6 +39,8 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **C2 appliqué, accord protégé en attente** : correctif activation/auth repris à l’identique. Trois agents standards et oMLX seul optionnel ; login Codex dans un état séparé jusqu’à réussite, masquage ciblé d’`api-key`, création de l’état avant promotion. Contrôles simulés : exactement les deux échecs Zed attendus avant accord. Preuve réelle isolée : promotion `codex-20261106-144209`, `verify_image: ALL OK` (18 PASS), `verify_launch: ALL OK` (13 PASS dans le script livré, contrairement aux 14 annoncés pour la répétition), EOF 2,3 s sans VM restante, marqueurs synthétiques absents des journaux. Le script comporte bien 13 appels de contrôle : aucune vérification retirée. Aucun compte réel ni quota, vrai Zed et installation utilisateur intacts ; image et état jetables supprimés. C3/C4 restent à faire.
+
 - 2026-11-06 — **C2a appliqué** : refus commun des versions ACP non filtrées dans les deux sens d’`initialize`, sans changement silencieux de version. Correctif de l’annexe repris à l’identique ; contrat, architectures et dépannage EN/FR alignés. La version 1 est le filtre livré, pas un plafond de conception permanent.
 
 - 2026-11-06 — **C1 appliqué** : composants de release et étape image Codex repris du correctif éprouvé, sans activation publique. Suppression du `bwrap` système confirmée nécessaire par la qualification prévue ; image réelle : 18 PASS, sandbox natif opérationnel, adaptateur 2.5.0 et moteur 0.165.0. Aucun compte ni modèle sollicité.
@@ -132,7 +134,7 @@ Format : date — fait ou décision — comment c'est vérifié.
   de décrire la version livrée tant que Codex n'est pas activé.
 - **Conception et transmission** : [SPEC_codex.md](SPEC_codex.md) et
   [PLAN_codex.md](PLAN_codex.md), étapes C0–C4 avec fichiers exemples,
-  acceptation, essais sans quota et étapes humaines. Implémentation non démarrée.
+  acceptation, essais sans quota et étapes humaines. C0 à C2 validées ; accord protégé reçu et rescellement humain confirmé.
   Le diff de deux attentes dans `tests/zed_settings_test.rs` est proposé dans
   le plan ; aucune autorisation de modification de fichier protégé n'est
   déduite de l'accord de conception.
@@ -278,7 +280,7 @@ Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (
 13. ~~**I1 et le dépôt Zevbox**~~ — **✅ décision 👤 (a) du 2026-10-29, faite le même jour** : I1 est respecté. `paths::project_rules` ajoute aux dossiers interdits le dossier source du binaire (`env!("CARGO_MANIFEST_DIR")` : un projet ne peut ni l'être, ni le contenir, ni s'y trouver), et `config::validate_project_path` refuse tout dossier dont le `Cargo.toml` déclare le paquet `zevbox` (copie du dépôt). Risque couvert : un agent qui modifierait le code que l'utilisateur recompile et installe. Preuve : `launch claude` depuis le dépôt → `is not an allowed project: it overlaps a zevbox directory (…)`, code 3, aucun conteneur.
 14. ~~**Test de fumée ACP non implémenté**~~ — **retiré du contrat le 2026-10-29 (décision 👤 : pas utile)**. Le test de fumée reste `uname`, `dpkg -s` et `/etc/zevbox-release.json` ; pas de marquage « failed » d'un lock en échec (aucun lock n'est écrit).
 
-15. **Codex en ACP — conception retenue le 2026-11-06, à implémenter** :
+15. **Codex en ACP — conception retenue le 2026-11-06, C0 à C2 validées** :
     [spécification](SPEC_codex.md) et [plan d'exécution](PLAN_codex.md).
     Réutiliser Claude/Antigravity, avec Codex standard (`opt_in: false`), auth
     native sans exclusivité imposée et ACP actuel compatible. Qualification

@@ -2,22 +2,22 @@
 
 [English](../ARCHITECTURE.md) · **Français**
 
-Ce document présente une vue d'ensemble détaillée du projet **`zevbox`**, de ses choix d'architecture, de son modèle de sécurité, ainsi que du fonctionnement interne du relais ACP et des micro-VM Apple Container.
+Ce document présente une vue d'ensemble détaillée du projet **Zevbox**, de ses choix d'architecture, de son modèle de sécurité, ainsi que du fonctionnement interne du relais ACP et des micro-VM Apple Container.
 
 ---
 
 ## 1. Contexte et Problématique
 
 ### Le problème avec les agents IA dans l'éditeur (Zed)
-Lorsqu'un éditeur comme **Zed** intègre un agent IA via le protocole ACP (*Agent Client Protocol*, p. ex. Claude Code ou Google Antigravity ; Zevbox propose aussi oMLX, Claude Code sur un serveur de modèles local), cet agent s'exécute habituellement directement sur votre Mac avec l'ensemble de vos privilèges utilisateurs.
+Lorsqu'un éditeur comme **Zed** intègre un agent IA via le protocole ACP (*Agent Client Protocol*, p. ex. Claude Code, Google Antigravity ou Codex ; Zevbox propose aussi oMLX, Claude Code sur un serveur de modèles local), cet agent s'exécute habituellement directement sur votre Mac avec l'ensemble de vos privilèges utilisateurs.
 
 Cela signifie qu'un agent pourrait :
 - Lire vos clés privées SSH (`~/.ssh/id_rsa`), identifiants cloud (`~/.aws`, `~/.config/gcloud`), trousseaux et variables d'environnement.
 - Exécuter des commandes arbitraires sur votre machine hôte (`rm -rf`, installations incontrôlées, accès réseau non sollicité).
 - Modifier des fichiers personnels sans rapport avec le projet en cours de développement.
 
-### La solution : `zevbox`
-`zevbox` isole complètement l'agent dans une **micro-VM Apple Container Linux arm64** éphémère. Il interpose entre Zed et la VM un **relais filtrant intelligent** qui inspecte et neutralise tout appel potentiellement dangereux.
+### La solution : Zevbox
+Zevbox isole complètement l'agent dans une **micro-VM Apple Container Linux arm64** éphémère. Il interpose entre Zed et la VM un **relais filtrant intelligent** qui inspecte et neutralise tout appel potentiellement dangereux.
 
 ```mermaid
 flowchart LR
@@ -30,7 +30,7 @@ flowchart LR
     end
 
     subgraph VM ["Micro-VM Apple Container (Linux arm64)"]
-        Agent["Agent ACP\n(Claude / Antigravity / oMLX)"]
+        Agent["Agent ACP\n(Claude / Antigravity / Codex / oMLX)"]
         VMFS["Système de fichiers éphémère Linux\n(Overlay jetable)"]
     end
 
@@ -86,7 +86,9 @@ flowchart TD
 - Dans un environnement Docker classique, les fichiers écrits par un conteneur appartiennent souvent à `root`, bloquant l'utilisateur sur son Mac pour modifier ou commiter ses propres fichiers.
 - `zevbox` mappe exactement votre UID/GID macOS (`id -u` / `id -g`, p. ex. 501:20) dans la VM. Les fichiers créés ou modifiés par Claude ou tout autre agent appartiennent immédiatement à votre utilisateur macOS sans root-squash ni conflit de permissions.
 
-#### 5. Éphémérité totale (`--rm`) et délestage des capacités (`--cap-drop ALL`)
+##Pour Codex seulement, `api-key` est masqué dans la réponse initialize : Zed ne transmet pas de clé ; une demande de cette méthode reçoit -32602 et le renvoi vers `zevbox auth codex`.
+
+## 5. Éphémérité totale (`--rm`) et délestage des capacités (`--cap-drop ALL`)
 - La micro-VM est créée avec une couche overlay temporaire. Dès que Zed ferme la session, la VM est anéantie : tous les fichiers temporaires, scripts de compilation ou artefacts générés hors du projet s'évaporent sans polluer votre Mac.
 - De surcroît, le conteneur démarre avec l'option `--cap-drop ALL` : même le compte `root` interne à la VM ne dispose d'aucun privilège système Linux spécial (`CAP_SYS_ADMIN`, `CAP_NET_ADMIN`, etc.).
 
@@ -232,9 +234,9 @@ flowchart TD
 
 ## 6. Gestion des Versions : Releases, Build et Rollback
 
-L'image comporte aussi une étape `codex`, préparée pour l'agent Codex. Rien ne l'expose encore aux utilisateurs.
+L’étape d’image `codex` installe l’agent standard Codex, résolu depuis `codex-acp` dans le registre ACP.
 
-`zevbox` utilise un pipeline de release immuable : chaque version d'un agent génère un identifiant horodaté unique (`<agent>-AAAAMMJJ-HHMMSS`) et un fichier de verrouillage (`lock.json`).
+Zevbox utilise un pipeline de release immuable : chaque version d'un agent génère un identifiant horodaté unique (`<agent>-AAAAMMJJ-HHMMSS`) et un fichier de verrouillage (`lock.json`).
 
 ```mermaid
 flowchart LR
@@ -360,11 +362,21 @@ flowchart LR
 
 ---
 
+### 7c. Codex
+
+Agent standard (`opt_in: false`), comme Claude et Antigravity ; oMLX reste seul optionnel. `setup` et `update` sans sélection incluent Codex. Sur installation existante, une release standard manquante déclenche la mise à jour globale, y compris oMLX installé ; `update --agent codex` cible Codex seul.
+
+L’adaptateur npm `@agentclientprotocol/codex-acp` et son moteur embarqué tournent dans la même VM, image `zevbox/codex:<id>`. Version stable exacte d’adaptateur au build ; version du moteur relevée séparément. `NO_BROWSER=1` et suppression du `bwrap` Ubuntu permettent le sandbox embarqué, sans réseau par défaut (`ps` ne fonctionne pas). Aucun passage forcé en Full access.
+
+`auth codex` réutilise la VM d’auth sur dossier vide avec état dédié `state/codex`. Le login CLI par code d’appareil utilise `CODEX_HOME=/home/agent/.codex-login`, puis Zevbox déplace le cache complet sur `.codex/auth.json` seulement après réussite : échec ou annulation conserve le compte actuel. Droits `0700` sur l’état et `.codex`, `0600` sur le cache. `auth --status`, `doctor` et `launch` valident localement `auth_mode=chatgpt` avec trois jetons non vides ou `apikey` avec clé non vide ; aucune garantie distante ni quota. Le `~/.codex` du Mac n’est jamais lu ni monté.
+
+Le relais masque `api-key` pour Codex seulement : Zed n’envoie aucune clé. Les autres méthodes restent soumises au filtre commun ; aucun refus global d’`authenticate`. Une clé API native valide reste acceptée. L’état privé `.codex/sessions` et les bases contiennent les prompts ; les journaux Zevbox ne les contiennent pas. Deux instances partagent cet état (risque de rafraîchissement concurrent). Preuve réelle sans compte en C2 ; connexion, modèle et interface Zed restent à accepter en C4.
+
 ## 8. Les 13 Invariants de Sécurité
 
 Ces règles sont testées automatiquement à chaque compilation (`scripts/check-invariants.sh` et la suite de tests) et ne peuvent jamais être relâchées :
 
-1. **I1 — Deux montages exclusifs** : Seuls le dossier du projet et le dossier d'état de l'agent sont montés. Les dossiers personnels (`$HOME`, `~/.ssh`, `~/.gemini`, etc.) ne sont jamais montés directement.
+1. **I1 — Deux montages exclusifs** : Seuls le dossier du projet et le dossier d'état de l'agent sont montés. Les dossiers personnels (`$HOME`, `~/.ssh`, `~/.gemini`, `~/.codex`, etc.) ne sont jamais montés directement.
 2. **I2 — Projets dans les zones autorisées** : le projet canonisé doit être strictement dans le dossier personnel (hors `~/Library` et hors dossier caché `~/.…`) ou sur un disque sous `/Volumes` ; choisir un agent Zevbox dans Zed vaut consentement, il n'y a plus de liste de projets.
 3. **I3 — Blocage du système de fichiers et du terminal hôte** : Aucun appel `fs/*` ou `terminal/*` ne parvient à Zed.
 4. **I4 — Filtrage bidirectionnel par ID** : Seules les méthodes répertoriées sont routées, les réponses sont associées à leur requête en attente.

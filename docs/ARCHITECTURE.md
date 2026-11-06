@@ -11,7 +11,7 @@ and how the ACP relay and the Apple Container micro-VMs work together.
 
 ### The problem with AI agents in the editor
 When an editor such as **Zed** integrates an AI agent through ACP (*Agent Client Protocol* —
-e.g. Claude Code or Google Antigravity; Zevbox also offers oMLX, Claude Code on a local model server), the agent normally runs directly on your Mac with all
+e.g. Claude Code, Google Antigravity or Codex; Zevbox also offers oMLX, Claude Code on a local model server), the agent normally runs directly on your Mac with all
 of your user privileges. It can therefore:
 
 - read your SSH private keys (`~/.ssh/id_rsa`), cloud credentials (`~/.aws`,
@@ -36,7 +36,7 @@ flowchart LR
     end
 
     subgraph VM ["Apple Container micro-VM (Linux arm64)"]
-        Agent["ACP agent\n(Claude / Antigravity / oMLX)"]
+        Agent["ACP agent\n(Claude / Antigravity / Codex / oMLX)"]
         VMFS["Ephemeral Linux filesystem\n(disposable overlay)"]
     end
 
@@ -204,6 +204,8 @@ sequenceDiagram
     Note over Zed: Zed never saw the request
 ```
 
+For Codex only, `api-key` is hidden in the initialize response: Zed sends no key; requesting this method returns -32602 and the hint to run `zevbox auth codex`.
+
 ### Verdict table
 
 | Direction | ACP method | Zevbox action | Reason |
@@ -256,7 +258,7 @@ flowchart TD
 
 ## 6. Versioning: releases, build and rollback
 
-The image also has a `codex` stage, prepared for the Codex agent. Nothing exposes it to users yet.
+The `codex` image stage installs the standard Codex agent, resolved from `codex-acp` in the ACP registry.
 
 Zevbox uses an immutable release pipeline: each agent version gets a unique timestamped id
 (`<agent>-YYYYMMDD-HHMMSS`) and a lock file (`lock.json`).
@@ -380,12 +382,22 @@ flowchart LR
 
 ---
 
+### 7c. Codex
+
+A standard agent (`opt_in: false`), like Claude and Antigravity; oMLX alone is optional. `setup` and unselected `update` include Codex. On an existing installation a missing standard release triggers the global update, including installed oMLX; `update --agent codex` targets Codex alone.
+
+The npm adapter `@agentclientprotocol/codex-acp` and its bundled engine run in the same VM, image `zevbox/codex:<id>`. The exact stable adapter is resolved at build time; the engine version is measured separately. `NO_BROWSER=1` and removal of Ubuntu’s `bwrap` enable the bundled sandbox, without network by default (`ps` does not work). No forced switch to Full access.
+
+`auth codex` reuses the empty-directory authentication VM with dedicated `state/codex`. CLI device sign-in uses `CODEX_HOME=/home/agent/.codex-login`, then Zevbox moves the complete cache over `.codex/auth.json` only after success: failure or cancellation keeps the current account. State and `.codex` use `0700`, the cache `0600`. `auth --status`, `doctor` and `launch` locally validate `auth_mode=chatgpt` with three non-empty tokens or `apikey` with a non-empty key; no remote validity or quota guarantee. The Mac’s `~/.codex` is never read or mounted.
+
+The relay hides `api-key` for Codex only: Zed sends no key. Other methods still use the common filter; there is no blanket `authenticate` refusal. A valid native API-key cache remains accepted. Private `.codex/sessions` and databases contain prompts; Zevbox journals do not. Two instances share this state (concurrent refresh risk). Real account-free proof is in C2; sign-in, model and Zed UI acceptance remain in C4.
+
 ## 8. The 13 security invariants
 
 Checked automatically on every build (`scripts/check-invariants.sh` and the test suite) and
 never relaxed:
 
-1. **I1 — Exactly two mounts**: the project directory and the agent's state directory. Personal folders (`$HOME`, `~/.ssh`, `~/.gemini`, …) are never mounted.
+1. **I1 — Exactly two mounts**: the project directory and the agent's state directory. Personal folders (`$HOME`, `~/.ssh`, `~/.gemini`, `~/.codex`, …) are never mounted.
 2. **I2 — Projects in allowed zones**: the canonical project must be strictly inside the home folder (not `~/Library`, not a hidden `~/.…` folder) or on a disk under `/Volumes`; picking a Zevbox agent in Zed is the consent, there is no project list.
 3. **I3 — Host filesystem and terminal blocked**: no `fs/*` or `terminal/*` call ever reaches Zed.
 4. **I4 — Bidirectional filtering by id**: only listed methods are routed; responses are matched to their pending request.

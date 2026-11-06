@@ -1,8 +1,8 @@
 # Plan d'implémentation de Codex en ACP
 
 Statut au 2026-11-06 : plan éprouvé par une répétition complète dans des copies
-jetables (§1.3). Aucune étape n'est appliquée au dépôt et rien ici ne vaut
-acceptation. Résultat attendu : [SPEC_codex.md](SPEC_codex.md).
+jetables (§1.3). C0 à C2 sont validées ; reprise à C3. Rien ici ne vaut
+acceptation C4. Résultat attendu : [SPEC_codex.md](SPEC_codex.md).
 
 L'humain demande la même expérience et les mêmes fonctions de gestion que pour
 Claude et Antigravity, avec Codex standard et une connexion native fiable. Le
@@ -249,7 +249,7 @@ Commit : `feat: prepare Codex ACP image and release components`.
 
 ### 5.1 C2a Version ACP (commit séparé, avant C2)
 
-Aujourd'hui, `src/` ne contrôle `protocolVersion` nulle part : une v2 passerait, avec
+Avant C2a, `src/` ne contrôlait `protocolVersion` nulle part : une v2 passerait, avec
 ses capacités dans un autre champ. Ce contrôle est obligatoire (SPEC §6), et il
 s'applique à tous les agents puisque le relais est commun.
 

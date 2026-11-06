@@ -153,7 +153,7 @@ fn decide_response(
             if let Some(refusal) = refuse_agent_protocol(id, &msg) {
                 return Verdict::Forward(refusal);
             }
-            strip_terminal_auth_methods(state, &mut msg);
+            strip_terminal_auth_methods(policy, state, &mut msg);
         }
         add_auth_hint(policy, &mut msg);
     }
@@ -174,18 +174,28 @@ fn refuse_agent_protocol(id: &Value, msg: &Value) -> Option<Value> {
     ))
 }
 
+/// Zed only sends `methodId` in `authenticate` and zevbox passes no key to the VM,
+/// so Codex's `api-key` login cannot finish here (DECISIONS 2026-11-06). A valid
+/// API cache stays accepted; `zevbox auth codex` is the way in.
+fn cannot_finish_in_zed(policy: &Policy, method: &Value) -> bool {
+    policy.agent == "codex" && method.get("id").and_then(Value::as_str) == Some("api-key")
+}
+
 /// F2: terminal auth methods (`type: "terminal"`) and any `_meta` (which may
 /// carry `terminal-auth` with a command) would make Zed run a program on the
 /// Mac. Keep only agent-handled methods, without `_meta`, and remember them
 /// for `authenticate`.
-fn strip_terminal_auth_methods(state: &mut RelayState, msg: &mut Value) {
+fn strip_terminal_auth_methods(policy: &Policy, state: &mut RelayState, msg: &mut Value) {
     let Some(methods) = msg
         .pointer_mut("/result/authMethods")
         .and_then(Value::as_array_mut)
     else {
         return;
     };
-    methods.retain(|m| matches!(m.get("type").and_then(Value::as_str), None | Some("agent")));
+    methods.retain(|m| {
+        matches!(m.get("type").and_then(Value::as_str), None | Some("agent"))
+            && !cannot_finish_in_zed(policy, m)
+    });
     for method in methods.iter_mut() {
         if let Some(obj) = method.as_object_mut() {
             obj.remove("_meta");

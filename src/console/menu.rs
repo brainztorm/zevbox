@@ -841,6 +841,7 @@ mod tests {
                     &["auth", "claude", "--status"],
                     &["auth", "antigravity", "--status"],
                     &["auth", "omlx", "--status"],
+                    &["auth", "codex", "--status"],
                 ],
             ),
             (Action::AuthClaude, &[&["auth", "claude"]]),

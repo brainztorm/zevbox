@@ -39,11 +39,18 @@ fn add_antigravity_release(env: &TestEnv) {
     lock["image"] = "zevbox/antigravity:antigravity-test".into();
     std::fs::create_dir_all(releases.join("antigravity-test")).unwrap();
     common::write_json(&releases.join("antigravity-test/lock.json"), &lock);
+    lock["releaseId"] = "codex-test".into();
+    lock["agent"] = "codex".into();
+    lock["authMarker"] = ".codex/auth.json".into();
+    lock["image"] = "zevbox/codex:codex-test".into();
+    std::fs::create_dir_all(releases.join("codex-test")).unwrap();
+    common::write_json(&releases.join("codex-test/lock.json"), &lock);
     common::write_json(
         &releases.join("active.json"),
         &serde_json::json!({
             "claude": {"current": common::RELEASE, "previous": null},
-            "antigravity": {"current": "antigravity-test", "previous": null}
+            "antigravity": {"current": "antigravity-test", "previous": null},
+            "codex": {"current": "codex-test", "previous": null}
         }),
     );
 }

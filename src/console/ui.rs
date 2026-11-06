@@ -554,9 +554,13 @@ mod tests {
         let screen = render(&app, 80, 24);
         let lines: Vec<&str> = screen.lines().collect();
         assert!(lines[0].contains("zevbox ─ Claude 0.99.1 · Antigravity 0.99.1"));
+        // With four agents the banner may exceed 80 columns (DECISIONS 2026-11-06).
+        let wide = render(&app, 95, 24);
         assert!(
-            lines[0].trim_end().ends_with("1 en cours"),
-            "compact at 80:\n{screen}"
+            wide.lines()
+                .next()
+                .is_some_and(|l| l.trim_end().ends_with("1 en cours")),
+            "compact at 95:\n{wide}"
         );
         assert!(render(&app, 120, 24).contains("1 agent en cours"));
         assert!(

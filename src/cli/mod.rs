@@ -24,7 +24,7 @@ use std::path::PathBuf;
 #[command(
     name = "zevbox",
     version,
-    about = "Run Claude / Antigravity / oMLX for Zed inside isolated Apple Container micro-VMs"
+    about = "Run Claude / Antigravity / oMLX / Codex for Zed inside isolated Apple Container micro-VMs"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -36,6 +36,7 @@ pub enum AgentArg {
     Claude,
     Antigravity,
     Omlx,
+    Codex,
 }
 
 impl AgentArg {
@@ -44,6 +45,7 @@ impl AgentArg {
             AgentArg::Claude => "claude",
             AgentArg::Antigravity => "antigravity",
             AgentArg::Omlx => "omlx",
+            AgentArg::Codex => "codex",
         }
     }
 
