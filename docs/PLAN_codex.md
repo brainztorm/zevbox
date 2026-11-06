@@ -7,7 +7,7 @@ et gates réussis, binaire corrigé installé localement, retour utilisateur pos
 dans Zed. Cette correction ne clôt pas C4 ; le détail des scénarios humains
 reste à qualifier.
 
-Reprise C4 autorisée le 2026-11-06 sur `feat/codex-acp` ; C0–C3 conservées,
+Reprise C4 sur `main` depuis l’intégration pour la version 0.2.2 ; C0–C3 conservées,
 aucun ancien correctif à réappliquer. Les instructions de mission de l’humain
 remplacent les anciennes consignes d’exécution contradictoires ci-dessous.
 C4 reste ouverte jusqu’aux preuves obligatoires. Connexion et fonctionnement

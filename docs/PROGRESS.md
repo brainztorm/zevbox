@@ -46,6 +46,16 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 
 ## Journal
 
+- 2026-11-06 — **Préparation de la version 0.2.2** (publication GitHub demandée 👤) :
+  version alignée dans Cargo.toml, Cargo.lock et contrat V2 ; CLI compilé :
+  `zevbox 0.2.2`. `make check` hors sandbox : 350 réussis, 8 ignorés,
+  fmt/clippy/invariants OK (`/tmp/zevbox-022-check.log`). Liens locaux, diff et
+  empreintes protégées conformes. Aucun changement de code fonctionnel.
+  Notes de release : Codex standard, correction de concurrence, filtre ACP,
+  console et documentation EN/FR avec capture Zed ; C4 reste ouverte.
+  Instructions de reprise actualisées vers `main` ; suppression des branches
+  intégrées et push autorisés par l’utilisateur (DECISIONS).
+
 - 2026-11-06 — **Déploiement de `0d91211`, retour humain et revue documentaire** :
   déploiement demandé par l’utilisateur puis `make install` réussi
   (`/tmp/zevbox-auth-install.log`) : `make check` 350 réussis, 8 ignorés,

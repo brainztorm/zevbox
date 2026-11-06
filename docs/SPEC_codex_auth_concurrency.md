@@ -1,7 +1,8 @@
 # Zevbox et les connexions Codex simultanées
 
 Statut au 2026-11-06 : **implémentée et validée sans compte** sur
-`fix/codex-auth-concurrency`. Tests et gates détaillés dans
+`fix/codex-auth-concurrency`, puis intégrée à `main` pour la version 0.2.2.
+Tests et gates détaillés dans
 [le plan d’exécution](PLAN_codex_auth_concurrency.md#8-résultats).
 Commit `0d91211` ensuite installé localement avec `make install` ;
 l’utilisateur confirme son essai Zed positif. Les tests de concurrence restent

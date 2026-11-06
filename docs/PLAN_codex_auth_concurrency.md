@@ -3,7 +3,8 @@
 Statut au 2026-11-06 : **implémenté et validé sans compte** ; résultats en §8.
 Après ces contrôles : déploiement local et retour utilisateur positif dans Zed
 (§9), sans acceptation globale C4.
-Les instructions ci-dessous conservent le déroulé de la mission exécutée.
+Correction intégrée à `main` pour la version 0.2.2 ; la branche dédiée est
+désormais historique. Les instructions ci-dessous conservent le déroulé de la mission exécutée.
 Aucun fichier protégé modifié. Contrat de cette évolution :
 [SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md).
 

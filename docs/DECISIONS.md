@@ -39,6 +39,16 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **Version 0.2.2 et publication** (demande 👤) : publier `main`
+  et la release GitHub `v0.2.2`, sans binaire joint comme en 0.2.1.
+  Contenu : agent Codex standard, auth dédiée et connexions simultanées isolées,
+  contrôle de version ACP, console Codex EN/FR et capture du menu Zed.
+  Suppression autorisée des branches locales intégrées `console`,
+  `feat/codex-acp`, `fix/codex-auth-concurrency`, et de la branche distante
+  `console` (les deux branches Codex n’existent pas sur origin).
+  Reprise sur `main` ; C4 reste ouverte, sans nouvelle preuve fournisseur
+  ni validation du setup global déduite de cette publication.
+
 - 2026-11-06 — **Capture du menu Zed dans les README** (demande 👤) :
   capture fournie conservée dans `docs/img/zed-agent-menu.jpeg`, affichée sous
   « What it looks like » et « À quoi ça ressemble » dans les versions EN/FR.

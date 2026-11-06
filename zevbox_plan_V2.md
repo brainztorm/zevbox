@@ -262,7 +262,7 @@ Versions vérifiées sur crates.io le 2026-10-13. N'en ajouter aucune autre sans
 ```toml
 [package]
 name = "zevbox"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 rust-version = "1.85"
 
