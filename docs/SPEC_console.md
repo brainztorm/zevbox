@@ -167,7 +167,7 @@ Non proposés : `launch` (réservé à Zed), `init` (fait par `setup`), `logs --
   Échap revient au menu (une fois la commande terminée).
 - **Pendant une commande** : Échap ouvre « Interrupt the command? » / « Interrompre la commande ? » ; Oui envoie SIGTERM au
   processus, puis SIGKILL après 5 s s'il tourne encore.
-- **Commande interactive** (`shell`, `auth claude`, `auth antigravity`, `setup`) : la console
+- **Commande interactive** (`shell`, `auth claude`, `auth antigravity`, `auth codex`, `setup`) : la console
   quitte l'écran alterné et le mode brut, lance la commande sur le vrai terminal (stdin/stdout/stderr
   hérités), attend sa fin, affiche « Press Enter to return to the console » / « Appuyez sur Entrée pour revenir à la console », puis se
   redessine.
@@ -178,7 +178,7 @@ Non proposés : `launch` (réservé à Zed), `init` (fait par `setup`), `logs --
 - Modèle du menu (pur) : arborescence, navigation, retour, commande générée pour chaque feuille,
   liste des actions confirmées (§6) — tests unitaires.
 - Boîte « Êtes-vous sûr ? » : Non par défaut, Tab/←/→, Échap = Non.
-- Rendu : `TestBackend` 80 × 24, présence du bandeau, des deux panneaux, de la ligne des touches ;
+- Rendu : `TestBackend` (bandeau abrégé contrôlé à 95 colonnes depuis C2), présence du bandeau, des deux panneaux, de la ligne des touches ;
   message « Enlarge the window » / « Agrandissez la fenêtre » sous 80 × 20 ; libellés anglais
   avec `Lang::En`, français avec `Lang::Fr`.
 - Textes : chaque clé de `i18n.rs` a ses deux langues, non vides, avec les mêmes paramètres ;

@@ -1,5 +1,7 @@
 # Plan d'implémentation de Codex en ACP
 
+Exécution C4 suspendue le 2026-11-06 : témoin builder modifié pendant un essai concurrent et téléchargement Antigravity expiré ; voir [PROGRESS.md](PROGRESS.md). C0–C3 sont validées, C4 non acceptée.
+
 Statut au 2026-11-06 : plan éprouvé par une répétition complète dans des copies
 jetables (§1.3). C0 à C3 sont validées ; reprise à C4. Rien ici ne vaut
 acceptation C4. Résultat attendu : [SPEC_codex.md](SPEC_codex.md).

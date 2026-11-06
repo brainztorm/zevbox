@@ -251,6 +251,7 @@ Zevbox protège **votre Mac** de l'agent. Il ne protège **pas** le projet que v
 
 **`zevbox: ACP protocol version <v> is not filtered by this zevbox`** — Zed parle une version d’ACP que le relais ne filtre pas encore : mettez Zevbox à jour.
 
+- **`zevbox: setup incomplete: an agent has no release`** — une construction ou un téléchargement a échoué. Consultez les erreurs précédentes et relancez `zevbox update` ; le résumé `zevbox setup complete` ne signifie pas un succès si le code de sortie est 1.
 - **`zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init'`** — lancez `zevbox setup` dans un terminal.
 - **`<chemin> is not an allowed project: <raison>. Fix: open a folder inside your home folder …`** — le dossier ouvert dans Zed est hors des zones autorisées (I2), par exemple un dossier caché `~/.…` ou un dossier système. Déplacez le projet ou ouvrez un autre dossier.
 - **`<projet>/.zed is a file or a link, so zevbox cannot mask it safely (I13). Fix: …`** — renommez ou supprimez ce `.zed` (un dossier normal convient), puis ouvrez un nouveau thread.
