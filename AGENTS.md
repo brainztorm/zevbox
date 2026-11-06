@@ -52,6 +52,13 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    protected-test diff proposed in C2. The executor must update every affected
    project document, including EN/FR pairs, in each behaviour commit and complete
    the repository-wide documentation review in `docs/PLAN_codex.md` §8.
+   **Concurrent Codex sign-in correction (planned, not implemented)**: see
+   `docs/SPEC_codex_auth_concurrency.md` and `docs/PLAN_codex_auth_concurrency.md`.
+   The 2026-11-06 request covers design and executor instructions only; implement
+   this separate topic only when assigned. It does not complete C4.
+   The original Codex branch is now integrated into local `main`. For this
+   correction, use `fix/codex-auth-concurrency`, based on `main` at `87db544`;
+   this takes precedence over the earlier C4 branch instruction for this topic.
 2. Rust lives in `/opt/homebrew/opt/rustup/bin` (the Makefile adds it to PATH;
    in a shell: `export PATH=/opt/homebrew/opt/rustup/bin:$PATH`).
 

@@ -1,5 +1,11 @@
 # Spécification de Codex en ACP dans Zevbox
 
+Correction préparée après revue, non implémentée : l’isolation des tentatives
+de connexion simultanées est définie dans
+[SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md), avec son
+[plan d’exécution](PLAN_codex_auth_concurrency.md). Les descriptions du dossier
+fixe ci-dessous décrivent encore le code livré ; cette conception ne clôt pas C4.
+
 Qualification C4 reprise le 2026-11-06 : gates séquentielles, image et relais réels réussis ; connexion et fonctionnement dans Zed confirmés par l’utilisateur, scénarios détaillés encore à vérifier. Setup global non validé (expiration Antigravity préexistante) ; voir [PROGRESS.md](PROGRESS.md). C0–C3 conservées, C4 non acceptée.
 
 Statut : conception retenue et précisée par l'humain le 2026-11-06 ; faits

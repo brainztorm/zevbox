@@ -1,5 +1,11 @@
 # Plan d'implémentation de Codex en ACP
 
+Sujet distinct préparé après revue :
+[correction des connexions Codex simultanées](PLAN_codex_auth_concurrency.md),
+selon [sa spécification](SPEC_codex_auth_concurrency.md). La demande du
+2026-11-06 couvre la conception seulement ; aucune correction livrée ni
+nouvelle validation C4 n’en découle.
+
 Reprise C4 autorisée le 2026-11-06 sur `feat/codex-acp` ; C0–C3 conservées,
 aucun ancien correctif à réappliquer. Les instructions de mission de l’humain
 remplacent les anciennes consignes d’exécution contradictoires ci-dessous.

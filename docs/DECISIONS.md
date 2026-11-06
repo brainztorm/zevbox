@@ -39,6 +39,22 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **Branche dédiée à la correction d’auth Codex** (demande 👤) :
+  branche initiale Codex intégrée à `main` local, vérifié à `87db544`.
+  Création de `fix/codex-auth-concurrency` depuis cette base pour livrer les
+  documents de conception et accueillir l’implémentation ultérieure. Le plan
+  et le message pour l’exécuteur ciblent désormais cette branche. Aucun push.
+
+- 2026-11-06 — **Conception de la correction des connexions Codex simultanées**
+  (demande 👤 : plan et encadrement, sans implémentation) : la revue de `87db544`
+  relève le partage destructif de `.codex-login`. Solution préparée : un dossier
+  privé unique par tentative, commande du lock adaptée seulement en mémoire,
+  dernière publication atomique réussie active, nettoyage limité à la tentative.
+  Aucun verrou global ni collecte de résidus ; interruptions brutales documentées.
+  [Spécification](SPEC_codex_auth_concurrency.md) et
+  [plan pour l’exécuteur](PLAN_codex_auth_concurrency.md). Code inchangé ; preuve
+  de reproduction à réaliser avec deux processus et caches synthétiques.
+
 - 2026-11-06 — **Confirmation C4 utilisateur** : connexion et fonctionnement
   dans Zed confirmés ; statut local authenticated. Actualiser les réserves sans
   transformer cette confirmation en acceptation des scénarios non décrits.
@@ -315,6 +331,14 @@ Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (
     C2a, C2, C3 et C4 et l'activation/auth groupées en C2 selon le plan Codex.
     Plan éprouvé le 2026-11-06 : correctifs appliqués et retirés après C3 ; scripts de vérification conservés
     dans [`codex_annex/`](codex_annex/README.md).
+
+## Correction préparée après la revue Codex
+
+- **Connexions simultanées Codex — à implémenter lors d’une mission distincte** :
+  suivre [SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md) et
+  [PLAN_codex_auth_concurrency.md](PLAN_codex_auth_concurrency.md).
+  La demande du 2026-11-06 porte seulement sur ces documents. La correction
+  ne clôt pas le backlog 15/C4 et ne change pas les preuves déjà consignées.
 
 ## Idées reportées
 

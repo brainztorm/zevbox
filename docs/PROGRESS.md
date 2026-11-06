@@ -46,6 +46,26 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 
 ## Journal
 
+- 2026-11-06 — **Transmission sur branche dédiée** : après intégration de la
+  branche Codex initiale, `main` local et `feat/codex-acp` pointent sur `87db544`.
+  Branche `fix/codex-auth-concurrency` créée depuis `main`, avec les documents
+  préparés et leurs renvois ; plan et prompt de l’exécuteur actualisés.
+  Aucun changement de code ni déploiement ; aucun push ou fetch.
+  Avant commit documentaire : `make check` hors sandbox réussi (343 tests,
+  8 ignorés, invariants OK), empreintes protégées, liens locaux des nouveaux
+  documents et `git diff --check` conformes. Ces contrôles portent sur le code
+  existant, pas sur la correction encore à implémenter.
+
+- 2026-11-06 — **Plan de correction de l’auth Codex concurrente** : demande
+  limitée à la conception et aux instructions pour un exécuteur. Création de
+  [SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md) et
+  [PLAN_codex_auth_concurrency.md](PLAN_codex_auth_concurrency.md) : dossier unique
+  par tentative, compatibilité des locks, publication atomique, erreurs et
+  interruptions, matrice de tests multiprocessus sans compte et revue EN/FR.
+  Aucun code, test, fichier protégé ou état utilisateur modifié. La course reste
+  à reproduire et corriger ; C4 reste ouverte. Pas de gate d’implémentation
+  revendiquée pour ce travail documentaire.
+
 - 2026-11-06 — **Confirmation utilisateur et contrôle de branche** : après les
   refus attendus du dépôt Zevbox lui-même (I12), puis du cache Codex absent,
   l’utilisateur confirme « C’est bon ça marche » dans le contexte de son essai
