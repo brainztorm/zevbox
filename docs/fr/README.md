@@ -37,6 +37,8 @@ dossier d'état** — et rien d'autre :
 
 ### À quoi ça ressemble
 
+![Les agents Zevbox dans le menu des agents de Zed](../img/zed-agent-menu.jpeg)
+
 ```mermaid
 flowchart LR
     subgraph Host ["Votre Mac (macOS, Apple Silicon)"]

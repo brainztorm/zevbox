@@ -35,6 +35,8 @@ directory** — and nothing else:
 
 ### What it looks like
 
+![Zevbox agents in Zed’s agent menu](docs/img/zed-agent-menu.jpeg)
+
 ```mermaid
 flowchart LR
     subgraph Host ["Your Mac (macOS, Apple Silicon)"]

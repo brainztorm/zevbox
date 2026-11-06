@@ -39,6 +39,11 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **Capture du menu Zed dans les README** (demande 👤) :
+  capture fournie conservée dans `docs/img/zed-agent-menu.jpeg`, affichée sous
+  « What it looks like » et « À quoi ça ressemble » dans les versions EN/FR.
+  Aucun changement de comportement ; les schémas existants sont conservés.
+
 - 2026-11-06 — **Déploiement et retour utilisateur de la correction concurrente** :
   après livraison de `0d91211`, déploiement explicitement demandé et réalisé
   par `make install` (contrôles inclus), binaire installé identique au build
