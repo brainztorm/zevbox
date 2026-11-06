@@ -39,6 +39,12 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **Confirmation C4 utilisateur** : connexion et fonctionnement
+  dans Zed confirmés ; statut local authenticated. Actualiser les réserves sans
+  transformer cette confirmation en acceptation des scénarios non décrits.
+  Main local est déjà ancêtre de la branche Codex ; simulation sans conflit,
+  aucune fusion nécessaire ni effectuée. Détails dans PROGRESS.
+
 - 2026-11-06 — **C4 partielle, déploiement ciblé réalisé** : gates séquentielles,
   image/relais, arrêts sans modèle et annulation sur cache synthétique réussis.
   Installation locale Codex seule, sauvegarde Zed et comptes existants préservés.

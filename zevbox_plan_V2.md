@@ -9,7 +9,8 @@
 > **Extension prévue le 2026-11-06** : conception Codex retenue dans
 > [docs/SPEC_codex.md](docs/SPEC_codex.md), exécution détaillée dans
 > [docs/PLAN_codex.md](docs/PLAN_codex.md). C0, C1, C2a, C2 et C3 sont validées ; Codex est activé avec son auth dédiée.
-> Connexion réelle, modèle et interface Zed restent à accepter en C4.
+> Connexion et fonctionnement dans Zed confirmés par l’utilisateur le 2026-11-06 ;
+> scénarios détaillés de permissions, annulation, modèles et sessions encore à vérifier en C4.
 > Reprise C4 : tests réels et gate 17 séquentiels, sans construction ni nettoyage
 > concurrents ; les états `/tmp` partagent le runtime et le builder global.
 > Déploiement local autorisé par `make install`, `update --agent codex`,

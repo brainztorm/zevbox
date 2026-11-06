@@ -1,6 +1,6 @@
 # Spécification de Codex en ACP dans Zevbox
 
-Qualification C4 reprise le 2026-11-06 : gates séquentielles, image et relais réels réussis ; connexion personnelle et usage Zed encore à accepter. Setup global non validé (expiration Antigravity préexistante) ; voir [PROGRESS.md](PROGRESS.md). C0–C3 conservées, C4 non acceptée.
+Qualification C4 reprise le 2026-11-06 : gates séquentielles, image et relais réels réussis ; connexion et fonctionnement dans Zed confirmés par l’utilisateur, scénarios détaillés encore à vérifier. Setup global non validé (expiration Antigravity préexistante) ; voir [PROGRESS.md](PROGRESS.md). C0–C3 conservées, C4 non acceptée.
 
 Statut : conception retenue et précisée par l'humain le 2026-11-06 ; faits
 techniques mesurés en VM le même jour (§8.1) ; C0 à C3 validées ; acceptation C4 encore à faire. La
@@ -363,9 +363,9 @@ adaptateur 2.5.0, moteur `codex-cli` 0.165.0.
 - [Zed 1.25.3, `authenticate`](https://github.com/zed-industries/zed/blob/v1.25.3/crates/agent_servers/src/acp.rs#L2054) : requête envoyée avec le seul `methodId`.
 
 Les mesures du §8.1 couvrent l'installation Linux arm64, les droits du cache, le
-comportement sans capacités hôte, le sandbox et la journalisation. La connexion
-ChatGPT réelle, l'usage d'un modèle et le comportement dans l'interface de Zed
-restent à prouver en C4 ; la lecture des sources ne les remplace pas.
+comportement sans capacités hôte, le sandbox et la journalisation. La connexion et le fonctionnement dans Zed ont ensuite été confirmés par
+l’utilisateur le 2026-11-06 ; les scénarios détaillés C4 restent à vérifier.
+La lecture des sources ne remplace pas ces essais.
 
 ## 9. Parité et différences avec Claude et Antigravity
 

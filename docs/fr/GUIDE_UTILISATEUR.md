@@ -180,7 +180,7 @@ Le login utilise `.codex-login` séparément, puis remplace `.codex/auth.json` s
 
 Codex est standard : `setup` et `update` sans sélection l’incluent dès l’état initialisé. Une release manquante déclenche la mise à jour globale : les autres agents standards et oMLX installé sont aussi reconstruits. `zevbox update --agent codex` construit Codex seul. La console propose « Se connecter à Codex » en mode interactif, avec confirmation si déjà connecté.
 
-Le sandbox natif fonctionne dans la VM, sans réseau par défaut ; `ps` n’y fonctionne pas. Modèle, effort et modes dépendent de l’adaptateur et du compte. L’historique et les bases persistent dans `state/codex/.codex`, avec les prompts, distincts des journaux Zevbox. Connexion réelle, dialogue, permissions et reprise dans Zed restent à accepter en C4.
+Le sandbox natif fonctionne dans la VM, sans réseau par défaut ; `ps` n’y fonctionne pas. Modèle, effort et modes dépendent de l’adaptateur et du compte. L’historique et les bases persistent dans `state/codex/.codex`, avec les prompts, distincts des journaux Zevbox. L’utilisateur a confirmé la connexion et le fonctionnement dans Zed le 2026-11-06. Les scénarios détaillés de permissions, annulation et reprise de session restent non vérifiés en C4.
 
 Qualification sans modèle du 2026-11-06 : image, relais, arrêt, annulation de connexion sur cache synthétique et navigation console EN/FR vérifiés ; détails et réserves dans [PROGRESS.md](../PROGRESS.md). L’installation globale par `setup` reste non validée (expiration préexistante du téléchargement Antigravity à 120 s).
 

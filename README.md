@@ -141,7 +141,7 @@ Codex is a standard agent, like Claude and Antigravity; oMLX alone is optional. 
 
 On an existing installation, `setup` adds Codex through the global update: it also rebuilds the other standard agents, and oMLX if installed. `zevbox update --agent codex` builds Codex alone. The console offers “Sign in to Codex” as an interactive action, with confirmation when already signed in.
 
-Codex keeps its history and databases in `state/codex/.codex`: prompts persist there, never in Zevbox’s journals. Its own sandbox runs inside the VM, without network by default; `ps` does not work inside it. Real sign-in and Zed usage remain to be accepted in C4.
+Codex keeps its history and databases in `state/codex/.codex`: prompts persist there, never in Zevbox’s journals. Its own sandbox runs inside the VM, without network by default; `ps` does not work inside it. The user confirmed sign-in and operation in Zed on 2026-11-06. Detailed permission, cancellation and session-resumption scenarios remain unverified in C4.
 
 Account-free qualification on 2026-11-06 verified the image, relay, shutdown, cancelled login with a synthetic cache and EN/FR console navigation; evidence and limits are in [PROGRESS.md](docs/PROGRESS.md). Global `setup` remains unvalidated because the existing Antigravity download timed out at 120 seconds.
 

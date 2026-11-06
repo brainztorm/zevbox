@@ -3,7 +3,9 @@
 Reprise C4 autorisée le 2026-11-06 sur `feat/codex-acp` ; C0–C3 conservées,
 aucun ancien correctif à réappliquer. Les instructions de mission de l’humain
 remplacent les anciennes consignes d’exécution contradictoires ci-dessous.
-C4 reste ouverte jusqu’aux preuves obligatoires.
+C4 reste ouverte jusqu’aux preuves obligatoires. Connexion et fonctionnement
+dans Zed confirmés par l’utilisateur le 2026-11-06 ; cela ne valide pas tous les
+scénarios de permissions, annulation et sessions.
 
 Statut au 2026-11-06 : plan éprouvé par une répétition complète dans des copies
 jetables (§1.3). C0 à C3 sont validées ; reprise à C4. Rien ici ne vaut

@@ -42,9 +42,21 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 | C2a | Le relais refuse les versions ACP qu'il ne filtre pas | ✅ | 2026-11-06 : correctif appliqué à l’identique ; `make check` vert, 332 tests réussis, 8 ignorés, invariants OK ; empreintes protégées conformes. Refus des versions non filtrées en requête et réponse, vérifié par tests simulés ; aucun nouvel essai Zed. |
 | C2 | Activation standard, auth native et diagnostics | ✅ | 2026-11-06 : correctif appliqué à l’identique, documents EN/FR préparés. Fmt/clippy OK ; exactement les deux échecs protégés attendus. Preuve réelle : promotion, `verify_image` 18 PASS, `verify_launch` 13 PASS et ALL OK, EOF 2,3 s sans VM restante, doctor/permissions et entrée Codex OK ; état isolé nettoyé. Diff §5.6 approuvé explicitement par 👤 et appliqué ; rescellement humain confirmé et vérifié, `make check` vert (343 tests réussis, 8 ignorés), invariants OK. Auth réelle à faire en C4. |
 | C3 | Console et commandes de gestion | ✅ | 2026-11-06 : correctif appliqué à l’identique ; `make check` vert, 343 tests réussis, 8 ignorés, invariants OK. 24 actions, Codex avant oMLX, textes EN/FR et guides alignés. Rendu en terminal simulé ; essai interactif humain réservé à C4. |
-| C4 | Qualification réelle, acceptation humaine et revue documentaire | 👤 | 2026-11-06 : gates séquentielles réussies, image/relais et cycle de vie Codex vérifiés sans modèle ; déploiement local ciblé effectué. C0–C3 conservées. Setup global non validé (expiration Antigravity préexistante). Connexion personnelle, quota et usage réel Zed encore en attente. |
+| C4 | Qualification réelle, acceptation humaine et revue documentaire | 👤 | 2026-11-06 : gates séquentielles réussies, image/relais et cycle de vie Codex vérifiés sans modèle ; déploiement local ciblé effectué. C0–C3 conservées. Setup global non validé (expiration Antigravity préexistante). Connexion et fonctionnement dans Zed confirmés par l’utilisateur ; auth --status = authenticated. Scénarios détaillés et quota des essais supplémentaires encore en attente. |
 
 ## Journal
+
+- 2026-11-06 — **Confirmation utilisateur et contrôle de branche** : après les
+  refus attendus du dépôt Zevbox lui-même (I12), puis du cache Codex absent,
+  l’utilisateur confirme « C’est bon ça marche » dans le contexte de son essai
+  Zed. Contrôle local : `zevbox auth codex --status` = `authenticated`.
+  Connexion et fonctionnement de base confirmés ; aucune déduction sur les
+  scénarios détaillés de permissions, annulation, sélecteurs ou sessions.
+  Documents actifs EN/FR actualisés ; les entrées précédentes sont historiques.
+  `main` local = `0d02506`, identique au merge-base avec HEAD ; `HEAD..main`
+  vide, donc tous ses commits sont déjà inclus. Simulation
+  `git merge-tree --write-tree HEAD main` code 0 sans conflit ; aucune fusion,
+  modification de main, récupération distante ou publication effectuée.
 
 - 2026-11-06 — **C4, nettoyage et revue finale accessible** : inventaire avant
   suppression et preuves de releases/builds archivés hors des états dans
