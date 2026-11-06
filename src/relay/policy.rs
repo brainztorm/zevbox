@@ -12,6 +12,10 @@ use super::jsonrpc::{
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
+/// The only ACP version this relay filters (§7.3). Another version moves capabilities
+/// and authentication to other fields: it must never pass unfiltered (I3, I4).
+const ACP_VERSION: u64 = 1;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Policy {
     /// Canonical project root, without trailing '/'.
@@ -146,11 +150,28 @@ fn decide_response(
     let mut msg = msg;
     if dir == Direction::AgentToClient {
         if state.initialize_ids.remove(&key) {
+            if let Some(refusal) = refuse_agent_protocol(id, &msg) {
+                return Verdict::Forward(refusal);
+            }
             strip_terminal_auth_methods(state, &mut msg);
         }
         add_auth_hint(policy, &mut msg);
     }
     Verdict::Forward(msg)
+}
+
+/// A successful `initialize` answer in an ACP version the relay does not filter
+/// becomes an error for Zed, which then stops the connection.
+fn refuse_agent_protocol(id: &Value, msg: &Value) -> Option<Value> {
+    let version = msg.get("result")?.get("protocolVersion");
+    if version.and_then(Value::as_u64) == Some(ACP_VERSION) {
+        return None;
+    }
+    Some(error_response(
+        id,
+        INVALID_REQUEST,
+        &protocol_message(version),
+    ))
 }
 
 /// F2: terminal auth methods (`type: "terminal"`) and any `_meta` (which may
@@ -194,7 +215,13 @@ fn decide_client_request(
     mut msg: Value,
 ) -> Verdict {
     match method {
-        "initialize" => rewrite_client_capabilities(&mut msg),
+        "initialize" => {
+            let version = msg.pointer("/params/protocolVersion");
+            if version.and_then(Value::as_u64) != Some(ACP_VERSION) {
+                return reply_error(id, INVALID_PARAMS, &protocol_message(version));
+            }
+            rewrite_client_capabilities(&mut msg);
+        }
         "authenticate" => {
             // Only methods kept by `strip_terminal_auth_methods` (F2).
             let requested = msg
@@ -320,6 +347,11 @@ pub fn cwd_message(root: &str, cwd: &str) -> String {
 
 pub fn additional_directories_message() -> String {
     "zevbox: extra workspace folders are not supported; open a single folder.".to_string()
+}
+
+pub fn protocol_message(version: Option<&Value>) -> String {
+    let found = version.map_or("none".to_string(), Value::to_string);
+    format!("zevbox: ACP protocol version {found} is not filtered by this zevbox (only version {ACP_VERSION}). Fix: update zevbox, or use a Zed that speaks ACP version {ACP_VERSION}.")
 }
 
 pub fn auth_hint(agent: &str) -> String {

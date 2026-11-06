@@ -253,12 +253,11 @@ parcours à prouver est donc v1 avec l'adaptateur stable courant, sans en dédui
 que Codex ou Zevbox doivent rester sur d'anciennes versions.
 
 La négociation réelle à travers le relais est mesurée : v1 dans les deux sens. La
-requalifier lors d'une évolution de Zed, de l'adaptateur ou du protocole. Le relais
-actuel réécrit `clientCapabilities` de v1, mais ne contrôle `protocolVersion` nulle
-part ; v2 change notamment le schéma des capacités, l'authentification et le cycle
+requalifier lors d'une évolution de Zed, de l'adaptateur ou du protocole. Depuis C2a, le relais contrôle `protocolVersion` dans la requête et la réponse
+`initialize` et refuse toute version autre que 1 ; v2 change notamment le schéma des capacités, l'authentification et le cycle
 des prompts. Sa prise en charge ne se résume pas à autoriser le nombre `2`. Une
 version non couverte doit produire un diagnostic actionnable, jamais un passage non
-filtré ni une réécriture silencieuse de la version : l'étape C2a du plan ajoute ce
+filtré ni une réécriture silencieuse de la version : l'étape C2a du plan applique ce
 refus, commun à tous les agents, en requête comme en réponse. Si la pile retenue requiert une évolution du
 protocole, adapter ensemble politique, tables du contrat et tests avant
 l'activation de Codex, comme sujet distinct respectant I1–I13 et les agents

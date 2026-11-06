@@ -39,6 +39,8 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **C2a appliqué** : refus commun des versions ACP non filtrées dans les deux sens d’`initialize`, sans changement silencieux de version. Correctif de l’annexe repris à l’identique ; contrat, architectures et dépannage EN/FR alignés. La version 1 est le filtre livré, pas un plafond de conception permanent.
+
 - 2026-11-06 — **C1 appliqué** : composants de release et étape image Codex repris du correctif éprouvé, sans activation publique. Suppression du `bwrap` système confirmée nécessaire par la qualification prévue ; image réelle : 18 PASS, sandbox natif opérationnel, adaptateur 2.5.0 et moteur 0.165.0. Aucun compte ni modèle sollicité.
 
 - 2026-11-06 — **Nom du projet (demande 👤)** : écrire **Zevbox** dans la prose,

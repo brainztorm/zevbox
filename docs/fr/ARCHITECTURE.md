@@ -185,7 +185,7 @@ sequenceDiagram
 
 | Direction | Méthode ACP | Action de Zevbox | Raison de sécurité |
 |---|---|---|---|
-| **Client → Agent** | `initialize` | **Réécrit** | Désactive toutes les capacités hôtes (`fs`, `terminal`, `auth.terminal` à faux). |
+| **Client → Agent** | `initialize` | **Réécrit**, ou refusé par l’erreur -32602 si `protocolVersion` n’est pas 1 | Désactive toutes les capacités hôtes (`fs`, `terminal`, `auth.terminal` à faux). Une autre version d’ACP déplacerait les capacités dans des champs que le relais ne filtre pas. Une réponse initialize d’une autre version devient une erreur -32600. |
 | **Client → Agent** | `authenticate` | **Transféré** seulement pour une méthode d'authentification gardée dans la réponse à `initialize`, sinon erreur -32602 | Les méthodes d'authentification terminales sont supprimées : aucun code d'authentification ne s'exécute sur l'hôte. |
 | **Client → Agent** | `session/new`, `session/load`, `session/resume`, `session/fork` | **Réécrit** | Force le `cwd` sur la racine du projet (sinon erreur -32602, y compris pour des dossiers supplémentaires), vide `mcpServers`, supprime `_meta` et `systemPrompt`. |
 | **Client → Agent** | `session/prompt`, `session/set_mode`, `session/set_model`, `session/set_config_option`, `session/list`, `session/close`, `session/delete`, `logout` | **Transféré** | Elles n'agissent que dans la VM de l'agent. |

@@ -237,6 +237,8 @@ Zevbox protects **your Mac** from the agent. It does **not** protect the project
 
 ## Troubleshooting by error message
 
+**`zevbox: ACP protocol version <v> is not filtered by this zevbox`** — Zed speaks an ACP version the relay does not filter yet: update Zevbox.
+
 - **`zevbox is not set up. Fix: run 'zevbox setup' or 'zevbox init'`** — run `zevbox setup` in a terminal.
 - **`<path> is not an allowed project: <reason>. Fix: open a folder inside your home folder …`** — the folder open in Zed is outside the allowed zones (I2), for example a hidden `~/.…` folder or a system folder. Move the project or open another folder.
 - **`<project>/.zed is a file or a link, so zevbox cannot mask it safely (I13). Fix: …`** — rename or remove that `.zed` (a regular folder is fine), then start a new thread.

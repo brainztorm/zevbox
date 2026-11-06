@@ -208,7 +208,7 @@ sequenceDiagram
 
 | Direction | ACP method | Zevbox action | Reason |
 |---|---|---|---|
-| **Client → Agent** | `initialize` | **Rewritten** | disables every host capability (`fs`, `terminal`, `auth.terminal` all false). |
+| **Client → Agent** | `initialize` | **Rewritten**, or refused with error -32602 unless `protocolVersion` is 1 | disables every host capability (`fs`, `terminal`, `auth.terminal` all false). Another ACP version would move capabilities to fields the relay does not filter. An initialize response with another version becomes error -32600. |
 | **Client → Agent** | `authenticate` | **Forwarded** only for an auth method kept in the `initialize` response, else error -32602 | terminal auth methods are removed, so no authentication code runs on the host. |
 | **Client → Agent** | `session/new`, `session/load`, `session/resume`, `session/fork` | **Rewritten** | forces `cwd` to the project root (error -32602 otherwise, also for extra directories), empties `mcpServers`, removes `_meta` and `systemPrompt`. |
 | **Client → Agent** | `session/prompt`, `session/set_mode`, `session/set_model`, `session/set_config_option`, `session/list`, `session/close`, `session/delete`, `logout` | **Forwarded** | they only act inside the agent's VM. |

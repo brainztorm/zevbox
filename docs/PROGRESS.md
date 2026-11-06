@@ -39,7 +39,7 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 |---|---|---|---|
 | C0 | Vérifier que les versions n'ont pas bougé | ✅ | 2026-11-06 : registre stable `2.5.0 @agentclientprotocol/codex-acp@2.5.0`, Zed `1.25.3`, `container` `1.5.0`, identiques à la qualification. `make check` hors restriction vert : 324 tests réussis, 8 ignorés, `invariants: OK` ; empreintes protégées conformes. |
 | C1 | Image et composants de release sans activation publique | ✅ | 2026-11-06 : correctif appliqué à l’identique ; `make check` vert, 329 tests réussis, 8 ignorés. Image jetable : `build rc=0`, `verify_image: ALL OK` (18 PASS), adaptateur 2.5.0, moteur 0.165.0, Node 24.19.0, ACP v1 ; image, builder et dossier nettoyés. |
-| C2a | Le relais refuse les versions ACP qu'il ne filtre pas | ⬜ | Correctif `C2a_relay_version.patch` éprouvé : 332 tests. Change le comportement commun du relais. |
+| C2a | Le relais refuse les versions ACP qu'il ne filtre pas | ✅ | 2026-11-06 : correctif appliqué à l’identique ; `make check` vert, 332 tests réussis, 8 ignorés, invariants OK ; empreintes protégées conformes. Refus des versions non filtrées en requête et réponse, vérifié par tests simulés ; aucun nouvel essai Zed. |
 | C2 | Activation standard, auth native et diagnostics | ⬜ | Correctif `C2_activation_auth.patch` éprouvé : deux échecs protégés attendus, puis 343 tests avec le diff protégé. Accord 👤 et rescellement requis. |
 | C3 | Console et commandes de gestion | ⬜ | Correctif `C3_console.patch` éprouvé : 343 tests, 24 actions. |
 | C4 | Qualification réelle, acceptation humaine et revue documentaire | ⬜ | Auth, quota et Zed avec 👤 ; tests simulés insuffisants. Revue finale de tous les documents concernés selon PLAN §8.5. |
