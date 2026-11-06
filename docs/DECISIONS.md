@@ -39,7 +39,15 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
-- 2026-11-06 — **C4 suspendu sur écarts d’exécution** : tests réels lancés à tort concurremment avec un setup : témoin `buildkit` modifié (7/8 tests réussis), causalité non démontrée ; reprise séquentielle à demander selon PLAN §1.5. Setup neuf isolé code 1 : Claude 0.101.0 et Codex 2.5.0 promus, téléchargement Antigravity 1.4.5 expiré à 120 s. Aucun contournement, compte réel ou déploiement. Preuves et commandes dans PROGRESS ; C4 et backlog 15 restent ouverts.
+- 2026-11-06 — **Reprise C4 autorisée** : branche `feat/codex-acp`, sans réapplication,
+  fusion, push ni sous-agent. Tests réels puis gate 17 séquentiels, sans opération
+  de builder concurrente ; état Codex seul pour les builds indépendants. Setup
+  Antigravity expiré : non validé et hors périmètre, pas de nouvelle reconstruction
+  globale. Déploiement local ciblé autorisé, login personnel et quota distincts.
+  Correction de preuve : buildkit absent avant le SIGKILL, présent/running après ;
+  causalité non démontrée, VM et enregistrement correctement nettoyés.
+
+- 2026-11-06 — **C4 suspendu sur écarts d’exécution (historique)** : tests réels lancés à tort concurremment avec un setup : témoin `buildkit` modifié (7/8 tests réussis), causalité non démontrée ; reprise séquentielle à demander selon PLAN §1.5. Setup neuf isolé code 1 : Claude 0.101.0 et Codex 2.5.0 promus, téléchargement Antigravity 1.4.5 expiré à 120 s. Aucun contournement, compte réel ou déploiement. Preuves et commandes dans PROGRESS ; C4 et backlog 15 restent ouverts.
 
 - 2026-11-06 — **C3 : connexion Codex dans la console** : correctif de l’annexe appliqué à l’identique, feuille avant oMLX, 24 actions, connexion interactive et confirmation de reconnexion en EN/FR. Vérification par terminal simulé ; essai visuel et connexion réelle réservés à C4 avec l’humain.
 
@@ -284,7 +292,7 @@ Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (
 13. ~~**I1 et le dépôt Zevbox**~~ — **✅ décision 👤 (a) du 2026-10-29, faite le même jour** : I1 est respecté. `paths::project_rules` ajoute aux dossiers interdits le dossier source du binaire (`env!("CARGO_MANIFEST_DIR")` : un projet ne peut ni l'être, ni le contenir, ni s'y trouver), et `config::validate_project_path` refuse tout dossier dont le `Cargo.toml` déclare le paquet `zevbox` (copie du dépôt). Risque couvert : un agent qui modifierait le code que l'utilisateur recompile et installe. Preuve : `launch claude` depuis le dépôt → `is not an allowed project: it overlaps a zevbox directory (…)`, code 3, aucun conteneur.
 14. ~~**Test de fumée ACP non implémenté**~~ — **retiré du contrat le 2026-10-29 (décision 👤 : pas utile)**. Le test de fumée reste `uname`, `dpkg -s` et `/etc/zevbox-release.json` ; pas de marquage « failed » d'un lock en échec (aucun lock n'est écrit).
 
-15. **Codex en ACP — conception retenue le 2026-11-06, C0 à C3 validées, C4 suspendu** :
+15. **Codex en ACP — conception retenue le 2026-11-06, C0 à C3 validées, C4 en cours** :
     [spécification](SPEC_codex.md) et [plan d'exécution](PLAN_codex.md).
     Réutiliser Claude/Antigravity, avec Codex standard (`opt_in: false`), auth
     native sans exclusivité imposée et ACP actuel compatible. Qualification

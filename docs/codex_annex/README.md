@@ -11,7 +11,12 @@ Les quatre scripts ci-dessous restent pour C4 et les requalifications.
 | `isolated_env.sh` | C1 à C4 | crée une installation jetable sous `/tmp` |
 | `verify_image.sh` | C1, C2, C4 | contrôle une image Codex : `PASS` ou `FAIL` |
 | `verify_launch.py` | C2, C4 | contrôle `zevbox launch codex` à travers le relais : `PASS` ou `FAIL` |
-| `cleanup_isolated.sh` | C1 à C4 | supprime les images et le dossier d'une installation jetable |
+| `cleanup_isolated.sh` | C1 à C4 | supprime seulement les images Codex puis le dossier jetable |
 
 Les quatre correctifs et le diff protégé ont été retirés après C3 (PLAN §6). Les
 scripts restent : ils requalifient une nouvelle version de Zed ou de l'adaptateur.
+
+Un état jetable partage le runtime et le builder global. Aucun build ni nettoyage
+pendant les tests d’intégration. Avant nettoyage, conserver hors de l’état un
+inventaire des ressources créées ; le script ne supprime pas les images Claude
+ou Antigravity d’un état mixte. Ne jamais supprimer de ressources étrangères.

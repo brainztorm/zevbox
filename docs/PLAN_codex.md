@@ -1,6 +1,9 @@
 # Plan d'implémentation de Codex en ACP
 
-Exécution C4 suspendue le 2026-11-06 : témoin builder modifié pendant un essai concurrent et téléchargement Antigravity expiré ; voir [PROGRESS.md](PROGRESS.md). C0–C3 sont validées, C4 non acceptée.
+Reprise C4 autorisée le 2026-11-06 sur `feat/codex-acp` ; C0–C3 conservées,
+aucun ancien correctif à réappliquer. Les instructions de mission de l’humain
+remplacent les anciennes consignes d’exécution contradictoires ci-dessous.
+C4 reste ouverte jusqu’aux preuves obligatoires.
 
 Statut au 2026-11-06 : plan éprouvé par une répétition complète dans des copies
 jetables (§1.3). C0 à C3 sont validées ; reprise à C4. Rien ici ne vaut
@@ -12,10 +15,33 @@ code d'appareil ChatGPT est le parcours guidé retenu, sans exclusivité imposé
 Ce plan complète le contrat V2 pour cette extension ; il n'en retire aucun
 invariant. Il ne demande ni sous-agents ni délégation.
 
-**Mode d'emploi.** Ce plan se suit à la lettre, dans l'ordre. Quand il donne une
-commande, lancer exactement cette commande. Quand il donne un résultat attendu,
-le comparer au résultat obtenu. Au moindre écart, appliquer le §1.5 au lieu
-d'improviser. Les décisions de conception sont déjà prises : ne pas les rouvrir.
+**Procédure de reprise prioritaire.** Préserver les modifications étrangères,
+vérifier les empreintes et `make check`, puis lancer séquentiellement
+`make test-integration` et `make verify STEP=17`. L’état sous `/tmp` partage le
+runtime et le builder global : vérifier les processus concurrents avant les
+contrôles et attendre les travaux étrangers sans les interrompre. Aucun build,
+setup, update ou nettoyage d’images pendant les tests d’intégration.
+Diagnostiquer et corriger les écarts dans le périmètre Codex, sans modifier les
+fichiers protégés ni les invariants ; poursuivre les contrôles indépendants.
+Seuls un geste personnel indispensable, une consommation de quota non autorisée
+ou une modification protégée nouvelle nécessitent l’humain. Aucun sous-agent,
+aucun changement de main, fusion ou push.
+
+Pour les builds indépendants, utiliser un état jetable limité à Codex. Le setup
+global neuf a échoué au téléchargement Antigravity à 120 s : contrôle non validé,
+limite préexistante hors Codex, sans changement de délai ni répétition des builds
+globaux. Le texte `zevbox setup complete` seul ne prouve rien : relever le code de
+sortie et les releases présentes. Une reprise d’état partiel prouve seulement une
+récupération. Inventorier les ressources créées avant tout nettoyage et conserver
+cet inventaire hors de l’état ; ne toucher à aucune ressource étrangère.
+`cleanup_isolated.sh` ne supprime que les images Codex : ne pas l’utiliser sur un
+état mixte en laissant des images sans inventaire.
+
+Déploiement local autorisé : `make install`, `zevbox update --agent codex`, puis
+`zevbox zed install` avec sauvegardes et préservation des autres réglages/comptes.
+Ne pas utiliser `setup`. Préparer et lancer le login dans un terminal sûr sans
+exposer ni consigner le code, puis demander seulement le geste navigateur requis.
+Sans quota autorisé, les essais de modèle restent explicitement en attente.
 
 La comparaison attendue avec Claude et Antigravity figure dans la SPEC §9.
 L'acceptation ne doit pas promettre des interfaces de modèles, des politiques de
@@ -464,7 +490,7 @@ fichier, `update` ne synchronise pas Zed. Ne jamais y désigner le dépôt Zevbo
 - [ ] `verify_image.sh` et `verify_launch.py` : `ALL OK`. Versions de Zed, adaptateur,
   moteur et protocole consignées.
 - [ ] Installation neuve : `( . "$W/env.sh"; "$W/zevbox-bin" setup )` construit Claude,
-  Antigravity et Codex, puis affiche `zevbox setup complete`. Sans terminal, il affiche
+  Antigravity et Codex, avec code 0 et les trois releases présentes ; le résumé seul ne suffit pas. Sans terminal, il affiche
   `skipping authentication (not a terminal)`.
 - [ ] Installation existante : dans une autre installation jetable, construire Claude et
   Antigravity avec `update --agent`, puis lancer `setup`. Constater la mise à jour globale
@@ -482,9 +508,8 @@ fichier, `update` ne synchronise pas Zed. Ne jamais y désigner le dépôt Zevbo
 
 ### 7.2 Connexion et modèle réel avec l'humain
 
-Préparer d'abord le déploiement avec l'humain : `make install`, puis `zevbox setup`. Sur
-cette machine, `setup` reconstruit aussi Claude, Antigravity et oMLX (§8.4). Pour ne
-construire que Codex : `zevbox update --agent codex`.
+Déploiement autorisé : `make install`, puis `zevbox update --agent codex` et
+`zevbox zed install`. Aucun `setup` pour ce déploiement (§1).
 
 - [ ] `zevbox auth codex` : le terminal affiche `https://auth.openai.com/codex/device` et un
   code. L'humain valide dans le navigateur. Fin attendue : `codex: signed in.`
