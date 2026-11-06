@@ -12,7 +12,7 @@ Format : date — fait ou décision — comment c'est vérifié.
 - `--mount type=bind,source=<chemin avec espace>,target=...` fonctionne → `stateRoot = ~/Library/Application Support/zevbox` est conservé.
 - `--uid 501 --gid 20` : les fichiers créés dans le projet appartiennent à 501:20 sur le Mac. `--cap-drop ALL` + `--init` : fonctionnement normal.
 - Dans la VM, `/proc/mounts` montre les montages hôte en `virtiofs` (espace encodé `\040`).
-- Les lignes de progression de `container run` vont sur **stderr** (stdout propre) ; zevbox passe quand même `--progress none`.
+- Les lignes de progression de `container run` vont sur **stderr** (stdout propre) ; Zevbox passe quand même `--progress none`.
 - Après `container run --rm`, le conteneur peut exister encore un court instant : toujours vérifier avec `list` puis `delete --force` (procédure §8.3).
 - `SIGKILL` du processus `zevbox launch` : le stdin du conteneur se ferme, l'agent sort, le conteneur disparaît (< 15 s). Vérifié avec l'implémentation de référence (`tests/integration_test.rs`).
 - Réglages Zed : `~/.config/zed/settings.json` (0600) contient déjà `agent_servers.claude-acp` (ne pas toucher).
@@ -25,20 +25,31 @@ Format : date — fait ou décision — comment c'est vérifié.
 - Fichiers lus par le serveur (chaînes présentes dans le binaire) : `$HOME/.gemini/antigravity-acp/settings.json` (`{"auth":{"type":"oauth-personal"}}`) et `$HOME/.gemini/antigravity-acp/acp_token.json` (format google-auth `authorized_user` : `client_id`, `client_secret`, `refresh_token`, `token_uri`, `scopes`).
 - Authentification retenue : OAuth 2.0 PKCE exécuté **sur l'hôte** par `zevbox auth antigravity` (client ID/secret d'application installée extraits du binaire public, listener `127.0.0.1:0`, échange du code via `curl`, écriture `0600`). Rejetés : clé API Gemini (facturation au jeton, pas le forfait AI Pro), réutilisation de `~/.gemini/oauth_creds.json` (client ID gemini-cli ≠ Antigravity → `unauthorized_client`), trousseau macOS (invite de mot de passe anxiogène), OAuth depuis la VM (navigateur hôte ne joint pas `127.0.0.1` de la VM sans `-p`, interdit par I1). Détails : `docs/exploration_solutions_gemini.md`.
 - Test réel 👤 (2026-10-14) : `zevbox auth claude` → `Login successful` ; `zevbox auth antigravity` → `Google Antigravity authenticated successfully.` (les deux : le navigateur ne s'est pas ouvert tout seul, l'URL imprimée a été copiée à la main). Le `session/new` depuis un autre projet que `zevbox` est refusé — comportement voulu, voir « Décisions » 2026-10-14 : le dialogue réel avec Gemini n'est donc **pas encore prouvé**.
-- Zed (`crates/agent_servers/src/acp/transport.rs`, `spawn_stdio`, lu le 2026-10-14) : pour un projet local, le processus agent custom est lancé avec `current_dir` = premier chemin de `project.default_path_list()` (premier worktree). Le `cwd` de `session/new` vient de la même liste. → zevbox peut déduire le projet de son propre répertoire de travail au lieu de `--project`.
+- Zed (`crates/agent_servers/src/acp/transport.rs`, `spawn_stdio`, lu le 2026-10-14) : pour un projet local, le processus agent custom est lancé avec `current_dir` = premier chemin de `project.default_path_list()` (premier worktree). Le `cwd` de `session/new` vient de la même liste. → Zevbox peut déduire le projet de son propre répertoire de travail au lieu de `--project`.
 - Zed (`crates/project/src/agent_server_store.rs`, lu le 2026-10-14) : les entrées `agent_servers` sont lues avec `settings.get::<AllAgentServersSettings>(None)`, c'est-à-dire **depuis les réglages globaux uniquement** ; un `.zed/settings.json` local au projet n'est pas consulté et Zed n'offre aucun filtrage par projet. Conséquence : avec une entrée par (agent, projet), **toutes** les entrées `zevbox · …` sont visibles dans tous les projets (constaté le 2026-10-14 dans `demo-app`). Seule une entrée par agent, indépendante du projet, évite cet affichage.
-- « Auto mode unavailable: the selected model does not support Auto mode; using Accept edits instead. » (2026-10-14, après R1) : message émis par **claude-agent-acp dans le conteneur** (`dist/session-mode.js`, `AUTO_MODE_FALLBACK_NOTICE`), pas par zevbox ni par le relais. Il apparaît quand la session démarre avec `mode = "auto"` et un modèle dont `supportsAutoMode !== true`. Cause sur cette machine : Zed a enregistré dans `~/.config/zed/settings.json` → `agent_servers."zevbox · Claude".default_config_options = {"model": "haiku", "mode": "auto"}` (Zed persiste les choix faits dans le sélecteur du thread ; `haiku` est aussi le `model` de `~/.claude/settings.json` de l'hôte). Haiku ne supporte pas Auto ; l'entrée `claude-acp` de l'hôte n'a pas le message car elle a `model: "fable"`. Le relais ne modifie pas ces options (`session/set_mode`, `session/set_model`, `session/set_config_option` sont relayés tels quels).
+- « Auto mode unavailable: the selected model does not support Auto mode; using Accept edits instead. » (2026-10-14, après R1) : message émis par **claude-agent-acp dans le conteneur** (`dist/session-mode.js`, `AUTO_MODE_FALLBACK_NOTICE`), pas par Zevbox ni par le relais. Il apparaît quand la session démarre avec `mode = "auto"` et un modèle dont `supportsAutoMode !== true`. Cause sur cette machine : Zed a enregistré dans `~/.config/zed/settings.json` → `agent_servers."zevbox · Claude".default_config_options = {"model": "haiku", "mode": "auto"}` (Zed persiste les choix faits dans le sélecteur du thread ; `haiku` est aussi le `model` de `~/.claude/settings.json` de l'hôte). Haiku ne supporte pas Auto ; l'entrée `claude-acp` de l'hôte n'a pas le message car elle a `model: "fable"`. Le relais ne modifie pas ces options (`session/set_mode`, `session/set_model`, `session/set_config_option` sont relayés tels quels).
 - Même test : `zevbox zed install` / `project add` / `update` / `rollback` (tous appellent `update_zed`) **écrasent** les `default_config_options` ajoutées par Zed aux entrées gérées : `zed_settings::apply_entries` compare l'objet existant à `{type, command, args, env}` et, s'il diffère, remplace l'objet entier (`prop.set_value`). → R8.
 - Test réel 👤 (2026-10-14, soir) : depuis `demo-app`, `zevbox · Antigravity · demo-app` et `zevbox · Claude · demo-app` répondent à un prompt. Étapes 14 et 16 prouvées de bout en bout.
 
 ## Faits vérifiés — agent oMLX (2026-10-29)
 
-- **Réseau des VM** : une VM Apple Container joint internet et le réseau principal du Mac (`en0`, route par défaut, box `192.168.1.254`), mais **pas** un réseau relié par une autre interface (ici câble Ethernet USB direct `en14` en `10.0.0.0/16` vers le Mac Studio `10.0.0.2` : `curl` expire, code 28). Le Mac a `net.inet.ip.forwarding=1` et la passerelle des VM est `bridge100` (`192.168.64.1`) : le NAT de vmnet (mode partagé de macOS) ne traduit que vers l'interface principale ; vers `en14` le paquet part avec l'adresse de la VM, que le Mac Studio ne sait pas router en retour (déduction : non observé au `tcpdump`, faute de `sudo`). Contournement retenu (👤) : joindre le serveur par son adresse sur le réseau principal, `http://192.168.1.8:8000` (même serveur, confirmé par 👤 ; HTTP 401 sans clé depuis une VM). Rejetés (👤) : règle `pf` sur le Mac, route sur le Mac Studio, relais réseau dans zevbox (§0.10).
+- **Réseau des VM** : une VM Apple Container joint internet et le réseau principal du Mac (`en0`, route par défaut, box `192.168.1.254`), mais **pas** un réseau relié par une autre interface (ici câble Ethernet USB direct `en14` en `10.0.0.0/16` vers le Mac Studio `10.0.0.2` : `curl` expire, code 28). Le Mac a `net.inet.ip.forwarding=1` et la passerelle des VM est `bridge100` (`192.168.64.1`) : le NAT de vmnet (mode partagé de macOS) ne traduit que vers l'interface principale ; vers `en14` le paquet part avec l'adresse de la VM, que le Mac Studio ne sait pas router en retour (déduction : non observé au `tcpdump`, faute de `sudo`). Contournement retenu (👤) : joindre le serveur par son adresse sur le réseau principal, `http://192.168.1.8:8000` (même serveur, confirmé par 👤 ; HTTP 401 sans clé depuis une VM). Rejetés (👤) : règle `pf` sur le Mac, route sur le Mac Studio, relais réseau dans Zevbox (§0.10).
 - **Serveur oMLX 0.7.2** (`/openapi.json`) : API compatible Anthropic (`POST /v1/messages`, `tool_use` correct avec `Qwen3.8-27B-4bit`) et OpenAI ; `Authorization: Bearer` ou `x-api-key` ; `GET /v1/models/status` donne `estimated_size` et `loaded` par modèle ; `POST /v1/models/{id}/unload` et `/load` acceptent la clé API (les routes `/admin/api/*` demandent une session admin). Modèles du 2026-10-29 : `Qwen3.8-27B-4bit` (≈ 17 Go, le plus petit), `GLM-5.3-Flash-oQ4e` (≈ 191 Go), `Qwen3.8-Flash-Next-oQ8e-mtp` (≈ 205 Go), `DeepSeek-V4.1-Flash-oQ4e-mtp` (≈ 454 Go).
 - **Adaptateur `claude-agent-acp` 0.99.0** (sources du paquet npm, SDK `@anthropic-ai/claude-agent-sdk` 0.3.312) : avec `env.ANTHROPIC_BASE_URL` + `env.ANTHROPIC_AUTH_TOKEN` dans `~/.claude/settings.json`, aucune connexion claude.ai n'est demandée ; `availableModels` (réglages) reconstruit le sélecteur de modèles de Zed avec les identifiants bruts (un identifiant inconnu du SDK devient une entrée telle quelle) ; le hook `PostModelSwitch` reçoit `from_model` et `to_model` (identifiants résolus). Le mode « gateway » de l'adaptateur (`authenticate` / `providers/set`, qui liste `/v1/models`) est piloté par le client : non utilisé. Nouvelle notification agent→Zed `_auth/status_update` : refusée par le relais (I4, journalisée), sans effet visible.
 
 ## Décisions
 
+- 2026-11-06 — **Nom du projet (demande 👤)** : écrire **Zevbox** dans la prose,
+  les titres et les libellés explicatifs des schémas, en anglais comme en
+  français. Le binaire/crate `zevbox`, les chemins, URL, noms d'images, labels,
+  préfixe Zed géré `zevbox · ` et citations de sorties CLI gardent leur
+  orthographe technique. Correction éditoriale des documents existants ;
+  aucune migration des identifiants ou du stockage.
+- 2026-11-06 — **Parité Codex précisée (demande 👤)** : SPEC Codex §9 compare
+  connexion, installation, moteur, dépendances, permissions, modèles, sessions,
+  documentation et sécurité. Les fonctions de gestion et invariants communs
+  sont exigés ; les nuances natives et performances doivent être rapportées
+  lors de C4. La conception ne promet pas l'identité des trois moteurs.
 - 2026-10-13 — Langue : code, identifiants, messages CLI en anglais ; README en français.
 - 2026-10-14 — Publication GitHub : README, `docs/USER_GUIDE.md` (ex-`MANUEL_UTILISATEUR.md`) et `docs/ARCHITECTURE.md` (ex-`EXPLICATION_ET_ARCHITECTURE.md`) réécrits en anglais pour attirer des contributeurs ; les journaux de travail (plans, DECISIONS, PROGRESS, exploration) restent en français.
 - 2026-10-13 — `status` est en lecture seule (affiche `orphan`) ; `launch`, `stop` et `clean` nettoient.
@@ -51,12 +62,12 @@ Format : date — fait ou décision — comment c'est vérifié.
   - **D1** — `launch` accepte un projet inconnu : choisir un agent `zevbox · …` dans Zed vaut consentement. Plus besoin de `zevbox project add`.
   - **E1** — I2 devient une règle de **zones** : projet autorisé seulement sous `$HOME` (hors `~/Library` et tout `~/.*`, et leur contenu) ou sous `/Volumes/<disque>/…` ; tout le reste refusé (dont `/`, `$HOME` et ses parents, `/opt/homebrew`, `/Applications`, `/usr/local`, `/private`, `/tmp`, `/var`, `/etc`, `/Users/Shared`) ; refus maintenus du `stateRoot`, de `~/.local/bin` et de tout dossier **contenant** une zone interdite. Motif : écrire dans ces dossiers permet à l'agent de faire exécuter du code par le Mac (LaunchAgents, état de `container`, `config.json` → `container_binary`, binaires du PATH, `Zed.app`, `~/.config/zed/settings.json`, `~/.ssh/config`, `~/.aws` `credential_process`…). Les dossiers « à secrets » ne sont pas refusés pour leurs secrets (choix de l'utilisateur) mais parce qu'ils sont aussi des points d'exécution.
   - **F1** — `config.projects` et les commandes `project add/remove/list` sont supprimés.
-  - **G1** (**implémenté le 2026-10-16** : `release::prune_images`, `clean --images`, fin d'`update`, contrôle `doctor` `disk`) — ménage disque : après `update`, garder par agent les images de la release active et de la précédente (suppression image par image, `zevbox/*` uniquement, jamais `image prune`) ; arrêter puis supprimer la VM `buildkit` ; `doctor` affiche l'espace occupé par zevbox. Constat : un conteneur zevbox `--rm` rend son disque à l'arrêt ; ce sont `buildkit` (disque persistant non « trimé ») et les anciennes images qui s'accumulent.
+  - **G1** (**implémenté le 2026-10-16** : `release::prune_images`, `clean --images`, fin d'`update`, contrôle `doctor` `disk`) — ménage disque : après `update`, garder par agent les images de la release active et de la précédente (suppression image par image, `zevbox/*` uniquement, jamais `image prune`) ; arrêter puis supprimer la VM `buildkit` ; `doctor` affiche l'espace occupé par Zevbox. Constat : un conteneur Zevbox `--rm` rend son disque à l'arrêt ; ce sont `buildkit` (disque persistant non « trimé ») et les anciennes images qui s'accumulent.
   - Autorisation 👤 de modifier les tests protégés nécessaires à D1/E1/F1 (et de les resceller).
   - Contrat (`zevbox_plan_V2.md` §3 I2, commandes) mis à jour au moment de l'implémentation.
 - 2026-10-16 — **EXP-01** (sortie de la VM par `.zed/` et `.git/config` d'un projet autorisé) : plan et résultats détaillés retirés du dépôt et de son historique le 2026-10-29 avant sa publication (faille non corrigée chez Zed, décision 👤). Phase conteneurs sur l'hôte (A1), phase Zed dans une VM macOS Tart (Tart installé par Homebrew, B2, gardé pour de futurs tests). Tout dans Tart est impossible : Virtualization.framework n'expose la virtualisation imbriquée qu'aux invités Linux (`VZGenericPlatformConfiguration`), pas à `VZMacPlatformConfiguration` (vérifié dans le SDK 27.0 de la machine).
 - 2026-10-16 — **P1 — protection contre la sortie par fichiers du projet** (décision 👤, suite d'EXP-01) : `launch` masque `<projet>/.zed` (`--tmpfs`) et met un `<projet>/.git` existant en lecture seule (`--read-only-path`) — l'agent garde la lecture de l'historique mais ne committe plus ; `guard.rs` surveille le projet pendant la session et arrête l'agent (message dans Zed) si un `.git` apparaît ou change ailleurs qu'à la racine existante. Ce ne sont pas des montages hôte : I1 (deux montages) inchangé. Le fixture protégé `tests/fixtures/fake-container` accepte `--tmpfs` et `--read-only-path` (autorisation 👤 du 2026-10-16). Vérifié : `docs/experiments/EXP-01-resultats.md`.
-- 2026-10-21 — **Signalement à Zed et dépôt privé** (décision 👤). Le comportement trouvé par EXP-01 sur les filtres git (exécutés par Zed sans geste, même en Restricted Mode, y compris dans les sous-dépôts) est un défaut de **Zed**, pas de zevbox. Les rapports `docs/experiments/EXP-01-*.md` avaient été poussés sur le dépôt public le 2026-10-20 (≈ 1 jour d'exposition, aucun outil d'exploitation, 1 étoile, 0 fork). Le 2026-10-21 : (1) dépôt `brainztorm/zevbox` passé en **privé** ; (2) signalement privé envoyé à Zed avec le compte GitHub de l'utilisateur : **GHSA-fvw8-qqcg-f4rm** (https://github.com/zed-industries/zed/security/advisories/GHSA-fvw8-qqcg-f4rm), état `triage`, divulgation différée jusqu'à leur correctif. **À faire plus tard** : suivre la réponse de Zed ; ne remettre le dépôt en public (ou publier les rapports) qu'après leur correctif ou leur accord. Rappel : les commits des rapports restent dans l'historique git.
+- 2026-10-21 — **Signalement à Zed et dépôt privé** (décision 👤). Le comportement trouvé par EXP-01 sur les filtres git (exécutés par Zed sans geste, même en Restricted Mode, y compris dans les sous-dépôts) est un défaut de **Zed**, pas de Zevbox. Les rapports `docs/experiments/EXP-01-*.md` avaient été poussés sur le dépôt public le 2026-10-20 (≈ 1 jour d'exposition, aucun outil d'exploitation, 1 étoile, 0 fork). Le 2026-10-21 : (1) dépôt `brainztorm/zevbox` passé en **privé** ; (2) signalement privé envoyé à Zed avec le compte GitHub de l'utilisateur : **GHSA-fvw8-qqcg-f4rm** (https://github.com/zed-industries/zed/security/advisories/GHSA-fvw8-qqcg-f4rm), état `triage`, divulgation différée jusqu'à leur correctif. **À faire plus tard** : suivre la réponse de Zed ; ne remettre le dépôt en public (ou publier les rapports) qu'après leur correctif ou leur accord. Rappel : les commits des rapports restent dans l'historique git.
 - 2026-10-21 — **Revue ARGON** (contre-expertise Sonnet 5.5 ; le fichier `ARGON_REVIEW.md` a été retiré du dépôt et de son historique le 2026-10-29 avant publication, il citait la faille Zed) : décisions 👤 R1 à R6 = oui (journalisation, `shell` protégé, `tools` à planifier, ménage des dossiers `releases/`, retrait de `inventory-preexisting.json` du contrat, autorisation des tests protégés cas par cas). Règle absolue ajoutée à `AGENTS.md` : documentation toujours à jour dans le même commit. Corrigé : `stop` (contrôle d'orphelin avant `SIGTERM`, test `tests/stop_pid_reuse_test.rs`). `update` (code de sortie 1 si échec), `rollback` (refuse une image absente), `setup` (un agent en échec ne bloque pas l'autre), `doctor` (version, image, auth partagée avec `auth --status`, droits `state/*`, binaire, entrées Zed, instances ; test `tests/doctor_test.rs`), **R2 fait** : `zevbox shell` utilise `launch_args` (mêmes protections I13 que l'agent ; tests `shell_protection_test`) ; **R4 fait** : `release::prune_release_dirs` (tests unitaires ; appliqué sur la vraie machine : 965 Mo d'archives libérés, `releases/` de ~920 Mo à 188 Ko) ; **R1 fait** : journalisation `tracing` → `logs/<id>.log` (tests `launch_log_test`, vérifié sur le vrai système, I9 testé), `doctor` lit les `blocked method=` ; `launch` : surveillance du projet démarrée **avant** le conteneur et refus d'un `.zed` fichier/lien (`guard::project_files_problem`, tests `launch_zed_file_test`) ; petits écarts : `zed install --dry-run` et sorties de `zed install/uninstall`, sauvegardes Zed gardées à 20 (le plan le disait, le code gardait 30), page de succès OAuth en anglais, lecture TCP du callback OAuth en boucle (test fragmenté) ; R5 fait : `inventory-preexisting.json` retiré du contrat et `Paths::inventory_file` supprimé.
 - 2026-10-29 — **Troisième agent : oMLX** (décisions 👤 : « on passe par la plus simple », adaptateur Claude, modèle par défaut = le plus petit, déchargement du modèle quitté, modification du test protégé `zed_settings_test.rs` 2 → 3 agents acceptée). `zevbox · oMLX` = l'adaptateur Claude (même étape `claude` du Containerfile, même registre `claude-acp`) avec ses propres releases `zevbox/omlx:<id>` et son propre état `state/omlx` (I1 inchangé : deux montages ; l'abonnement Claude n'est pas touché). `zevbox auth omlx [--url U] [--model M]` tourne **sur le Mac** : URL, clé (saisie masquée, ou lue sur stdin), liste des modèles (`/v1/models/status`, sinon `/v1/models`), écriture de `state/omlx/.claude/settings.json` (`0600`, clés non gérées conservées) puis test du serveur **depuis une VM**. Réglages écrits : `env` (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` — jamais `ANTHROPIC_API_KEY`, F6 —, `ANTHROPIC_DEFAULT_MODEL` = défaut, `ANTHROPIC_SMALL_FAST_MODEL` = le plus petit, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` ; depuis le 2026-10-29, ni `ANTHROPIC_MODEL`, ni `model`, ni cases opus/sonnet/haiku, voir backlog 9), `availableModels`, `modelPicker` (mêmes modèles, backlog 11), `permissions.defaultMode` = `bypassPermissions` s'il est absent (tous les modèles du serveur), hook `PostModelSwitch` qui demande `POST /v1/models/<ancien>/unload` **dans la VM** (le relais ne change pas, `launch` reste sans réseau : I10 intact). Le petit modèle « auxiliaire » (requêtes de fond de Claude Code : titres, contrôle des commandes…) n'est jamais déchargé : il serait rechargé aussitôt. La clé n'apparaît ni en argument (`curl --config -` sur stdin), ni en `-e`, ni dans un journal (I9, testé). oMLX est **optionnel** (`AgentSpec.opt_in`) : `update`/`setup` sans `--agent` ne le construisent que s'il est déjà installé ; `doctor` le dit « optional, not installed » et, installé, teste le serveur depuis une VM (`omlx:server`). Code : `src/omlx.rs`, `src/cli/auth_omlx.rs` ; tests `tests/omlx_test.rs` + unitaires.
 - 2026-10-13 — Étape 11 : Digest vérifié `node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392`.
@@ -64,6 +75,148 @@ Format : date — fait ou décision — comment c'est vérifié.
 - 2026-10-30 — **`zevbox console`** (branche `console`, conception validée par 👤 en conversation, 5 questions ouvertes réglées par défaut dans `docs/SPEC_console.md` §1, à confirmer par 👤) : menu plein écran au clavier au-dessus des commandes, pour ne plus avoir à retenir commandes et options. Sous-commande du **binaire unique** (pas de binaire séparé) ; **interface en français** (la sortie des commandes reste en anglais) — langue remplacée le même jour par « Console bilingue » ci-dessous ; **ne réimplémente aucune commande** : chaque action lance `zevbox <commande>` (`current_exe()`) comme processus enfant, arguments un par un (I7), de sorte que la ligne de commande reste la seule source de vérité ; `ratatui` + `crossterm` (tests au `TestBackend`) ; clé oMLX sur l'**entrée standard** de `auth omlx`, jamais en argv ni en variable d'environnement ; « Êtes-vous sûr ? » (Non par défaut) pour les actions à impact ; `launch` jamais proposé (I6). Démarre sans `config.json`. Code dans `src/console/`.
 - 2026-10-30 — **Console, retours 👤 après essai** : (1) explications plus complètes dans le panneau de droite pour chaque menu et chaque action (ce que ça fait, quand s'en servir, ce que ça change ou non, conséquences), défilables avec PgUp/PgDn ; (2) la zone qui reçoit les touches est visible : cadre et titre **bleus** pour le panneau actif (menu à gauche, action à droite), l'autre en gris, et la ligne du bas dit où vont les touches ; (3) **trois couleurs au plus, au sens commun** : bleu = là où vous êtes (panneau actif, ligne sélectionnée, bouton choisi), vert = ça va (`✓ terminé`, agent installé, connecté), rouge = attention (`✗ échec`, « Êtes-vous sûr ? », non installé ou non connecté) ; le reste en couleur neutre ou gris, stderr marqué `!` sans couleur. Couleurs de la palette du terminal (suivent son thème).
 - 2026-10-30 — **Console bilingue** (demande 👤 après la 0.2.0) : l'interface de `zevbox console` existe en **anglais et en français** ; la sortie des commandes lancées reste en anglais. Langue : `zevbox console --lang en|fr`, sinon la première valeur non vide de `LC_ALL`, `LC_MESSAGES`, `LANG` (ordre POSIX) : une valeur qui commence par `fr` donne le français, tout le reste (ou rien) l'anglais ; `--lang` invalide → erreur clap, code 2. Tous les textes visibles (bandeau, menus, explications des 23 actions, durées, touches, listes, saisies, « Are you sure? » / « Êtes-vous sûr ? », Yes/No et Oui/Non avec No/Non par défaut, résultats, « Press Enter to return to the console ») sont dans une seule table, `src/console/i18n.rs` (`Lang`, `Msg`, `lang.t(Msg::…)`), testée de façon exhaustive (chaque clé a ses deux langues, mêmes paramètres). Aide de `console` : « English or French » au lieu de « French interface ».
+
+## Extension Codex retenue le 2026-11-06
+
+- **Décision 👤** : ajouter Codex avec la même expérience et les mêmes fonctions
+  de gestion que Claude et Antigravity, en réutilisant leurs implémentations.
+  Adaptateur `@agentclientprotocol/codex-acp` dans la VM, agent standard comme
+  Claude et Antigravity, connexion native fiable, CLI et console EN/FR ;
+  invariants I1–I13 conservés. Le parcours guidé utilise le CLI embarqué et le
+  code d'appareil ChatGPT. Le registre consulté indique la stable 2.5.0 ;
+  revalider et qualifier la version au début de l'exécution.
+- **Correction de la proposition de l'agent, à la demande 👤** : le statut
+  optionnel initialement proposé pour Codex était un choix de l'agent, pas une
+  demande de l'humain. Il est retiré : `opt_in: false`, inclusion dans `setup`
+  dès l'état vierge et dans `update` dès l'état initialisé, même sans release
+  (`update` exige `config.json`), mêmes règles de diagnostic et d'échec que
+  Claude/Antigravity. oMLX reste seul optionnel. La conception et le plan ont
+  été corrigés avant toute implémentation.
+- **Authentification précisée par 👤** : aucune exclusivité ChatGPT demandée.
+  La proposition de vider `authMethods` et de refuser tout `authenticate` est
+  retirée. `NO_BROWSER` masque le login navigateur mais conserve `api-key` ;
+  cette présence n'est pas un défaut en soi. Qualifier les modes natifs réellement
+  proposés après filtrage, reconnaître leurs caches valides et renvoyer vers
+  `zevbox auth codex` pour un parcours inutilisable. Pas de rejet d'un cache API
+  valide au seul motif de son mode, ni de bascule silencieuse. Le terminal reste
+  le parcours garanti, sans ouvrir l'elicitation ou l'auth terminal hôte. Une
+  reconnexion explicite doit fonctionner même si le cache révoqué à distance
+  paraît encore valide localement.
+- **ACP à jour et compatible, demande 👤** : distinguer versions de Zed, du
+  paquet adaptateur, du moteur et du protocole. Qualifier la stable actuelle,
+  sans gel permanent sur v1 et sans activer une v2 non filtrée. Si la pile
+  retenue requiert une évolution, adapter ensemble relais, tables et tests avant
+  l'activation, en sujet distinct conservant I1–I13 et les agents existants.
+  La présence d'une v2 en brouillon ne suffit pas à imposer sa migration.
+- **Ordre d'intégration corrigé après revue** : C1 prépare l'image et les
+  composants de release sans entrée publique ; C2 livre dans le même commit
+  `AGENTS`, `AgentArg`, raccordement update, auth Codex, statut et diagnostics.
+  Motif : le chemin d'auth par défaut actuel est celui de Claude, avec son état
+  et ses réglages ; il ne doit jamais recevoir Codex. Le test de statut générique
+  de console doit suivre dès C2 ; la connexion dédiée et les 24 actions arrivent
+  en C3. Le diff protégé des deux attentes Zed est donc prévu en C2.
+- **Réutilisation de `setup`** : une release standard manquante déclenche la
+  mise à jour globale existante. Sur une installation Claude/Antigravity, ajouter
+  Codex par `setup` reconstruit aussi les autres agents standards et oMLX déjà
+  installé. Documenter et tester ce cas ; seul le ciblage `update --agent codex`
+  garantit ici de ne pas modifier les releases actives des autres agents.
+- **Documentation, demande 👤 du 2026-11-06** : l'exécutant met à jour l'ensemble
+  des documents concernés dans les commits d'implémentation, y compris contrat,
+  README, guides et architectures EN/FR, AGENTS, specs et suivi. PLAN Codex §8
+  impose des livrables par étape et une revue finale des mentions, exemples,
+  schémas, messages, liens et compteurs. Les documents d'utilisation continuent
+  de décrire la version livrée tant que Codex n'est pas activé.
+- **Conception et transmission** : [SPEC_codex.md](SPEC_codex.md) et
+  [PLAN_codex.md](PLAN_codex.md), étapes C0–C4 avec fichiers exemples,
+  acceptation, essais sans quota et étapes humaines. Implémentation non démarrée.
+  Le diff de deux attentes dans `tests/zed_settings_test.rs` est proposé dans
+  le plan ; aucune autorisation de modification de fichier protégé n'est
+  déduite de l'accord de conception.
+
+### Constats statiques de la revue Codex — 2026-11-06
+
+Les sources publiques et leur portée sont détaillées dans
+[SPEC_codex.md §8](SPEC_codex.md#8-sources-et-faits-à-qualifier).
+Ces constats alimentent C0 ; ils ne prouvent ni un login ni un échange modèle.
+
+- Zed installé : **1.25.3**, build `20261023.131444`, relevé dans l'application.
+  Le [code de connexion de ce tag](https://github.com/zed-industries/zed/blob/v1.25.3/crates/agent_servers/src/acp.rs#L1026)
+  demande `ProtocolVersion::V1`. Le code préparatoire v2 ne prouve pas son usage
+  dans ces connexions.
+- Adaptateur **2.5.0** : archive npm inspectée sans installation, intégrité
+  sha512 conforme aux métadonnées, routage v1/v2, dépendance Codex `^0.165.0`.
+  Le moteur résolu Linux arm64 reste à relever dans la VM. Le `--version`
+  intercepté par l'adaptateur ne permet pas de le mesurer via
+  `codex-acp cli --version` : exécuter le binaire embarqué directement.
+- Auth : `NO_BROWSER` conserve `api-key` ; le cache est relu indépendamment
+  de la liste des méthodes. Le device login ACP réclame l'elicitation URL,
+  contrairement au login CLI retenu. Formats effectifs du cache, droits,
+  reconnexion et persistance restent à qualifier dans la VM.
+- Journaux : `APP_SERVER_LOGS` absent ou vide désactive la trace de trafic,
+  mais les erreurs brutes de `Logger.error` sur stderr nécessitent des essais
+  négatifs avec marqueurs synthétiques.
+- Questions structurées : `handleUserInput` répond avec des réponses vides
+  sans elicitation de formulaire. Qualifier l'effet sur le dialogue et le mode
+  de planification ; documenter la limite, vérifier la clarification par texte.
+- Aucun build, login ou essai Zed Codex exécuté pendant cette revue statique ;
+  aucun code ni test protégé modifié. Les essais en VM qui ont suivi sont
+  consignés dans la section suivante.
+
+### Sonde VM et répétition du plan Codex — 2026-11-06
+
+Demande 👤 : vérifier que le plan peut être mené par un agent exécutant moins
+capable. Mesures en vraies VM Apple Container avec les options de
+`zevbox launch`, sans compte ni clé réelle, et répétition complète du code dans
+des copies jetables sous `/tmp`. Le dépôt n'a reçu que des documents.
+
+- **Décision 👤 — bandeau de la console** : avec quatre agents, le bandeau peut
+  dépasser 80 colonnes ; l'utilisateur agrandit son terminal. Pas de refonte du
+  bandeau. Le test `screen_has_banner_two_panels_and_keys` contrôle le bandeau
+  abrégé à 95 colonnes au lieu de 80 (C2).
+- **Sandbox de Codex** : avec le `bubblewrap` 0.12.0 d'Ubuntu (tiré par
+  `glycin-loaders`), toute commande de Codex échoue dans la VM
+  (`bwrap: Can't mount proc on /proc: Operation not permitted`), en lecture seule
+  comme en écriture : Apple Container masque des sous-chemins de `/proc`, et Codex
+  ne reconnaît l'échec, pour se replier sans nouveau `/proc`, que sous la forme
+  écrite par son propre `bwrap`. Décision : l'image Codex supprime
+  `/usr/bin/bwrap`. Mesuré ensuite : écriture limitée au projet, `/opt` et
+  `/home/agent` protégés, réseau coupé, outils courants opérationnels, seul `ps`
+  échoue. Sans ce correctif, C0 aurait bloqué sur le mode natif.
+- **Login dans un `CODEX_HOME` séparé** : `codex login` révoque et supprime
+  d'abord la connexion qu'il trouve. L'idée d'une sauvegarde suivie d'une
+  restauration est abandonnée, car elle rendrait des jetons révoqués. Le login
+  écrit dans `state/codex/.codex-login`, et Zevbox renomme son `auth.json` sur le
+  cache seulement s'il est complet. Mesuré : Ctrl-C conserve le cache.
+- **`api-key` masqué pour Codex** : Zed 1.25.3 n'envoie que `methodId` dans
+  `authenticate`, et Zevbox ne passe aucune clé à la VM ; ce parcours ne peut pas
+  aboutir. Masquage ciblé dans le relais, renvoi vers `zevbox auth codex`. Un cache
+  API valide reste accepté ; aucun refus global d'`authenticate`. À requalifier si
+  Zed transmet un jour une clé.
+- **Version ACP** : `src/` ne contrôlait `protocolVersion` nulle part. Le contrôle
+  devient obligatoire et forme une étape à part, C2a, commune à tous les agents :
+  toute version autre que `1` est refusée avec un diagnostic, en requête comme en
+  réponse.
+- **Migration** : sur une installation antérieure à Codex, `setup` ne relance pas
+  `init`, donc `state/codex` manquait et `doctor` affichait `[WARN] permissions`.
+  Décision : `update` crée `state/<agent>` avant la promotion.
+- **Format du cache** : `auth_mode` `apikey` avec `OPENAI_API_KEY` non vide, ou
+  `chatgpt` avec les trois jetons non vides ; tout le reste est refusé.
+- **Annexe exécutable** : `docs/codex_annex/` contient un correctif par étape
+  (C1, C2a, C2, C3), le diff protégé et quatre scripts (`isolated_env.sh`,
+  `verify_image.sh`, `verify_launch.py`, `cleanup_isolated.sh`). Appliqués dans
+  l'ordre sur un dépôt propre : `make check` vert à C1 (329 tests), C2a (332),
+  C2 avec le diff protégé (343) et C3 (343) ; à C2 sans ce diff, exactement les
+  deux échecs protégés prévus. Pipeline réel en installation jetable :
+  construction et promotion en 1 min 32, `verify_image` 18 PASS, `verify_launch`
+  14 PASS, deuxième release et rollback aller-retour. L'exécutant applique ces
+  correctifs au lieu de réécrire le code ; les quatre correctifs et le diff protégé
+  sont retirés après C3, les scripts restent pour requalifier une nouvelle version.
+- **Faux positif de charge** : `session_with_wrong_cwd_rejected_before_agent`
+  (`lifecycle_test`, protégé) a échoué une fois par délai (`zevbox launch did not
+  exit within 5s`) pendant la répétition, puis réussi quatre fois sur quatre. Test
+  légitime, à conserver ; le plan dit de le relancer, jamais de le modifier.
+- **Clés et comptes** : les essais n'ont utilisé qu'une clé synthétique ; le code
+  d'appareil affiché n'a été ni utilisé ni consigné.
 
 ## À vérifier (remplir pendant les étapes indiquées)
 
@@ -101,8 +254,8 @@ Ce qui suit est écrit pour être exécuté sans autre contexte que `AGENTS.md`,
 Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (R1–R8 d'origine, EXP-01, P1/I13, D1/E1/F1/G1, revue ARGON R1/R2/R4/R5/R6). Reste :
 
 1. ~~**R3 — `tools add/remove` sans résolution du registre**~~ — **abandonné le 2026-10-30 (décision 👤)** : qu'un `tools add/remove` mette au passage le client ACP à sa dernière version est accepté (il bouge peu ; le relais refuse toute méthode non auditée ; `rollback` reste possible). Plan §8.1/§8.7 amendés pour décrire le comportement réel. La spécification `docs/SPEC_tools_rebuild.md` est conservée pour mémoire, marquée abandonnée.
-2. ~~**Faille Zed (filtres git exécutés sans geste, même en Restricted Mode)**~~ — signalée le 2026-10-21, **GHSA-fvw8-qqcg-f4rm**, toujours en `triage` le 2026-10-29 sans réponse. **Décision 👤 du 2026-10-29 : on n'attend plus, dépôt rendu public** après retrait de `docs/experiments/` et `ARGON_REVIEW.md` de tout l'historique (`git filter-repo` ; sauvegarde complète faite avant). Les protections I13 de zevbox restent documentées.
-3. **Essai réel dans Zed** du parcours « projet jamais ajouté → `+` → agent zevbox » (testé en ligne de commande, jamais dans Zed lui-même) et du message d'erreur quand le service Apple Container est arrêté.
+2. ~~**Faille Zed (filtres git exécutés sans geste, même en Restricted Mode)**~~ — signalée le 2026-10-21, **GHSA-fvw8-qqcg-f4rm**, toujours en `triage` le 2026-10-29 sans réponse. **Décision 👤 du 2026-10-29 : on n'attend plus, dépôt rendu public** après retrait de `docs/experiments/` et `ARGON_REVIEW.md` de tout l'historique (`git filter-repo` ; sauvegarde complète faite avant). Les protections I13 de Zevbox restent documentées.
+3. **Essai réel dans Zed** du parcours « projet jamais ajouté → `+` → agent Zevbox » (testé en ligne de commande, jamais dans Zed lui-même) et du message d'erreur quand le service Apple Container est arrêté.
 4. **Écarts mineurs de la revue ARGON** — 4.1 et 4.2a **tranchés le 2026-10-29 (👤) : plan amendé** (§13.11 `shutdown_background`, §8 `<id8>` sans nouveau tirage). Dernier écart **corrigé le 2026-10-29** (accord 👤) : le preflight du `launch` appelle `auth::is_authenticated`, comme `auth --status` et `doctor` (Antigravity : jeton de rafraîchissement non vide, plus seulement le fichier). Contrairement à ce qui était craint, **aucun test protégé n'a changé** ; tests ajoutés `tests/r4_launch_auth_test.rs` (2).
 5. ~~**Risque accepté (P1)**~~ — **retiré de la liste le 2026-10-29 (👤 : accepté, on n'y revient plus).** Pour mémoire : un sous-dépôt git créé par l'agent peut déclencher un premier effet côté Zed avant l'arrêt de l'agent par la surveillance (`guard.rs`).
 6. ~~Contrôle `doctor` 10 (méthodes refusées) lit tous les journaux conservés (30)~~ — **✅ corrigé le 2026-10-29** : seuls les journaux modifiés dans les 7 derniers jours comptent, et les refus déjà audités et sans effet (`relay::policy::AUDITED_REFUSALS` = `_auth/status_update`, voir 7) ne sont plus signalés (ils restent refusés par le relais).
@@ -118,8 +271,18 @@ Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (
 
 12. ~~**`prune_images` d'un état isolé supprime les images de la vraie installation**~~ — **✅ corrigé le 2026-10-29** (accord 👤). `release::stale_images_here` : une image `zevbox/*` n'est « ancienne » pour une racine d'état que si son tag est une release dont le dossier `releases/<id>/` existe **dans cette racine** (et qu'elle n'est ni `current` ni `previous` ni utilisée par une instance). Utilisé par `prune_images` (`update`, `clean --images`) et par le contrôle `disk` de `doctor`. Une image dont le dossier a déjà disparu reste (suppression à la main). Preuve réelle : depuis une racine isolée, `doctor` comptait les 5 images réelles comme anciennes (donc à supprimer) avec l'ancien binaire, 0 avec le nouveau.
 
-13. ~~**I1 et le dépôt zevbox**~~ — **✅ décision 👤 (a) du 2026-10-29, faite le même jour** : I1 est respecté. `paths::project_rules` ajoute aux dossiers interdits le dossier source du binaire (`env!("CARGO_MANIFEST_DIR")` : un projet ne peut ni l'être, ni le contenir, ni s'y trouver), et `config::validate_project_path` refuse tout dossier dont le `Cargo.toml` déclare le paquet `zevbox` (copie du dépôt). Risque couvert : un agent qui modifierait le code que l'utilisateur recompile et installe. Preuve : `launch claude` depuis le dépôt → `is not an allowed project: it overlaps a zevbox directory (…)`, code 3, aucun conteneur.
+13. ~~**I1 et le dépôt Zevbox**~~ — **✅ décision 👤 (a) du 2026-10-29, faite le même jour** : I1 est respecté. `paths::project_rules` ajoute aux dossiers interdits le dossier source du binaire (`env!("CARGO_MANIFEST_DIR")` : un projet ne peut ni l'être, ni le contenir, ni s'y trouver), et `config::validate_project_path` refuse tout dossier dont le `Cargo.toml` déclare le paquet `zevbox` (copie du dépôt). Risque couvert : un agent qui modifierait le code que l'utilisateur recompile et installe. Preuve : `launch claude` depuis le dépôt → `is not an allowed project: it overlaps a zevbox directory (…)`, code 3, aucun conteneur.
 14. ~~**Test de fumée ACP non implémenté**~~ — **retiré du contrat le 2026-10-29 (décision 👤 : pas utile)**. Le test de fumée reste `uname`, `dpkg -s` et `/etc/zevbox-release.json` ; pas de marquage « failed » d'un lock en échec (aucun lock n'est écrit).
+
+15. **Codex en ACP — conception retenue le 2026-11-06, à implémenter** :
+    [spécification](SPEC_codex.md) et [plan d'exécution](PLAN_codex.md).
+    Réutiliser Claude/Antigravity, avec Codex standard (`opt_in: false`), auth
+    native sans exclusivité imposée et ACP actuel compatible. Qualification
+    réelle et revue documentaire complète obligatoires avant acceptation.
+    Les règles communes ci-dessus restent applicables, avec les étapes C0, C1,
+    C2a, C2, C3 et C4 et l'activation/auth groupées en C2 selon le plan Codex.
+    Plan éprouvé le 2026-11-06 : correctifs testés et scripts de vérification
+    dans [`codex_annex/`](codex_annex/README.md).
 
 ## Idées reportées
 

@@ -1,6 +1,6 @@
-# AGENTS.md — guide for AI agents working on zevbox
+# AGENTS.md — guide for AI agents working on Zevbox
 
-zevbox runs ACP agents (Claude, Antigravity, and oMLX = the Claude adapter on
+Zevbox runs ACP agents (Claude, Antigravity, and oMLX = the Claude adapter on
 a local model server) for the Zed editor inside Apple Container micro-VMs, with a filtering ACP relay so the agent can never use Zed
 to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
 
@@ -18,6 +18,9 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    change with stale docs is not finished.
 2. **Protected files** (below): never edited without the human's explicit
    « 👤 » for that change; show the `git diff` first.
+3. **Project name**: write **Zevbox** in prose and documentation titles.
+   Keep technical spellings exact: `zevbox` executable/crate, paths, repository
+   URLs, image names, labels, managed Zed prefix `zevbox · ` and quoted CLI output.
 
 ## Before anything
 
@@ -27,6 +30,22 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    done. What remains is the section « Backlog » of `docs/DECISIONS.md`; follow
    the « Reste à faire » common rules there (one topic per commit, `make check`
    before each commit, docs updated in the same commit).
+   **Codex extension (design accepted 2026-11-06, not implemented yet)**:
+   for Codex work, also read `docs/SPEC_codex.md` and `docs/PLAN_codex.md`.
+   Reuse Claude/Antigravity, including `opt_in: false`; oMLX alone is optional.
+   Native login must be reliable, without a ChatGPT-only restriction or a blanket
+   ACP authentication ban. Qualify the current stable adapter against the actual
+   Zed and negotiated ACP version; the observed v1 is not a permanent ceiling.
+   Follow C0, C1, C2a, C2, C3, C4 when implementation is assigned: C1 prepares
+   image/release components without public activation; C2a makes the relay refuse
+   ACP versions it does not filter; C2 enables the standard agent together with
+   its own auth routing, state and diagnostics. The plan was rehearsed:
+   `docs/codex_annex/` holds one tested patch per step and PASS/FAIL scripts;
+   apply them, do not rewrite that code. Never expose Codex through
+   the Claude auth fallback. The design approval does not authorize the
+   protected-test diff proposed in C2. The executor must update every affected
+   project document, including EN/FR pairs, in each behaviour commit and complete
+   the repository-wide documentation review in `docs/PLAN_codex.md` §8.
 2. Rust lives in `/opt/homebrew/opt/rustup/bin` (the Makefile adds it to PATH;
    in a shell: `export PATH=/opt/homebrew/opt/rustup/bin:$PATH`).
 
@@ -79,7 +98,7 @@ ways, responses routed by pending id · I5 `cwd` == project root, no extra dirs,
 `mcpServers: []` · I6 stdout = JSON-RPC only in `launch` · I7 no host shell ·
 I8 stop/delete one verified `zevbox-*` + label container, never `--all`; « unregistered » = only containers whose `/home/agent` mount is under this state root ·
 I9 no message content/tokens in logs (`launch` journals to `logs/<id>.log` via tracing: names, paths, ids, sizes only) · I10 no network/build in `launch` ·
-I11 no unwrap/expect/panic in `src/` · I12 zevbox files (and its sources: build folder, any `Cargo.toml` named zevbox) never mounted ·
+I11 no unwrap/expect/panic in `src/` · I12 Zevbox files (and its sources: build folder, any `Cargo.toml` named `zevbox`) never mounted ·
 I13 `.zed` masked, existing `.git` read-only in the ACP container, project guard (started before the container) stops the agent on a new `.git`, `.zed` must not be a file or link (`guard.rs`).
 
 ## Common changes
@@ -97,4 +116,4 @@ I13 `.zed` masked, existing `.git` read-only in the ACP container, project guard
 Use `--all`/`-a` with `container stop|delete`; pass `-t` to the ACP container;
 mount `$HOME`, `~/.claude`, `~/.gemini`, `~/.ssh`; set `ANTHROPIC_API_KEY`
 (oMLX uses `ANTHROPIC_AUTH_TOKEN` in `state/omlx` only); put a key in argv or `-e`;
-write to the user's project from zevbox; point Zed at `target/`.
+write to the user's project from Zevbox; point Zed at `target/`.

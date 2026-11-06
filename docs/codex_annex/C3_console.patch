@@ -1,0 +1,150 @@
+diff --git a/src/console/i18n.rs b/src/console/i18n.rs
+index 955c46e..7e94a9a 100644
+--- a/src/console/i18n.rs
++++ b/src/console/i18n.rs
+@@ -107,8 +107,8 @@ messages! {
+     MenuUpdatesDesc => "An update builds a new image per agent: latest Ubuntu, latest agent version, your added tools. It is tested before being activated, and the previous version is kept so you can go back to it. Nothing updates by itself: only when you ask for it here.",
+         "Une mise à jour construit une image neuve par agent : dernière Ubuntu, dernière version de l'agent, vos outils ajoutés. Elle est testée avant d'être activée, et la version précédente est gardée pour y revenir. Rien ne se met à jour tout seul : seulement quand vous le demandez ici.";
+     MenuAuth => "Agent sign-in", "Connexion des agents";
+-    MenuAuthDesc => "Each agent signs in once: Claude with your Claude subscription, Antigravity with your Google account, oMLX with your own model server. The tokens stay in zevbox's state folder: neither your ~/.claude nor the macOS keychain is used.",
+-        "Chaque agent se connecte une fois : Claude à votre abonnement Claude, Antigravity à votre compte Google, oMLX à votre propre serveur de modèles. Les jetons restent dans le dossier d'état de zevbox : ni votre ~/.claude ni le trousseau macOS ne sont utilisés.";
++    MenuAuthDesc => "Each agent signs in once: Claude with your Claude subscription, Antigravity with your Google account, Codex with your ChatGPT account, oMLX with your own model server. The tokens stay in zevbox's state folder: neither your ~/.claude, your ~/.codex nor the macOS keychain is used.",
++        "Chaque agent se connecte une fois : Claude à votre abonnement Claude, Antigravity à votre compte Google, Codex à votre compte ChatGPT, oMLX à votre propre serveur de modèles. Les jetons restent dans le dossier d'état de zevbox : ni votre ~/.claude, ni votre ~/.codex, ni le trousseau macOS ne sont utilisés.";
+     MenuTools => "Linux tools", "Outils Linux";
+     MenuToolsDesc => "The agents' VMs already have Node, Python, git, ripgrep, jq, curl and the build tools. If another Ubuntu package (apt) is needed, add it here: it is built into the images and present in every session. What the agent installs by itself is gone at the next session.",
+         "Les VM des agents ont déjà Node, Python, git, ripgrep, jq, curl et les outils de compilation. S'il faut un autre paquet Ubuntu (apt), ajoutez-le ici : il est intégré aux images et présent à chaque session. Ce que l'agent installe lui-même disparaît à la session suivante.";
+@@ -132,6 +132,7 @@ messages! {
+     AuthStatusLabel => "Sign-in status", "État des connexions";
+     AuthClaudeLabel => "Sign in to Claude", "Se connecter à Claude";
+     AuthAntigravityLabel => "Sign in to Antigravity", "Se connecter à Antigravity";
++    AuthCodexLabel => "Sign in to Codex", "Se connecter à Codex";
+     AuthOmlxLabel => "Connect oMLX", "Connecter oMLX";
+     ToolsListLabel => "Show added tools", "Voir les outils ajoutés";
+     ToolsAddLabel => "Add a tool", "Ajouter un outil";
+@@ -168,6 +169,8 @@ messages! {
+         "La connexion se fait dans une VM jetable qui ne voit aucun de vos dossiers. Une adresse https://claude.com/… s'affiche : ouvrez-la dans le navigateur du Mac (il ne s'ouvre pas tout seul), connectez-vous avec votre abonnement Claude, puis collez le code affiché. Le jeton est rangé dans le dossier d'état de zevbox, jamais dans votre ~/.claude.";
+     AuthAntigravityDesc => "A small server opens on your Mac (127.0.0.1 only) and the browser shows the Google sign-in: choose your Google AI Pro account and allow (5 minutes at most). The token is stored in zevbox's state folder; the macOS keychain is never touched.",
+         "Un petit serveur s'ouvre sur votre Mac (127.0.0.1 seulement) et le navigateur affiche la connexion Google : choisissez votre compte Google AI Pro et autorisez (5 minutes au plus). Le jeton est rangé dans le dossier d'état de zevbox ; le trousseau macOS n'est jamais touché.";
++    AuthCodexDesc => "The sign-in happens in a throw-away VM that sees none of your folders. An address and a one-time code are printed: open the address in the Mac's browser (it does not open by itself), sign in, then enter the code. Device code sign-in may have to be enabled first in your ChatGPT security settings. The token is stored in zevbox's state folder, never in your ~/.codex.",
++        "La connexion se fait dans une VM jetable qui ne voit aucun de vos dossiers. Une adresse et un code à usage unique s'affichent : ouvrez l'adresse dans le navigateur du Mac (il ne s'ouvre pas tout seul), connectez-vous, puis saisissez le code. Il faut parfois d'abord activer la connexion par code d'appareil dans les réglages de sécurité de ChatGPT. Le jeton est rangé dans le dossier d'état de zevbox, jamais dans votre ~/.codex.";
+     AuthOmlxDesc => "Links the oMLX agent to your model server (for example a Mac Studio): its address, its API key (hidden, never on the command line) and the default model. The Mac checks the address and the key and lists the models, then zevbox writes the settings and checks that a VM reaches the server. Your Claude subscription is not used.",
+         "Relie l'agent oMLX à votre serveur de modèles (par exemple un Mac Studio) : son adresse, sa clé d'API (masquée, jamais sur la ligne de commande) et le modèle par défaut. Le Mac vérifie l'adresse et la clé et liste les modèles, puis zevbox écrit les réglages et vérifie qu'une VM atteint le serveur. Votre abonnement Claude n'est pas utilisé.";
+     ToolsListDesc => "Lists the Ubuntu packages (apt) you added to the agents' images. The base tools (Node, Python, git, ripgrep, jq, curl, compilers) are not listed: they are always there. Changes nothing.",
+diff --git a/src/console/menu.rs b/src/console/menu.rs
+index 022689d..9e2184a 100644
+--- a/src/console/menu.rs
++++ b/src/console/menu.rs
+@@ -54,6 +54,7 @@ pub enum Action {
+     AuthStatus,
+     AuthClaude,
+     AuthAntigravity,
++    AuthCodex,
+     AuthOmlx,
+     ToolsList,
+     ToolsAdd,
+@@ -302,6 +303,7 @@ impl Action {
+             Action::AuthStatus => Msg::AuthStatusLabel,
+             Action::AuthClaude => Msg::AuthClaudeLabel,
+             Action::AuthAntigravity => Msg::AuthAntigravityLabel,
++            Action::AuthCodex => Msg::AuthCodexLabel,
+             Action::AuthOmlx => Msg::AuthOmlxLabel,
+             Action::ToolsList => Msg::ToolsListLabel,
+             Action::ToolsAdd => Msg::ToolsAddLabel,
+@@ -337,6 +339,7 @@ impl Action {
+             Action::AuthStatus => Msg::AuthStatusDesc,
+             Action::AuthClaude => Msg::AuthClaudeDesc,
+             Action::AuthAntigravity => Msg::AuthAntigravityDesc,
++            Action::AuthCodex => Msg::AuthCodexDesc,
+             Action::AuthOmlx => Msg::AuthOmlxDesc,
+             Action::ToolsList => Msg::ToolsListDesc,
+             Action::ToolsAdd => Msg::ToolsAddDesc,
+@@ -359,7 +362,7 @@ impl Action {
+             Action::UpdateCheck => Msg::CostCheck,
+             Action::UpdateAll => Msg::CostUpdateAll,
+             Action::UpdateAgent => Msg::CostUpdateAgent,
+-            Action::AuthClaude | Action::AuthAntigravity => Msg::CostSignIn,
++            Action::AuthClaude | Action::AuthAntigravity | Action::AuthCodex => Msg::CostSignIn,
+             Action::AuthOmlx => Msg::CostOmlx,
+             Action::ToolsAdd | Action::ToolsRemove => Msg::CostTools,
+             Action::Doctor | Action::Clean | Action::CleanImages => Msg::CostSeconds,
+@@ -398,7 +401,11 @@ impl Action {
+     pub fn is_interactive(self) -> bool {
+         matches!(
+             self,
+-            Action::Shell | Action::AuthClaude | Action::AuthAntigravity | Action::Setup
++            Action::Shell
++                | Action::AuthClaude
++                | Action::AuthAntigravity
++                | Action::AuthCodex
++                | Action::Setup
+         )
+     }
+
+@@ -436,6 +443,7 @@ impl Action {
+         match self {
+             Action::AuthClaude => Some("claude"),
+             Action::AuthAntigravity => Some("antigravity"),
++            Action::AuthCodex => Some("codex"),
+             Action::AuthOmlx => Some("omlx"),
+             _ => None,
+         }
+@@ -562,6 +570,10 @@ impl Action {
+                 "auth".to_string(),
+                 "antigravity".to_string(),
+             ])],
++            Action::AuthCodex => vec![Invocation::interactive(vec![
++                "auth".to_string(),
++                "codex".to_string(),
++            ])],
+             Action::AuthOmlx => {
+                 let mut args = vec![
+                     "auth".to_string(),
+@@ -702,6 +714,7 @@ pub fn root() -> Menu {
+                     leaf(Action::AuthStatus),
+                     leaf(Action::AuthClaude),
+                     leaf(Action::AuthAntigravity),
++                    leaf(Action::AuthCodex),
+                     leaf(Action::AuthOmlx),
+                 ],
+             ),
+@@ -811,7 +824,7 @@ mod tests {
+         assert_eq!(updates, Some(4));
+         assert!(menu_at(&root, &[6]).is_none(), "a leaf is not a menu");
+         assert!(menu_at(&root, &[42]).is_none());
+-        assert_eq!(all_actions(&root).len(), 23);
++        assert_eq!(all_actions(&root).len(), 24);
+     }
+
+     #[test]
+@@ -846,6 +859,7 @@ mod tests {
+             ),
+             (Action::AuthClaude, &[&["auth", "claude"]]),
+             (Action::AuthAntigravity, &[&["auth", "antigravity"]]),
++            (Action::AuthCodex, &[&["auth", "codex"]]),
+             (
+                 Action::AuthOmlx,
+                 &[&[
+@@ -936,6 +950,7 @@ mod tests {
+         for a in [
+             Action::AuthClaude,
+             Action::AuthAntigravity,
++            Action::AuthCodex,
+             Action::AuthOmlx,
+         ] {
+             assert!(a
+@@ -1023,6 +1038,7 @@ mod tests {
+             [
+                 Action::AuthClaude,
+                 Action::AuthAntigravity,
++                Action::AuthCodex,
+                 Action::Shell,
+                 Action::Setup
+             ]
+@@ -1078,6 +1094,7 @@ mod tests {
+         for (action, id) in [
+             (Action::AuthClaude, "claude"),
+             (Action::AuthAntigravity, "antigravity"),
++            (Action::AuthCodex, "codex"),
+             (Action::AuthOmlx, "omlx"),
+         ] {
+             assert!(action.confirmation(&p, &snap(&[]), Lang::Fr).is_none());

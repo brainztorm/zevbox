@@ -1,4 +1,4 @@
-# Avancement zevbox
+# Avancement Zevbox
 
 Mettre à jour **après** chaque étape : statut, preuve (commande + résultat
 résumé), date. Statuts : ⬜ à faire · 🟨 en cours · ✅ terminé (gate OK) ·
@@ -28,8 +28,79 @@ précédentes ne sont pas ✅ ici.
 | 16 | 👤 Intégration Zed réelle | ✅ | `make install` compile en release et installe dans `~/.local/bin/zevbox`. `zevbox zed install` injecte les entrées `zevbox · Claude · zevbox` et `zevbox · Antigravity · zevbox` dans `~/.config/zed/settings.json` avec sauvegarde automatique dans `backups/`. Désinstallation vérifiée rétablissant le fichier à l'identique. Preuve de rejet pour projets non autorisés validée. `make verify STEP=16` OK (2026-10-13). |
 | 17 | README, AGENTS.md, acceptation | ✅ | `README.md` complet rédigé en français (installation en 3 commandes, usage quotidien, référence des 15 commandes CLI, persistance §11, invariants §3, dépannage). `AGENTS.md` présent et concis. Zéro stub restant dans `src/`. Tous les tests et invariants passent. `make verify STEP=17` OK (2026-10-13). |
 
+## Extension Codex
+
+Conception retenue par 👤 le 2026-11-06 : même expérience et mêmes fonctions de
+gestion que Claude/Antigravity. [SPEC_codex.md](SPEC_codex.md) fixe le résultat ;
+[PLAN_codex.md](PLAN_codex.md) décrit la reprise par un agent exécutant.
+Les étapes ci-dessous sont distinctes des gates historiques 0–17.
+
+| Étape | Titre | Statut | Preuve / notes |
+|---|---|---|---|
+| C0 | Vérifier que les versions n'ont pas bougé | ⬜ | Qualification de fond faite le 2026-11-06 (SPEC §8.1, sonde VM). Reste à confirmer adaptateur, Zed et `container` le jour de l'exécution (PLAN §3). |
+| C1 | Image et composants de release sans activation publique | ⬜ | Correctif `C1_image_release.patch` éprouvé : `make check` 329 tests, `verify_image` ALL OK. |
+| C2a | Le relais refuse les versions ACP qu'il ne filtre pas | ⬜ | Correctif `C2a_relay_version.patch` éprouvé : 332 tests. Change le comportement commun du relais. |
+| C2 | Activation standard, auth native et diagnostics | ⬜ | Correctif `C2_activation_auth.patch` éprouvé : deux échecs protégés attendus, puis 343 tests avec le diff protégé. Accord 👤 et rescellement requis. |
+| C3 | Console et commandes de gestion | ⬜ | Correctif `C3_console.patch` éprouvé : 343 tests, 24 actions. |
+| C4 | Qualification réelle, acceptation humaine et revue documentaire | ⬜ | Auth, quota et Zed avec 👤 ; tests simulés insuffisants. Revue finale de tous les documents concernés selon PLAN §8.5. |
+
 ## Journal
 
+- 2026-11-06 — **Plan Codex éprouvé par sonde VM et répétition** (demande 👤 :
+  « que l'agent exécuteur moins intelligent puisse mener les choses sans
+  problème ») : mesures en vraies VM Apple Container avec les options de
+  `launch`, sans compte ni clé réelle ; code de C1 à C3 écrit et validé dans des
+  copies jetables. Trouvé et corrigé dans le plan : sandbox de Codex inopérant avec
+  le `bwrap` d'Ubuntu, login révoquant l'ancien compte avant réussite, `api-key`
+  impossible depuis Zed, aucun contrôle de `protocolVersion`, `state/codex` manquant
+  sur installation existante, tests `update` impossibles avec le faux `container`,
+  deux tests non protégés oubliés, faux positif de délai. Décision 👤 sur le
+  bandeau consignée. Preuves : `make check` vert à chaque étape (329, 332, 343,
+  343 tests), pipeline réel en 1 min 32, `verify_image` 18 PASS, `verify_launch`
+  14 PASS, rollback aller-retour, nettoyage complet des images d'essai. PLAN réécrit
+  pour un exécutant à la lettre ; SPEC, DECISIONS, AGENTS et contrat alignés ;
+  annexe `docs/codex_annex/` ajoutée. Dépôt : documents seulement, aucun code ni
+  test modifié, empreintes protégées conformes. Formulation « `update` dès l'état
+  vierge » corrigée (`update` exige l'état initialisé).
+- 2026-11-06 — **Conception Codex révisée et documentation de transmission**
+  (demande 👤) : SPEC/PLAN, AGENTS, contrat et DECISIONS alignés sur une auth
+  native fiable sans exclusivité ChatGPT, sans vidage systématique
+  d'`authMethods` ni refus général d'`authenticate`. Dernière stable à qualifier avec le Zed réel,
+  pas de gel permanent d'ACP en v1. C1 prépare les composants ; C2 active
+  ensemble l'agent standard et son auth pour éviter le chemin Claude.
+  Effet global du `setup` de migration explicité ; tests prévus pour caches
+  natifs, reconnexion, journaux en échec et dialogue sans questionnaires.
+  PLAN §8 impose les mises à jour documentaires de tout le projet par
+  l'exécutant dans chaque commit, puis une revue finale EN/FR. Constats
+  statiques sourcés dans DECISIONS ; C0–C4 restent non validées. Aucun code,
+  test ni fichier protégé modifié pendant cette révision documentaire.
+  Vérification : `git diff --check` OK, liens/ancres locaux et blocs Markdown
+  des six documents contrôlés, diff protégé proposé vérifié par
+  `git apply --check` sans application, 29 empreintes protégées conformes.
+  Comparaison à l'état de travail initial : seuls ces six documents ont changé,
+  modifications préexistantes des autres fichiers conservées. `make check`
+  non relancé pour cette révision documentaire sans commit ; aucun essai VM.
+- 2026-11-06 — **Codex standard comme Claude/Antigravity (rectification 👤)** :
+  statut optionnel proposé par l'agent retiré du plan ; il ne provenait pas de
+  la demande humaine. SPEC, PLAN, AGENTS, contrat et DECISIONS alignés sur
+  `opt_in: false`, inclusion dans `setup` dès l'état vierge et dans `update` dès
+  l'état initialisé, et diagnostic
+  d'agent standard. Aucun code ni test protégé modifié.
+- 2026-11-06 — **Nom Zevbox et comparaison des agents** (demande 👤) : nom du
+  projet capitalisé dans la prose documentaire EN/FR, plans et schémas
+  explicatifs ; orthographes techniques et exemples de sorties conservés.
+  Convention ajoutée à `AGENTS.md` et DECISIONS. SPEC Codex §9 complétée avec
+  les différences prévues face à Claude/Antigravity ; PLAN Codex impose leur
+  vérification à l'acceptation. Aucun code ni fichier protégé modifié.
+- 2026-11-06 — **Préparation de Codex en ACP** (demande 👤, conception retenue) :
+  `docs/SPEC_codex.md` et `docs/PLAN_codex.md` créés, avec réutilisation des
+  exemples Claude/Antigravity/oMLX, étapes C0–C4, diff protégé proposé et critères
+  de parité CLI/console/Zed. Aucun code ni fichier protégé modifié. Base actuelle :
+  `make check` OK (fmt, clippy, tests, invariants ; les 8 tests de vraie VM restent
+  ignorés par cette commande). Première exécution restreinte : refus de socket
+  locale et échec de surveillance ; relance hors restriction : tout passe sans
+  changement de code. `shasum -a 256 -c tests/PROTECTED.sha256` et
+  `git diff --check` OK. Connexion, construction Codex et essais Zed non effectués.
 - 2026-10-13 — Harnais fourni : squelette, 167 tests (159 + 8 réels), faux
   `container`, faux agent, gates. Tous les tests ont été validés contre une
   implémentation de référence jetable (non fournie) : ils sont réalisables.
@@ -73,8 +144,8 @@ précédentes ne sont pas ✅ ici.
 - 2026-10-29 — **Backlog 4 (auth au `launch`)** : `supervisor::preflight` appelle `auth::is_authenticated` (une seule définition pour `launch`, `auth --status`, `doctor`) : un `acp_token.json` sans `refresh_token` donne `Antigravity is not authenticated. Fix: run 'zevbox auth antigravity' …` avant tout `container run`. Aucun test protégé modifié (238 tests verts) ; `tests/r4_launch_auth_test.rs` (2) ajouté.
 - 2026-10-29 — **Publication du dépôt** (décision 👤, backlog 2) : `docs/experiments/` (recette EXP-01 de la faille Zed non corrigée) et `ARGON_REVIEW.md` retirés de tout l'historique avec `git filter-repo` (sauvegarde `git bundle` complète faite avant) ; identifiants de commits cités dans les docs remplacés par les nouveaux ; audit des secrets de l'historique : seul le `client_secret` Google d'Antigravity (public dans son binaire, nécessaire à `auth antigravity`) ; dépôt `brainztorm/zevbox` passé en public.
 - 2026-10-29 — **Backlog 12 (ménage des images limité à sa racine d'état)** : `release::stale_images_here` (tag = release dont `releases/<id>/` existe ici) pour `prune_images` et le contrôle `disk` de `doctor`. Tests `stale_images_tests` (2). Preuve réelle : racine isolée, ancien binaire = `5 from old releases` (les 5 images réelles), nouveau = `none from old releases` ; racine réelle inchangée. 242 tests verts.
-- 2026-10-29 — **Relecture complète des docs** (demande 👤 : « toute la partie textuelle vérifiée et à jour ») : 4 agents en parallèle, un par paire de documents (README, guide, architecture, plan + `AGENTS.md`), chaque phrase comparée au code ; corrections faites (oMLX partout, messages exacts, ordre du preflight, tableau des verdicts du relais, cycle de vie, I5/I8, liens vers les fichiers retirés, exemple `jq` → `tree`, `Cargo.toml`) ; plan aligné sur le code pour `setup`, l'ordre du `launch`, `status`, `rollback --agent`, les doublons de `tools` ; écarts sans décision → backlog 13 (I1 et le dépôt zevbox) et 14 (test de fumée ACP) ; description GitHub avec oMLX. Reste signalé : `scripts/verify-step.sh:73` (protégé) cite encore `zevbox_plan.md`.
-- 2026-10-29 — **Backlog 13 (a) : sources de zevbox interdites comme projet** (I1/I12) : dossier source du binaire dans `forbidden` (`paths::project_rules`), refus de tout dossier dont le `Cargo.toml` déclare `zevbox` (`config::is_zevbox_source`). Tests `zevbox_source_tests` (3) ; 245 tests verts ; preuve réelle : `launch claude` depuis le dépôt refusé (`it overlaps a zevbox directory`).
+- 2026-10-29 — **Relecture complète des docs** (demande 👤 : « toute la partie textuelle vérifiée et à jour ») : 4 agents en parallèle, un par paire de documents (README, guide, architecture, plan + `AGENTS.md`), chaque phrase comparée au code ; corrections faites (oMLX partout, messages exacts, ordre du preflight, tableau des verdicts du relais, cycle de vie, I5/I8, liens vers les fichiers retirés, exemple `jq` → `tree`, `Cargo.toml`) ; plan aligné sur le code pour `setup`, l'ordre du `launch`, `status`, `rollback --agent`, les doublons de `tools` ; écarts sans décision → backlog 13 (I1 et le dépôt Zevbox) et 14 (test de fumée ACP) ; description GitHub avec oMLX. Reste signalé : `scripts/verify-step.sh:73` (protégé) cite encore `zevbox_plan.md`.
+- 2026-10-29 — **Backlog 13 (a) : sources de Zevbox interdites comme projet** (I1/I12) : dossier source du binaire dans `forbidden` (`paths::project_rules`), refus de tout dossier dont le `Cargo.toml` déclare `zevbox` (`config::is_zevbox_source`). Tests `zevbox_source_tests` (3) ; 245 tests verts ; preuve réelle : `launch claude` depuis le dépôt refusé (`it overlaps a zevbox directory`).
 - 2026-10-29 — `scripts/verify-step.sh` (protégé) : texte affiché `zevbox_plan.md` → `zevbox_plan_V2.md`, **avec l'accord 👤 du 2026-10-29** ; sa seule ligne de `tests/PROTECTED.sha256` rescellée ; `make verify STEP=17` OK.
 - 2026-10-30 — **Backlog 1 abandonné** (décision 👤) : `tools add/remove` continue de passer par le pipeline `update` (dernière version du client ACP). Plan amendé (ligne `tools`, §8.7), spécification marquée abandonnée.
 - 2026-10-30 — **Base Ubuntu courante** (décision 👤) : voir DECISIONS (2026-10-30). Tests : `image_digest_tests` ; `make check` OK ; `zevbox update` réel : 3 releases Ubuntu 26.10 promues (Claude 0.99.1, Antigravity 1.4.5, oMLX 0.99.1), anciennes images du 2026-10-14 supprimées ; `initialize` + `session/new` réels OK pour les trois.
