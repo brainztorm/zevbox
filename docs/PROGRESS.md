@@ -46,6 +46,8 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 
 ## Journal
 
+- 2026-11-06 — **Retrait des correctifs appliqués** : C1, C2a, C2, C3 et diff protégé supprimés selon PLAN §6 ; quatre scripts de qualification conservés. AGENTS, en-tête V2, PLAN §1.3, annexe README et backlog DECISIONS actualisés. Les mentions dans les journaux datés et recettes du plan restent l’historique ; ne plus tenter d’appliquer ces fichiers à la reprise C4.
+
 - 2026-11-06 — **C3 validé** : correctif console appliqué sans réécriture, `make check` vert (343 tests, 8 ignorés). Documents mis à jour : README et guides EN/FR, SPEC console, contrat, AGENTS, SPEC/PLAN Codex et DECISIONS ; recherche §8.3 relue, mentions spécifiques et historiques conservées. Diff et empreintes conformes. La revue automatique du commit C2 a initialement classé `r3_mounts_test.rs` comme protégé ; vérification de son absence du manifeste et de sa prescription explicite dans PLAN §5.2, puis nouvelle revue acceptée sans contournement.
 
 - 2026-11-06 — **C2 validé** : rescellement humain confirmé (« manifest OK confirmé »), seule ligne Zed modifiée dans le manifeste et empreintes conformes. `make check` final vert : 343 tests réussis, 8 ignorés, invariants OK. Diff protégé strictement conforme à l’accord ; documentation et statut alignés. Authentification réelle et essais Zed restent à faire en C4.

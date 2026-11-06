@@ -39,9 +39,8 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    Follow C0, C1, C2a, C2, C3, C4 when implementation is assigned: C1 prepares
    image/release components without public activation; C2a makes the relay refuse
    ACP versions it does not filter; C2 enables the standard agent together with
-   its own auth routing, state and diagnostics. The plan was rehearsed:
-   `docs/codex_annex/` holds one tested patch per step and PASS/FAIL scripts;
-   apply them, do not rewrite that code. Never expose Codex through
+   its own auth routing, state and diagnostics. The rehearsed patches have been applied and removed after C3.
+   `docs/codex_annex/` retains the PASS/FAIL requalification scripts. Never expose Codex through
    the Claude auth fallback. The design approval does not authorize the
    protected-test diff proposed in C2. The executor must update every affected
    project document, including EN/FR pairs, in each behaviour commit and complete

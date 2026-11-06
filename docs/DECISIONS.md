@@ -289,7 +289,7 @@ Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (
     réelle et revue documentaire complète obligatoires avant acceptation.
     Les règles communes ci-dessus restent applicables, avec les étapes C0, C1,
     C2a, C2, C3 et C4 et l'activation/auth groupées en C2 selon le plan Codex.
-    Plan éprouvé le 2026-11-06 : correctifs testés et scripts de vérification
+    Plan éprouvé le 2026-11-06 : correctifs appliqués et retirés après C3 ; scripts de vérification conservés
     dans [`codex_annex/`](codex_annex/README.md).
 
 ## Idées reportées

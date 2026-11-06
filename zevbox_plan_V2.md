@@ -19,7 +19,7 @@
 > C1 prépare l'image et les composants de release ; C2a fait refuser par le
 > relais, pour tous les agents, toute version d'ACP qu'il ne filtre pas ; C2
 > active ensemble l'agent standard, son auth dédiée et ses diagnostics. Le plan a
-> été éprouvé en copies jetables : correctifs et scripts dans `docs/codex_annex/`. Le `setup` commun reste une
+> été éprouvé en copies jetables : correctifs appliqués et retirés après C3 ; scripts conservés dans `docs/codex_annex/`. Le `setup` commun reste une
 > mise à jour globale lorsqu'une release standard manque, y compris lors de
 > l'ajout de Codex à une installation existante.
 > L'exécutant met à jour tous les documents concernés dans chaque commit de

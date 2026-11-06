@@ -55,7 +55,12 @@ restriction ; ne pas assouplir ces tests.
 
 ### 1.3 Annexe : ce qui est déjà prouvé
 
-Le dossier `docs/codex_annex/` contient le résultat de la répétition du
+Les correctifs de `docs/codex_annex/` ont été appliqués puis retirés après C3.
+Les quatre scripts restent pour C4 et les requalifications. Les noms de correctifs
+et commandes d’application ci-dessous décrivent la procédure exécutée ; ils ne
+sont plus des fichiers présents ni des actions de reprise.
+
+Le dossier `docs/codex_annex/` conserve les scripts issus de la répétition du
 2026-11-06. Chaque correctif a été appliqué dans l'ordre sur un dépôt propre, avec
 `make check` complet après chaque étape. Le code complet a aussi été construit et
 exécuté dans une vraie VM (SPEC §8.1).
