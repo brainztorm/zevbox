@@ -46,6 +46,26 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 
 ## Journal
 
+- 2026-11-06 — **Déploiement de `0d91211`, retour humain et revue documentaire** :
+  déploiement demandé par l’utilisateur puis `make install` réussi
+  (`/tmp/zevbox-auth-install.log`) : `make check` 350 réussis, 8 ignorés,
+  invariants OK, build release et installation dans `~/.local/bin/zevbox`.
+  Identité du binaire installé vérifiée par `cmp`, version 0.2.1.
+  L’utilisateur confirme « c’est bon de mon côté » après son essai Zed.
+  Aucun détail fournisseur simultané ou scénario C4 supplémentaire déduit.
+  Revue complémentaire : en-têtes périmés de SPEC/PLAN Codex, rubrique de
+  correction de DECISIONS et attente d’annulation de PLAN Codex corrigés.
+  SPEC/PLAN concurrence actualisés avec le déploiement et ce retour.
+  README, guides et architectures EN/FR, contrat V2 et AGENTS relus :
+  comportement concurrent déjà conforme, pas de modification nécessaire.
+  Les entrées de journal antérieures restent historiques ; la rubrique
+  résultats §8 du plan concurrence précède le déploiement §9.
+  Contrôles du commit documentaire : `make check` hors sandbox, 350 réussis,
+  8 ignorés, fmt/clippy/invariants OK (`/tmp/zevbox-auth-docs-check.log`) ;
+  liens locaux, `git diff --check` et empreintes protégées conformes.
+  Fusion suspendue à la demande de l’utilisateur ; aucune fusion ni push.
+  **C4 reste ouverte.**
+
 - 2026-11-06 — **Correction des connexions Codex simultanées validée** :
   départ sur `fix/codex-auth-concurrency` à `5980fdb`, état propre, aucun
   changement étranger. Référence `make check` hors restriction : 343 réussis,

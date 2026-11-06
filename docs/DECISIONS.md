@@ -39,6 +39,16 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **Déploiement et retour utilisateur de la correction concurrente** :
+  après livraison de `0d91211`, déploiement explicitement demandé et réalisé
+  par `make install` (contrôles inclus), binaire installé identique au build
+  release. L’utilisateur confirme « c’est bon de mon côté » après son essai Zed.
+  Ce retour ne décrit pas un essai fournisseur de deux connexions simultanées
+  ni tous les scénarios C4 ; aucune acceptation globale déduite.
+  Revue documentaire complémentaire : en-têtes SPEC/PLAN Codex et rubrique
+  de correction périmés rectifiés ; modèle persisté distingué du HOME exécuté.
+  Fusion suspendue à la demande de l’utilisateur, aucun push.
+
 - 2026-11-06 — **Correction des connexions Codex simultanées livrée**
   (mission explicite 👤, branche existante `fix/codex-auth-concurrency`) :
   collision reproduite avec deux processus du vrai binaire et caches synthétiques.
@@ -350,13 +360,15 @@ Tout le travail des revues et décisions du 2026-10-14 → 2026-10-21 est fait (
     Plan éprouvé le 2026-11-06 : correctifs appliqués et retirés après C3 ; scripts de vérification conservés
     dans [`codex_annex/`](codex_annex/README.md).
 
-## Correction préparée après la revue Codex
+## Correction livrée après la revue Codex
 
-- **Connexions simultanées Codex — à implémenter lors d’une mission distincte** :
-  suivre [SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md) et
+- **Connexions simultanées Codex — implémentées le 2026-11-06** :
+  commit `0d91211`, tests multiprocessus et gates réussis ; voir
+  [SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md) et
   [PLAN_codex_auth_concurrency.md](PLAN_codex_auth_concurrency.md).
-  La demande du 2026-11-06 porte seulement sur ces documents. La correction
-  ne clôt pas le backlog 15/C4 et ne change pas les preuves déjà consignées.
+  Binaire installé localement, puis retour utilisateur positif dans Zed.
+  La correction ne clôt pas le backlog 15/C4 ; les scénarios détaillés
+  et effets distants restent soumis aux preuves prévues.
 
 ## Idées reportées
 

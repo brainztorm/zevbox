@@ -1,10 +1,11 @@
 # Plan d'implémentation de Codex en ACP
 
-Sujet distinct préparé après revue :
+Sujet distinct livré dans `0d91211` le 2026-11-06 :
 [correction des connexions Codex simultanées](PLAN_codex_auth_concurrency.md),
-selon [sa spécification](SPEC_codex_auth_concurrency.md). La demande du
-2026-11-06 couvre la conception seulement ; aucune correction livrée ni
-nouvelle validation C4 n’en découle.
+selon [sa spécification](SPEC_codex_auth_concurrency.md). Tests multiprocessus
+et gates réussis, binaire corrigé installé localement, retour utilisateur positif
+dans Zed. Cette correction ne clôt pas C4 ; le détail des scénarios humains
+reste à qualifier.
 
 Reprise C4 autorisée le 2026-11-06 sur `feat/codex-acp` ; C0–C3 conservées,
 aucun ancien correctif à réappliquer. Les instructions de mission de l’humain
@@ -529,7 +530,9 @@ Déploiement autorisé : `make install`, puis `zevbox update --agent codex` et
 - [ ] `zevbox auth codex --status` : `authenticated`. Droits : `state/codex` en 0700,
   `.codex` en 0700, `auth.json` en 0600. Une nouvelle VM relit le même état.
 - [ ] Reconnexion : relancer `zevbox auth codex`, annuler avec Ctrl-C. Attendu : message
-  `the Codex sign-in did not finish`, compte actuel toujours utilisable dans Zed.
+  `the Codex sign-in did not finish`. Cette tentative ne publie rien.
+  Sans publication concurrente, le compte reste utilisable dans Zed ; une autre
+  tentative réussie peut changer le compte actif.
 - [ ] Compte révoqué à distance, si l'humain l'accepte : Zed affiche
   `Authentication required → run 'zevbox auth codex' in a macOS terminal.`, et
   `zevbox auth codex` reconnecte.

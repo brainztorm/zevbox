@@ -2,7 +2,11 @@
 
 Statut au 2026-11-06 : **implémentée et validée sans compte** sur
 `fix/codex-auth-concurrency`. Tests et gates détaillés dans
-[le plan d’exécution](PLAN_codex_auth_concurrency.md#8-résultats). C4 reste ouverte.
+[le plan d’exécution](PLAN_codex_auth_concurrency.md#8-résultats).
+Commit `0d91211` ensuite installé localement avec `make install` ;
+l’utilisateur confirme son essai Zed positif. Les tests de concurrence restent
+des preuves sans compte ; aucun essai fournisseur simultané n’est déduit de ce
+retour. C4 reste ouverte.
 
 ## 1. Problème et résultat attendu
 

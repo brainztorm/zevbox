@@ -1,10 +1,13 @@
 # Spécification de Codex en ACP dans Zevbox
 
-Correction préparée après revue, non implémentée : l’isolation des tentatives
-de connexion simultanées est définie dans
-[SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md), avec son
-[plan d’exécution](PLAN_codex_auth_concurrency.md). Les descriptions du dossier
-fixe ci-dessous décrivent encore le code livré ; cette conception ne clôt pas C4.
+Correction des connexions simultanées implémentée dans `0d91211` le
+2026-11-06 : chaque tentative possède un dossier privé unique et publie son
+cache atomiquement après réussite et validation. Le dossier fixe reste
+uniquement le modèle persisté des releases compatibles. Voir
+[SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md) et son
+[plan d’exécution](PLAN_codex_auth_concurrency.md). Binaire corrigé déployé
+localement par `make install`, puis retour utilisateur positif dans Zed.
+Cela ne clôt pas C4 ni ne prouve les effets distants de connexions simultanées.
 
 Qualification C4 reprise le 2026-11-06 : gates séquentielles, image et relais réels réussis ; connexion et fonctionnement dans Zed confirmés par l’utilisateur, scénarios détaillés encore à vérifier. Setup global non validé (expiration Antigravity préexistante) ; voir [PROGRESS.md](PROGRESS.md). C0–C3 conservées, C4 non acceptée.
 
@@ -27,7 +30,7 @@ I1–I13 de [zevbox_plan_V2.md](../zevbox_plan_V2.md) s'appliquent intégralemen
 | Adaptateur | `@agentclientprotocol/codex-acp`, version stable exacte résolue dans le registre ACP ; aucune version `preview`. |
 | Exécution | L'adaptateur et son Codex App Server tournent dans la même VM Linux arm64. |
 | Installation | Agent standard (`opt_in: false`), comme Claude et Antigravity. `setup` construit sa release manquante et propose sa connexion ; `update` sans `--agent` le traite même s'il n'a jamais été installé. Le quick start `auth codex` et le ciblage `update --agent codex` restent disponibles. |
-| Connexion principale | `zevbox auth codex` utilise le CLI Codex embarqué, avec connexion ChatGPT par code d'appareil dans une VM jetable et stockage Linux dédié. Le login tourne dans un `CODEX_HOME` séparé : il ne remplace le compte actuel qu'après réussite (§5). |
+| Connexion principale | `zevbox auth codex` utilise le CLI Codex embarqué, avec connexion ChatGPT par code d'appareil dans une VM jetable et stockage Linux dédié. Chaque tentative utilise un `CODEX_HOME` privé unique ; la dernière publication atomique réussie devient active (§5). |
 | Autres modes natifs | Pas d'exclusivité ChatGPT : un cache natif valide par clé API est reconnu. Pas d'assistant de saisie de clé dans ce chantier, et Zed ne peut pas transmettre de clé à travers le relais (§5). Pas de bascule silencieuse. L'accès aux modèles et la facturation dépendent du mode choisi. |
 | Version ACP | Dernière version stable de l'adaptateur, protocole négocié compatible avec le Zed utilisé et couvert par le relais. La v1 observée aujourd'hui n'est pas un plafond permanent ; voir §6. |
 | Interface | CLI, entrée Zed et console EN/FR, avec les mêmes mécanismes de confirmation et de diagnostic que les agents existants. |

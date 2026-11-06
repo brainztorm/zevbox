@@ -1,6 +1,8 @@
 # Plan de correction des connexions Codex simultanées
 
 Statut au 2026-11-06 : **implémenté et validé sans compte** ; résultats en §8.
+Après ces contrôles : déploiement local et retour utilisateur positif dans Zed
+(§9), sans acceptation globale C4.
 Les instructions ci-dessous conservent le déroulé de la mission exécutée.
 Aucun fichier protégé modifié. Contrat de cette évolution :
 [SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md).
@@ -217,3 +219,18 @@ existantes. C4 reste ouverte ; rafraîchissements de sessions concurrentes et
 effets distants fournisseur hors portée. SIGKILL peut laisser un dossier privé
 et un enfant provisoire ; aucune collecte automatique ni garantie de nettoyage
 après toute interruption.
+
+
+## 9. Déploiement ultérieur et retour humain
+
+Après le commit `0d91211`, l’utilisateur a explicitement demandé le
+déploiement : `make install` réussi, dont `make check` (350 réussis,
+8 ignorés, invariants OK) et compilation release. `cmp` confirme l’identité
+entre `target/release/zevbox` et `~/.local/bin/zevbox` ; version `0.2.1`.
+Log local : `/tmp/zevbox-auth-install.log`. Aucun update ni rebuild d’image.
+
+L’utilisateur confirme ensuite « c’est bon de mon côté » dans le contexte de
+son essai Zed. Aucun détail supplémentaire sur deux connexions fournisseur
+simultanées, les permissions ou les sessions n’est déduit. C4 reste ouverte.
+La fusion envisagée a été suspendue à sa demande ; aucune fusion ni push
+effectué lors de cette mise à jour documentaire.
