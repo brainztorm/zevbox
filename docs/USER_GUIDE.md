@@ -197,7 +197,7 @@ The login runs in a throw-away VM. Open the printed address in the Mac’s brows
 
 Login uses a separate `.codex-login`, then replaces `.codex/auth.json` only after success. `state/codex` and `.codex` have mode `0700`, the cache `0600`. `--status` accepts a complete ChatGPT or API cache; it checks neither remote validity nor quota. A valid API-key login stored by Codex is accepted, without a Zevbox key prompt or key transmission from Zed. Never mount the Mac’s `~/.codex`.
 
-Codex is standard: `setup` and unselected `update` include it once initialised. A missing standard release triggers the global update: other standard agents and installed oMLX are also rebuilt. `zevbox update --agent codex` builds Codex alone. Dedicated console sign-in arrives in C3; use the terminal until then.
+Codex is standard: `setup` and unselected `update` include it once initialised. A missing standard release triggers the global update: other standard agents and installed oMLX are also rebuilt. `zevbox update --agent codex` builds Codex alone. The console offers “Sign in to Codex” as an interactive action, with confirmation when already signed in.
 
 The native sandbox runs inside the VM, without network by default; `ps` does not work inside it. Model, effort and modes depend on the adapter and account. History and databases persist in `state/codex/.codex`, including prompts, separately from Zevbox’s journals. Real sign-in, dialogue, permissions and session resumption in Zed remain to be accepted in C4.
 
@@ -437,7 +437,7 @@ palette, so they follow its theme.
 
 The menus: **Running agents** (status, stop one or all, read a session log), **Updates**
 (check, update everything or one agent, go back to the previous version), **Agent sign-in**
-(sign-in status, Claude, Antigravity, oMLX), **Linux tools** (show, add, remove), **Diagnosis
+(sign-in status, Claude, Antigravity, Codex, oMLX), **Linux tools** (show, add, remove), **Diagnosis
 and cleanup** (`doctor`, `clean`, `clean --images`), **Zed** (preview, install, remove the
 entries), **Shell in a VM** and **First-time setup** (`setup`). When an action needs a choice
 (an agent, a running instance, a tool; the list appears in the right-hand panel) or some text
@@ -458,7 +458,7 @@ Each action runs the real `zevbox <command>` as a child process; its output appe
 right-hand panel (lines the command writes to stderr start with `!`), ending with `✓ done`,
 `✗ failed (code N)`, `✗ failed (interrupted)` or `✗ failed (could not start the command)`. While
 it runs, Esc offers to interrupt it: SIGTERM, then SIGKILL after 5 seconds, to the command and
-everything it started. The interactive commands (the Claude and Antigravity sign-ins, the shell
+everything it started. The interactive commands (the Claude, Antigravity and Codex sign-ins, the shell
 and `setup`) hand the whole terminal over: the console steps aside, the command runs normally,
 then "Press Enter to return to the console" brings the menu back.
 

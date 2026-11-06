@@ -54,6 +54,7 @@ pub enum Action {
     AuthStatus,
     AuthClaude,
     AuthAntigravity,
+    AuthCodex,
     AuthOmlx,
     ToolsList,
     ToolsAdd,
@@ -302,6 +303,7 @@ impl Action {
             Action::AuthStatus => Msg::AuthStatusLabel,
             Action::AuthClaude => Msg::AuthClaudeLabel,
             Action::AuthAntigravity => Msg::AuthAntigravityLabel,
+            Action::AuthCodex => Msg::AuthCodexLabel,
             Action::AuthOmlx => Msg::AuthOmlxLabel,
             Action::ToolsList => Msg::ToolsListLabel,
             Action::ToolsAdd => Msg::ToolsAddLabel,
@@ -337,6 +339,7 @@ impl Action {
             Action::AuthStatus => Msg::AuthStatusDesc,
             Action::AuthClaude => Msg::AuthClaudeDesc,
             Action::AuthAntigravity => Msg::AuthAntigravityDesc,
+            Action::AuthCodex => Msg::AuthCodexDesc,
             Action::AuthOmlx => Msg::AuthOmlxDesc,
             Action::ToolsList => Msg::ToolsListDesc,
             Action::ToolsAdd => Msg::ToolsAddDesc,
@@ -359,7 +362,7 @@ impl Action {
             Action::UpdateCheck => Msg::CostCheck,
             Action::UpdateAll => Msg::CostUpdateAll,
             Action::UpdateAgent => Msg::CostUpdateAgent,
-            Action::AuthClaude | Action::AuthAntigravity => Msg::CostSignIn,
+            Action::AuthClaude | Action::AuthAntigravity | Action::AuthCodex => Msg::CostSignIn,
             Action::AuthOmlx => Msg::CostOmlx,
             Action::ToolsAdd | Action::ToolsRemove => Msg::CostTools,
             Action::Doctor | Action::Clean | Action::CleanImages => Msg::CostSeconds,
@@ -398,7 +401,11 @@ impl Action {
     pub fn is_interactive(self) -> bool {
         matches!(
             self,
-            Action::Shell | Action::AuthClaude | Action::AuthAntigravity | Action::Setup
+            Action::Shell
+                | Action::AuthClaude
+                | Action::AuthAntigravity
+                | Action::AuthCodex
+                | Action::Setup
         )
     }
 
@@ -436,6 +443,7 @@ impl Action {
         match self {
             Action::AuthClaude => Some("claude"),
             Action::AuthAntigravity => Some("antigravity"),
+            Action::AuthCodex => Some("codex"),
             Action::AuthOmlx => Some("omlx"),
             _ => None,
         }
@@ -561,6 +569,10 @@ impl Action {
             Action::AuthAntigravity => vec![Invocation::interactive(vec![
                 "auth".to_string(),
                 "antigravity".to_string(),
+            ])],
+            Action::AuthCodex => vec![Invocation::interactive(vec![
+                "auth".to_string(),
+                "codex".to_string(),
             ])],
             Action::AuthOmlx => {
                 let mut args = vec![
@@ -702,6 +714,7 @@ pub fn root() -> Menu {
                     leaf(Action::AuthStatus),
                     leaf(Action::AuthClaude),
                     leaf(Action::AuthAntigravity),
+                    leaf(Action::AuthCodex),
                     leaf(Action::AuthOmlx),
                 ],
             ),
@@ -811,7 +824,7 @@ mod tests {
         assert_eq!(updates, Some(4));
         assert!(menu_at(&root, &[6]).is_none(), "a leaf is not a menu");
         assert!(menu_at(&root, &[42]).is_none());
-        assert_eq!(all_actions(&root).len(), 23);
+        assert_eq!(all_actions(&root).len(), 24);
     }
 
     #[test]
@@ -846,6 +859,7 @@ mod tests {
             ),
             (Action::AuthClaude, &[&["auth", "claude"]]),
             (Action::AuthAntigravity, &[&["auth", "antigravity"]]),
+            (Action::AuthCodex, &[&["auth", "codex"]]),
             (
                 Action::AuthOmlx,
                 &[&[
@@ -936,6 +950,7 @@ mod tests {
         for a in [
             Action::AuthClaude,
             Action::AuthAntigravity,
+            Action::AuthCodex,
             Action::AuthOmlx,
         ] {
             assert!(a
@@ -1023,6 +1038,7 @@ mod tests {
             [
                 Action::AuthClaude,
                 Action::AuthAntigravity,
+                Action::AuthCodex,
                 Action::Shell,
                 Action::Setup
             ]
@@ -1078,6 +1094,7 @@ mod tests {
         for (action, id) in [
             (Action::AuthClaude, "claude"),
             (Action::AuthAntigravity, "antigravity"),
+            (Action::AuthCodex, "codex"),
             (Action::AuthOmlx, "omlx"),
         ] {
             assert!(action.confirmation(&p, &snap(&[]), Lang::Fr).is_none());

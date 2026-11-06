@@ -39,6 +39,8 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **C3 : connexion Codex dans la console** : correctif de l’annexe appliqué à l’identique, feuille avant oMLX, 24 actions, connexion interactive et confirmation de reconnexion en EN/FR. Vérification par terminal simulé ; essai visuel et connexion réelle réservés à C4 avec l’humain.
+
 - 2026-11-06 — **C2 appliqué, accord protégé en attente** : correctif activation/auth repris à l’identique. Trois agents standards et oMLX seul optionnel ; login Codex dans un état séparé jusqu’à réussite, masquage ciblé d’`api-key`, création de l’état avant promotion. Contrôles simulés : exactement les deux échecs Zed attendus avant accord. Preuve réelle isolée : promotion `codex-20261106-144209`, `verify_image: ALL OK` (18 PASS), `verify_launch: ALL OK` (13 PASS dans le script livré, contrairement aux 14 annoncés pour la répétition), EOF 2,3 s sans VM restante, marqueurs synthétiques absents des journaux. Le script comporte bien 13 appels de contrôle : aucune vérification retirée. Aucun compte réel ni quota, vrai Zed et installation utilisateur intacts ; image et état jetables supprimés. C3/C4 restent à faire.
 
 - 2026-11-06 — **C2a appliqué** : refus commun des versions ACP non filtrées dans les deux sens d’`initialize`, sans changement silencieux de version. Correctif de l’annexe repris à l’identique ; contrat, architectures et dépannage EN/FR alignés. La version 1 est le filtre livré, pas un plafond de conception permanent.

@@ -1,7 +1,7 @@
 # Plan d'implémentation de Codex en ACP
 
 Statut au 2026-11-06 : plan éprouvé par une répétition complète dans des copies
-jetables (§1.3). C0 à C2 sont validées ; reprise à C3. Rien ici ne vaut
+jetables (§1.3). C0 à C3 sont validées ; reprise à C4. Rien ici ne vaut
 acceptation C4. Résultat attendu : [SPEC_codex.md](SPEC_codex.md).
 
 L'humain demande la même expérience et les mêmes fonctions de gestion que pour

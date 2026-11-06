@@ -178,7 +178,7 @@ La connexion tourne dans une VM jetable. Ouvrez l’adresse affichée dans le na
 
 Le login utilise `.codex-login` séparément, puis remplace `.codex/auth.json` seulement après réussite. `state/codex` et `.codex` sont en `0700`, le cache en `0600`. `--status` accepte un cache complet ChatGPT ou API ; il ne vérifie ni la validité distante ni le quota. Une clé API valide déjà enregistrée par Codex est acceptée, sans assistant Zevbox ni transmission de clé depuis Zed. Ne montez jamais le `~/.codex` du Mac.
 
-Codex est standard : `setup` et `update` sans sélection l’incluent dès l’état initialisé. Une release manquante déclenche la mise à jour globale : les autres agents standards et oMLX installé sont aussi reconstruits. `zevbox update --agent codex` construit Codex seul. La connexion dédiée de console arrive en C3 ; utilisez le terminal jusque-là.
+Codex est standard : `setup` et `update` sans sélection l’incluent dès l’état initialisé. Une release manquante déclenche la mise à jour globale : les autres agents standards et oMLX installé sont aussi reconstruits. `zevbox update --agent codex` construit Codex seul. La console propose « Se connecter à Codex » en mode interactif, avec confirmation si déjà connecté.
 
 Le sandbox natif fonctionne dans la VM, sans réseau par défaut ; `ps` n’y fonctionne pas. Modèle, effort et modes dépendent de l’adaptateur et du compte. L’historique et les bases persistent dans `state/codex/.codex`, avec les prompts, distincts des journaux Zevbox. Connexion réelle, dialogue, permissions et reprise dans Zed restent à accepter en C4.
 
@@ -410,7 +410,7 @@ sûr ? », « non installé »). Ce sont les couleurs de votre terminal : elles 
 
 Les menus : **Agents en cours** (état, arrêter un agent ou tous, lire le journal d'une session),
 **Mises à jour** (vérifier, tout mettre à jour ou un seul agent, revenir en arrière),
-**Connexion des agents** (état des connexions, Claude, Antigravity, oMLX), **Outils Linux**
+**Connexion des agents** (état des connexions, Claude, Antigravity, Codex, oMLX), **Outils Linux**
 (voir, ajouter, retirer), **Diagnostic et ménage** (`doctor`, `clean`, `clean --images`),
 **Zed** (aperçu, installer, retirer les entrées), **Shell dans une VM** et **Première
 installation** (`setup`). Quand une action demande un choix (un agent, une instance en cours, un
@@ -433,7 +433,7 @@ commencent par `!`), et se termine par `✓ terminé`, `✗ échec (code N)`,
 `✗ échec (interrompue)` ou `✗ échec (impossible de lancer la commande)`. Pendant qu'elle tourne,
 Échap propose de l'interrompre : SIGTERM puis SIGKILL après 5 secondes, à la commande et à tout ce
 qu'elle a lancé.
-Les commandes interactives (connexions Claude et Antigravity, shell et `setup`) reçoivent tout le
+Les commandes interactives (connexions Claude, Antigravity et Codex, shell et `setup`) reçoivent tout le
 terminal : la console s'efface, la commande se déroule normalement, puis « Appuyez sur Entrée pour
 revenir à la console » ramène le menu.
 

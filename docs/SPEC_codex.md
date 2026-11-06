@@ -1,7 +1,7 @@
 # Spécification de Codex en ACP dans Zevbox
 
 Statut : conception retenue et précisée par l'humain le 2026-11-06 ; faits
-techniques mesurés en VM le même jour (§8.1) ; C0 à C2 validées ; C3 et acceptation C4 restent à faire. La
+techniques mesurés en VM le même jour (§8.1) ; C0 à C3 validées ; acceptation C4 encore à faire. La
 connexion doit être simple et fiable, sans exclusivité ChatGPT imposée ; ACP doit
 rester à jour et compatible avec le Zed utilisé. Le plan d'exécution associé est
 [PLAN_codex.md](PLAN_codex.md).

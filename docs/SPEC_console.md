@@ -38,7 +38,7 @@
   `WORKED EXAMPLE`. Le terminal est **toujours restauré** (mode brut, écran alterné, curseur),
   y compris en cas d'erreur.
 
-Depuis C2, les listes et le statut générique suivent les quatre agents : Claude, Antigravity, oMLX et Codex (trois standards, oMLX seul optionnel). La connexion Codex dédiée arrive en C3 ; jusque-là, utiliser `zevbox auth codex` au terminal. Le compteur reste à 23 actions avant C3.
+Depuis C2, les listes et le statut générique suivent les quatre agents : Claude, Antigravity, oMLX et Codex (trois standards, oMLX seul optionnel). Depuis C3, la connexion Codex dédiée est disponible en mode interactif, avant oMLX dans le menu, avec confirmation de reconnexion. Le menu compte 24 actions.
 
 ## 3. Écran
 
@@ -122,6 +122,7 @@ Chaque feuille = une commande `zevbox …`. Libellés en anglais, le français e
   - Sign-in status (État des connexions) — `auth <a> --status` pour chaque agent, l'un après l'autre
   - Sign in to Claude (Se connecter à Claude) — `auth claude` (interactif, §7 ; confirmation si déjà connecté)
   - Sign in to Antigravity (Se connecter à Antigravity) — `auth antigravity` (interactif ; confirmation si déjà connecté)
+  - Sign in to Codex (Se connecter à Codex) — `auth codex` (interactif ; confirmation si déjà connecté)
   - Connect oMLX (Connecter oMLX) — saisie de l'adresse (pré-remplie avec l'actuelle), de la clé (masquée ;
     vide = garder l'actuelle) et du modèle (optionnel) → `auth omlx --url <u> [--model <m>]`,
     clé sur stdin (confirmation si déjà connecté)

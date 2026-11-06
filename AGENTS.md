@@ -30,7 +30,7 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    done. What remains is the section « Backlog » of `docs/DECISIONS.md`; follow
    the « Reste à faire » common rules there (one topic per commit, `make check`
    before each commit, docs updated in the same commit).
-   **Codex extension (C0–C2 validated 2026-11-06; resume at C3)**:
+   **Codex extension (C0–C3 validated 2026-11-06; resume at C4)**:
    for Codex work, also read `docs/SPEC_codex.md` and `docs/PLAN_codex.md`.
    Reuse Claude/Antigravity, including `opt_in: false`; oMLX alone is optional.
    Native login must be reliable, without a ChatGPT-only restriction or a blanket
