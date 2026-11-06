@@ -98,7 +98,7 @@ permet aussi de se reconnecter : un cache local bien formé mais révoqué à
 distance ne doit pas empêcher le lancement du login natif.
 
 Après connexion, la commande vérifie le résultat et indique la prochaine action
-dans Zed. Une erreur ou une annulation ne détruit pas un ancien état valide. La
+dans Zed. Une erreur ou une annulation ne publie rien pour cette tentative ; une autre tentative simultanée peut publier une nouvelle connexion. La
 connexion par code d'appareil est une fonction bêta d'OpenAI : son activation dans
 les réglages de sécurité du compte, ou par un administrateur de workspace, est
 expliquée avec une action corrective, sans repli silencieux sur une clé API ou une
@@ -134,7 +134,7 @@ mais ne peut pas committer dans le `.git` racine protégé.
 | `image_repo` | `zevbox/codex` |
 | `npmPackage` | `@agentclientprotocol/codex-acp@<version stable exacte>` |
 | `agentCommand` | `/opt/zevbox/codex/node_modules/.bin/codex-acp` |
-| `authCommand` | `env`, `CODEX_HOME=/home/agent/.codex-login`, puis le même exécutable, `cli`, `-c`, `cli_auth_credentials_store="file"`, `login`, `--device-auth`. Syntaxe et démarrage du flux vérifiés en VM. |
+| `authCommand` | `env`, `CODEX_HOME=/home/agent/.codex-login`, puis le même exécutable, `cli`, `-c`, `cli_auth_credentials_store="file"`, `login`, `--device-auth`. Modèle persisté compatible : HOME substitué à l’exécution uniquement, sans modifier le lock ni reconstruire l’image. Syntaxe et démarrage du flux vérifiés en VM. |
 | `authMarker` | `.codex/auth.json` (vérifié en VM). |
 | Image | `ENV NO_BROWSER=1` ; `/usr/bin/bwrap` supprimé, indispensable au sandbox de Codex (§6). |
 | État hôte | `stateRoot/state/codex`, monté en `/home/agent`. |
@@ -174,14 +174,14 @@ Codex partageant l'assemblage, pour éviter les noms, labels et chemins Claude
 codés en dur. Ni configuration de modèle Claude ni instructions Claude ne sont
 appliquées à Codex.
 
-Le login tourne avec `CODEX_HOME=/home/agent/.codex-login`. En effet,
+Le login tourne avec `CODEX_HOME=/home/agent/.codex-login-<suffixe>`, unique par tentative (correction du 2026-11-06, [spécification](SPEC_codex_auth_concurrency.md)). En effet,
 `codex login` commence par révoquer à distance puis supprimer la connexion qu'il
 trouve dans son `CODEX_HOME` (`clear_existing_auth_before_login`, Codex 0.165.0).
 Lancé sur le vrai `.codex`, un échec ou une annulation ferait perdre un compte
 valide, et une sauvegarde suivie d'une restauration rendrait des jetons déjà
-révoqués. Zevbox crée donc un dossier de login vide, vérifie le `auth.json` obtenu,
+révoqués. Zevbox crée donc atomiquement un dossier privé unique de login vide, vérifie le `auth.json` régulier sans lien obtenu après code de sortie 0,
 le renomme sur `state/codex/.codex/auth.json` seulement s'il est complet, puis
-supprime le dossier de login. Mesuré le 2026-11-06 : Ctrl-C pendant l'attente du
+supprime seulement son dossier de login. Une tentative échouée ou annulée ne publie rien ; une autre tentative simultanée peut réussir. Chaque connexion possède un dossier privé `state/codex/.codex-login-<suffixe>`. La dernière publication atomique réussie devient active. Le nettoyage normal ne supprime que ce dossier ; une interruption brutale (dont SIGKILL) peut laisser un résidu privé, jamais repris ni balayé par les connexions suivantes. Attendre la fin de ses processus avant toute suppression manuelle. Mesuré avant cette correction le 2026-11-06 : Ctrl-C pendant l'attente du
 code laisse le cache intact, sans dossier de login ni VM restants.
 
 Le HOME Linux dédié place les données sous `/home/agent/.codex`. Le stockage

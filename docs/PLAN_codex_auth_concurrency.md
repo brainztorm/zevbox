@@ -1,8 +1,8 @@
 # Plan de correction des connexions Codex simultanées
 
-Statut au 2026-11-06 : **prêt pour une mission d’implémentation ultérieure**.
-La demande actuelle porte uniquement sur la conception et ce plan ; aucun code,
-test ou fichier protégé n’est modifié. Contrat de cette évolution :
+Statut au 2026-11-06 : **implémenté et validé sans compte** ; résultats en §8.
+Les instructions ci-dessous conservent le déroulé de la mission exécutée.
+Aucun fichier protégé modifié. Contrat de cette évolution :
 [SPEC_codex_auth_concurrency.md](SPEC_codex_auth_concurrency.md).
 
 ## 1. Mission et préparation
@@ -174,3 +174,46 @@ Ne pas annoncer C4 terminée ni une validation fournisseur avec les caches simul
 > fichiers protégés, les comptes, les images, les autres agents et les invariants.
 > Aucun sous-agent, déploiement, fusion ou push. Termine les gates séquentielles
 > et rapporte les preuves ; cette mission ne clôt pas C4.
+
+## 8. Résultats
+
+2026-11-06, branche existante à `5980fdb`, état initial propre. Référence
+hors sandbox : `make check`, 343 tests réussis, 8 ignorés, invariants OK.
+Reproduction avant correction : `two_attempts_and_both_publication_orders`
+échoue, le candidat A est remplacé par B au même chemin pendant l’attente de A.
+Preuve locale : `/tmp/zevbox-auth-reproduction.log`.
+
+La matrice §4 est couverte par le nouveau fichier non protégé
+`tests/codex_auth_concurrency_test.rs` et les tests unitaires d’auth :
+
+| Preuve | Couverture |
+|---|---|
+| `two_attempts_and_both_publication_orders` | Deux processus ouverts, droits privés, deux montages, candidat A intact, publications A/B et B/A, cache complet à chaque étape, lock inchangé, adaptateur conservé, ancien dossier fixe intact, nettoyage limité. |
+| `failures_do_not_publish_or_damage_other_attempts` | Échec puis succès, succès puis échec ; cache vide, JSON cassé, incomplet ou lien refusés. |
+| `spawn_failure_cleans_only_its_attempt` | Exécutable disparu après prepare : erreur, cache actif et B intacts, seul dossier B restant. |
+| `signals_isolate_attempts_and_leave_residues_unadopted` | SIGINT du groupe A et SIGKILL du seul parent A, B puis C réussissent ; nouveau HOME C, résidu A préservé, enfant survivant terminé par le harnais. |
+| `incompatible_commands_are_rejected_before_run` | Affectation absente, répétée ou mal placée, exécutable inattendu : code 1 actionnable, aucun run. |
+| `cleanup_errors_preserve_publication_and_primary_errors` | Suppression réellement empêchée par parent non inscriptible ; avertissement, succès préservé, échec et diagnostic principal conservés. |
+| `failed_publication_preserves_active_destination_and_candidate` | Renommage impossible et préparation des droits impossible : destination et candidat conservés. |
+| Tests Codex et suite existante | API/ChatGPT, statut en lecture seule, non-régression Claude ; aucune donnée synthétique dans stdout/stderr des connexions terminées. |
+
+Tests ciblés : cinq tests multiprocessus et huit tests Codex réussis ; nouveaux
+tests unitaires réussis. Trois répétitions supplémentaires des cinq tests
+multiprocessus : toutes vertes. `make check` hors sandbox : **350 réussis,
+8 ignorés**, invariants OK. Les essais restreints échouent uniquement sur les
+tests socket/watcher existants ; relance hors restriction réussie, aucun
+contournement. Puis, après inventaire du runtime sans build/update/setup
+concurrent : `make test-integration` **8/8**, puis `make verify STEP=17`
+**STEP 17: OK**, séquentiellement (la gate rejoue aussi les huit tests réels).
+Logs : `/tmp/zevbox-auth-{targeted,check-unrestricted,integration,verify17}.log`.
+
+Revue documentaire EN/FR et recherche §5 effectuées : occurrences restantes
+du dossier fixe = modèle de release, compatibilité ou historique daté.
+Aucun script de l’annexe n’exige ce chemin. Empreintes protégées et
+`git diff --check` conformes ; liens locaux modifiés vérifiés.
+Aucun rebuild de release, changement de lock installé, compte personnel,
+quota, déploiement, fusion ou push. Les gates emploient leurs images de test
+existantes. C4 reste ouverte ; rafraîchissements de sessions concurrentes et
+effets distants fournisseur hors portée. SIGKILL peut laisser un dossier privé
+et un enfant provisoire ; aucune collecte automatique ni garantie de nettoyage
+après toute interruption.

@@ -46,6 +46,38 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 
 ## Journal
 
+- 2026-11-06 — **Correction des connexions Codex simultanées validée** :
+  départ sur `fix/codex-auth-concurrency` à `5980fdb`, état propre, aucun
+  changement étranger. Référence `make check` hors restriction : 343 réussis,
+  8 ignorés. Avant correction, deux processus réels : A écrit et attend, B
+  démarre et supprime/remplace le candidat de A dans le HOME partagé ; assertion
+  d’intégrité A échouée (`/tmp/zevbox-auth-reproduction.log`).
+  Dossiers privés uniques, candidat explicite et renommage atomique après
+  réussite/validation implémentés sans migration ni rebuild de release.
+  Matrice complète et correspondance des tests dans
+  [PLAN concurrence §8](PLAN_codex_auth_concurrency.md#8-résultats) :
+  deux ordres de publication, échecs, caches invalides/liens, démarrage impossible,
+  erreurs de publication/droits, nettoyage réellement empêché, SIGINT du groupe,
+  SIGKILL du parent, résidu non adopté et ancien dossier fixe intact.
+  Tests ciblés 5 + 8 et nouveaux unitaires OK ; trois répétitions supplémentaires
+  de concurrence toutes vertes. `make check` restreint : échecs existants
+  socket/watcher interdits ; hors restriction **350 réussis, 8 ignorés**,
+  fmt/clippy/invariants OK (`/tmp/zevbox-auth-check-unrestricted.log`).
+  Inventaire runtime effectué, aucun build/update/setup étranger en cours.
+  Ensuite séquentiellement : `make test-integration` **8/8**
+  (`/tmp/zevbox-auth-integration.log`), `make verify STEP=17`
+  **STEP 17: OK**, dont intégration rejouée 8/8
+  (`/tmp/zevbox-auth-verify17.log`). Empreintes protégées conformes, aucun
+  fichier protégé modifié, `git diff --check` et liens locaux conformes.
+  Documentation revue/actualisée : AGENTS, contrat V2, README/guides/architectures
+  EN/FR, SPEC/PLAN Codex, SPEC/PLAN concurrence, DECISIONS et présent journal.
+  Annexe examinée : aucun script dépendant du dossier fixe ; occurrences
+  restantes = modèle compatible ou historique explicitement daté.
+  Aucun compte, quota, sous-agent, déploiement, fusion, push ni changement de main.
+  Limites : SIGKILL peut laisser dossier privé/enfant provisoire ; pas de balayage.
+  Rafraîchissements des sessions et effets distants non couverts. **C4 reste ouverte.**
+
+
 - 2026-11-06 — **Transmission sur branche dédiée** : après intégration de la
   branche Codex initiale, `main` local et `feat/codex-acp` pointent sur `87db544`.
   Branche `fix/codex-auth-concurrency` créée depuis `main`, avec les documents

@@ -39,6 +39,23 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **Correction des connexions Codex simultanées livrée**
+  (mission explicite 👤, branche existante `fix/codex-auth-concurrency`) :
+  collision reproduite avec deux processus du vrai binaire et caches synthétiques.
+  Chaque tentative possède désormais un TempDir privé unique sous l’état Codex ;
+  elle ne lit, publie ni nettoie les candidats des autres. Code 0 enfant et
+  cache natif complet régulier sans lien requis avant renommage atomique ;
+  dernière publication réussie active. La commande persistée reste un modèle :
+  substitution structurelle en mémoire, locks et images existantes inchangés.
+  Pas de verrou global, de balayage ni de suppression de l’ancien dossier fixe.
+  Nettoyage secondaire au résultat de publication ; résidus après interruption
+  brutale possibles, suppression manuelle seulement après la fin des processus.
+  `make check` 350/350 (8 ignorés), intégration 8/8 puis gate 17 OK,
+  empreintes protégées intactes. Matrice et logs dans
+  [PLAN concurrence §8](PLAN_codex_auth_concurrency.md#8-résultats).
+  Aucun compte ni quota utilisé, C4 reste ouverte.
+
+
 - 2026-11-06 — **Branche dédiée à la correction d’auth Codex** (demande 👤) :
   branche initiale Codex intégrée à `main` local, vérifié à `87db544`.
   Création de `fix/codex-auth-concurrency` depuis cette base pour livrer les
@@ -232,8 +249,9 @@ des copies jetables sous `/tmp`. Le dépôt n'a reçu que des documents.
   échoue. Sans ce correctif, C0 aurait bloqué sur le mode natif.
 - **Login dans un `CODEX_HOME` séparé** : `codex login` révoque et supprime
   d'abord la connexion qu'il trouve. L'idée d'une sauvegarde suivie d'une
-  restauration est abandonnée, car elle rendrait des jetons révoqués. Le login
-  écrit dans `state/codex/.codex-login`, et Zevbox renomme son `auth.json` sur le
+  restauration est abandonnée, car elle rendrait des jetons révoqués. Dans la mesure initiale, le login
+  écrit dans `state/codex/.codex-login` (remplacé ensuite par des dossiers uniques,
+  voir la correction de concurrence ci-dessus), et Zevbox renomme son `auth.json` sur le
   cache seulement s'il est complet. Mesuré : Ctrl-C conserve le cache.
 - **`api-key` masqué pour Codex** : Zed 1.25.3 n'envoie que `methodId` dans
   `authenticate`, et Zevbox ne passe aucune clé à la VM ; ce parcours ne peut pas

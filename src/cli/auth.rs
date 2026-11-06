@@ -7,7 +7,7 @@ pub use super::auth_omlx::OmlxOptions;
 
 /// Cached Codex login, relative to `state/codex`.
 pub const CODEX_AUTH_MARKER: &str = ".codex/auth.json";
-/// `CODEX_HOME` of the login VM, relative to `state/codex`.
+/// Persisted release template; each invocation substitutes its private directory.
 const CODEX_LOGIN_DIR: &str = ".codex-login";
 
 pub async fn run(agent: super::AgentArg, status: bool) -> anyhow::Result<u8> {
@@ -211,7 +211,7 @@ fn login_run_spec(
 }
 
 /// `authCommand` of a Codex release: the device-code login of the bundled Codex,
-/// in the separate `CODEX_HOME` kept by [`auth_codex`].
+/// with a compatible template HOME, replaced per invocation by [`auth_codex`].
 pub fn codex_login_command(adapter: &str) -> Vec<String> {
     vec![
         "env".to_string(),
@@ -228,43 +228,52 @@ pub fn codex_login_command(adapter: &str) -> Vec<String> {
 /// `zevbox auth codex`. `codex login` starts by revoking and deleting the login it
 /// finds in its `CODEX_HOME`, so it never runs on the real `.codex`: it gets an empty
 /// folder, and its `auth.json` replaces the current one only once it is complete.
-/// A failed or cancelled login therefore leaves the current account working.
+/// Each attempt owns its candidate; only a successful publication changes auth.
 fn auth_codex(
     paths: &Paths,
     config: &crate::config::Config,
     lock: &crate::release::ReleaseLock,
 ) -> anyhow::Result<u8> {
-    let login_dir = paths.state_dir("codex").join(CODEX_LOGIN_DIR);
-    if login_dir.exists() {
-        std::fs::remove_dir_all(&login_dir)?; // left by an interrupted login
-    }
-    crate::fsutil::ensure_private_dir(&login_dir)?;
+    let attempt = tempfile::Builder::new()
+        .prefix(".codex-login-")
+        .tempdir_in(paths.state_dir("codex"))?;
+    let login_dir = attempt.path().to_path_buf();
+    // Keep the owner alive through child exit, validation and atomic publication.
+    let result = (|| -> anyhow::Result<bool> {
+        crate::fsutil::ensure_private_dir(&login_dir)?;
+        let name = login_dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| anyhow::anyhow!("invalid Codex sign-in directory"))?;
+        let command = codex_attempt_command(&lock.auth_command, name)?;
 
-    // I1: same throwaway project as the Claude login.
-    let tmp_root = paths.state_root.join("tmp");
-    crate::fsutil::ensure_private_dir(&tmp_root)?;
-    let tmp = tempfile::Builder::new()
-        .prefix("auth-")
-        .tempdir_in(&tmp_root)?;
-    let tmp_path = std::fs::canonicalize(tmp.path())?;
-    let spec = login_run_spec("codex", config, paths, lock, &tmp_path);
+        // I1: same throwaway project as the Claude login.
+        let tmp_root = paths.state_root.join("tmp");
+        crate::fsutil::ensure_private_dir(&tmp_root)?;
+        let tmp = tempfile::Builder::new()
+            .prefix("auth-")
+            .tempdir_in(&tmp_root)?;
+        let tmp_path = std::fs::canonicalize(tmp.path())?;
+        let mut spec = login_run_spec("codex", config, paths, lock, &tmp_path);
+        spec.command = command;
 
-    crate::ui::out(
-        "codex: the browser will NOT open by itself (the login runs inside the VM).\n\
+        crate::ui::out(
+            "codex: the browser will NOT open by itself (the login runs inside the VM).\n\
          1. Open the address printed below in your browser.\n\
          2. Sign in, then enter the one-time code printed below.",
-    );
+        );
 
-    let args = crate::container::run_args(&spec);
-    let mut cmd = std::process::Command::new(&config.container_binary);
-    cmd.args(&args);
-    cmd.stdin(std::process::Stdio::inherit());
-    cmd.stdout(std::process::Stdio::inherit());
-    cmd.stderr(std::process::Stdio::inherit());
-    let exit_status = cmd.status()?;
+        let args = crate::container::run_args(&spec);
+        let mut cmd = std::process::Command::new(&config.container_binary);
+        cmd.args(&args);
+        cmd.stdin(std::process::Stdio::inherit());
+        cmd.stdout(std::process::Stdio::inherit());
+        cmd.stderr(std::process::Stdio::inherit());
+        let exit_status = cmd.status()?;
 
-    let saved = exit_status.success() && keep_codex_login(paths)?;
-    std::fs::remove_dir_all(&login_dir)?;
+        Ok(exit_status.success() && keep_codex_login(paths, &login_dir.join("auth.json"))?)
+    })();
+    let saved = finish_codex_attempt(result, attempt.close(), &login_dir)?;
     if saved {
         crate::ui::out(
             "codex: signed in. Next: open a project in Zed, then choose 'zevbox · Codex' with '+'.",
@@ -272,24 +281,63 @@ fn auth_codex(
         Ok(EXIT_OK)
     } else {
         crate::ui::err(
-            "zevbox: the Codex sign-in did not finish; the previous sign-in, if any, is unchanged. Fix: run 'zevbox auth codex' again. If the page refuses the code, enable device code sign-in in your ChatGPT security settings (workspace: ask an admin).",
+            "zevbox: the Codex sign-in did not finish; this attempt did not replace the sign-in. Fix: run 'zevbox auth codex' again. If the page refuses the code, enable device code sign-in in your ChatGPT security settings (workspace: ask an admin).",
         );
         Ok(EXIT_ERROR)
     }
 }
 
-/// Moves the new login over the current one, if it is a complete login.
-fn keep_codex_login(paths: &Paths) -> std::io::Result<bool> {
-    let state = paths.state_dir("codex");
-    let new_login = state.join(CODEX_LOGIN_DIR).join("auth.json");
-    if !has_codex_login(&new_login) {
+/// Adapt only the supported release template, never a shell string or the lock.
+fn codex_attempt_command(template: &[String], name: &str) -> anyhow::Result<Vec<String>> {
+    if template.first().map(String::as_str) != Some("env")
+        || template.get(1) != Some(&format!("CODEX_HOME=/home/agent/{CODEX_LOGIN_DIR}"))
+        || template.len() < 3
+        || template
+            .iter()
+            .filter(|s| s.starts_with("CODEX_HOME="))
+            .count()
+            != 1
+    {
+        anyhow::bail!("zevbox: unsupported Codex sign-in command in this release. Fix: run 'zevbox update --agent codex' and retry 'zevbox auth codex'.");
+    }
+    let mut command = template.to_vec();
+    command[1] = format!("CODEX_HOME=/home/agent/{name}");
+    Ok(command)
+}
+
+/// Cleanup is secondary: it cannot turn a published login into a failure,
+/// or hide the original error. Called only after the child has exited.
+fn finish_codex_attempt(
+    result: anyhow::Result<bool>,
+    cleanup: std::io::Result<()>,
+    directory: &std::path::Path,
+) -> anyhow::Result<bool> {
+    if let Err(error) = cleanup {
+        crate::ui::err(&format!(
+            "zevbox: warning: could not clean Codex sign-in directory {}: {error}. Remove it manually only after all processes of this attempt have ended.",
+            directory.display()
+        ));
+    }
+    result
+}
+
+/// Publish this attempt's complete regular file with one same-filesystem rename.
+fn keep_codex_login(paths: &Paths, new_login: &std::path::Path) -> std::io::Result<bool> {
+    use std::os::unix::fs::PermissionsExt;
+    let metadata = match std::fs::symlink_metadata(new_login) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e),
+    };
+    if !metadata.file_type().is_file() || !has_codex_login(new_login) {
         return Ok(false);
     }
-    let target = state.join(CODEX_AUTH_MARKER);
+    std::fs::set_permissions(new_login, std::fs::Permissions::from_mode(0o600))?;
+    let target = paths.state_dir("codex").join(CODEX_AUTH_MARKER);
     if let Some(dir) = target.parent() {
         crate::fsutil::ensure_private_dir(dir)?;
     }
-    std::fs::rename(&new_login, &target)?;
+    std::fs::rename(new_login, &target)?;
     Ok(true)
 }
 
@@ -706,13 +754,66 @@ mod tests {
         std::fs::write(&current, old).unwrap();
 
         std::fs::write(&new_login, "{").unwrap();
-        assert!(!keep_codex_login(&paths).unwrap());
+        assert!(!keep_codex_login(&paths, &new_login).unwrap());
         assert_eq!(std::fs::read_to_string(&current).unwrap(), old);
 
         let new = r#"{"auth_mode":"apikey","OPENAI_API_KEY":"new"}"#;
         std::fs::write(&new_login, new).unwrap();
-        assert!(keep_codex_login(&paths).unwrap());
+        assert!(keep_codex_login(&paths, &new_login).unwrap());
         assert_eq!(std::fs::read_to_string(&current).unwrap(), new);
+    }
+
+    #[test]
+    fn cleanup_errors_preserve_publication_and_primary_errors() {
+        use std::os::unix::fs::PermissionsExt;
+        for result in [Ok(true), Ok(false), Err(anyhow::anyhow!("primary"))] {
+            let parent = tempfile::tempdir().unwrap();
+            let attempt = tempfile::tempdir_in(parent.path()).unwrap();
+            let directory = attempt.path().to_path_buf();
+            std::fs::write(directory.join("residue"), "synthetic").unwrap();
+            std::fs::set_permissions(parent.path(), std::fs::Permissions::from_mode(0o500))
+                .unwrap();
+            let cleanup = attempt.close();
+            std::fs::set_permissions(parent.path(), std::fs::Permissions::from_mode(0o700))
+                .unwrap();
+            assert!(cleanup.is_err(), "read-only parent must prevent removal");
+            assert!(directory.exists());
+            let expected = result.as_ref().ok().copied();
+            let actual = finish_codex_attempt(result, cleanup, &directory);
+            match expected {
+                Some(saved) => assert_eq!(actual.unwrap(), saved),
+                None => assert_eq!(actual.unwrap_err().to_string(), "primary"),
+            }
+        }
+    }
+
+    #[test]
+    fn failed_publication_preserves_active_destination_and_candidate() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(dir.path());
+        let candidate = dir.path().join("candidate");
+        std::fs::write(
+            &candidate,
+            r#"{"auth_mode":"apikey","OPENAI_API_KEY":"synthetic"}"#,
+        )
+        .unwrap();
+        let target = paths.state_dir("codex").join(CODEX_AUTH_MARKER);
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("sentinel"), "keep").unwrap();
+        assert!(keep_codex_login(&paths, &candidate).is_err());
+        assert_eq!(
+            std::fs::read_to_string(target.join("sentinel")).unwrap(),
+            "keep"
+        );
+        assert!(candidate.is_file());
+        // Permission preparation failure also leaves the old state untouched.
+        std::fs::remove_dir_all(target.parent().unwrap()).unwrap();
+        std::fs::write(target.parent().unwrap(), "blocked").unwrap();
+        assert!(keep_codex_login(&paths, &candidate).is_err());
+        assert_eq!(
+            std::fs::read_to_string(target.parent().unwrap()).unwrap(),
+            "blocked"
+        );
     }
 
     #[test]

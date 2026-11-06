@@ -193,9 +193,9 @@ zevbox auth codex
 zevbox auth codex --status
 ```
 
-The login runs in a throw-away VM. Open the printed address in the Mac’s browser, sign in with your ChatGPT account and enter the one-time code. This beta feature may need enabling in ChatGPT security settings, or by a workspace admin. Expected completion: `codex: signed in.` A failed or cancelled attempt keeps the current account.
+The login runs in a throw-away VM. Open the printed address in the Mac’s browser, sign in with your ChatGPT account and enter the one-time code. This beta feature may need enabling in ChatGPT security settings, or by a workspace admin. Expected completion: `codex: signed in.` A failed or cancelled attempt publishes nothing; another simultaneous attempt may still succeed. Each login owns a private `state/codex/.codex-login-<suffix>` directory. The last successful atomic publication becomes active. Normal cleanup removes only that attempt’s directory; abrupt termination (including SIGKILL) may leave a private residue, never adopted or swept by later logins. Remove residues manually only after their processes have ended.
 
-Login uses a separate `.codex-login`, then replaces `.codex/auth.json` only after success. `state/codex` and `.codex` have mode `0700`, the cache `0600`. `--status` accepts a complete ChatGPT or API cache; it checks neither remote validity nor quota. A valid API-key login stored by Codex is accepted, without a Zevbox key prompt or key transmission from Zed. Never mount the Mac’s `~/.codex`.
+Login uses its unique private directory, then atomically replaces `.codex/auth.json` only after exit code 0 and complete native cache validation (regular file, no symlink). `state/codex` and `.codex` have mode `0700`, the cache `0600`. `--status` accepts a complete ChatGPT or API cache; it checks neither remote validity nor quota. A valid API-key login stored by Codex is accepted, without a Zevbox key prompt or key transmission from Zed. Never mount the Mac’s `~/.codex`.
 
 Codex is standard: `setup` and unselected `update` include it once initialised. A missing standard release triggers the global update: other standard agents and installed oMLX are also rebuilt. `zevbox update --agent codex` builds Codex alone. The console offers “Sign in to Codex” as an interactive action, with confirmation when already signed in.
 

@@ -1,17 +1,18 @@
 # Zevbox et les connexions Codex simultanées
 
-Statut au 2026-11-06 : conception préparée à la demande de l’utilisateur,
-**non implémentée**. L’implémentation relève d’une mission ultérieure selon
-[le plan d’exécution](PLAN_codex_auth_concurrency.md). C4 reste ouverte.
+Statut au 2026-11-06 : **implémentée et validée sans compte** sur
+`fix/codex-auth-concurrency`. Tests et gates détaillés dans
+[le plan d’exécution](PLAN_codex_auth_concurrency.md#8-résultats). C4 reste ouverte.
 
 ## 1. Problème et résultat attendu
 
-Dans `src/cli/auth.rs`, `auth_codex` supprime puis recrée
-`state/codex/.codex-login`, lance le login natif, publie éventuellement son cache,
-puis supprime ce dossier. Deux commandes sur le même état utilisent donc le
-même espace de travail. Le démarrage ou la fin de l’une peut supprimer les
-données de l’autre. Le constat vient de la revue de `87db544` ; aucun compte
-réel n’a été utilisé pour reproduire la course.
+Avant cette correction, dans `src/cli/auth.rs`, `auth_codex` supprimait puis recréait
+`state/codex/.codex-login`, lançait le login natif, publiait éventuellement son cache,
+puis supprimait ce dossier. Deux commandes sur le même état utilisaient donc le
+même espace de travail. Le démarrage ou la fin de l’une pouvait supprimer les
+données de l’autre. Le constat initial vient de la revue de `87db544` ; la course a ensuite été
+reproduite par deux processus du vrai binaire et des caches synthétiques, sans
+compte réel (PROGRESS, 2026-11-06).
 
 Deux commandes `zevbox auth codex` doivent pouvoir attendre leur validation
 navigateur simultanément. Chacune doit lire, publier et nettoyer uniquement le

@@ -52,10 +52,14 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    protected-test diff proposed in C2. The executor must update every affected
    project document, including EN/FR pairs, in each behaviour commit and complete
    the repository-wide documentation review in `docs/PLAN_codex.md` §8.
-   **Concurrent Codex sign-in correction (planned, not implemented)**: see
+   **Concurrent Codex sign-in correction (implemented 2026-11-06)**: see
    `docs/SPEC_codex_auth_concurrency.md` and `docs/PLAN_codex_auth_concurrency.md`.
-   The 2026-11-06 request covers design and executor instructions only; implement
-   this separate topic only when assigned. It does not complete C4.
+   Each attempt owns a unique private directory; never share or sweep login
+   directories. Publish only its validated regular cache after child success,
+   by atomic rename; last successful publication wins. Keep release templates
+   compatible without rewriting locks or rebuilding images. SIGKILL can leave
+   private residues; cleanup failure must not reverse publication success.
+   This correction does not complete C4.
    The original Codex branch is now integrated into local `main`. For this
    correction, use `fix/codex-auth-concurrency`, based on `main` at `87db544`;
    this takes precedence over the earlier C4 branch instruction for this topic.
