@@ -1,0 +1,10 @@
+{
+  "id": "codex-acp",
+  "name": "Codex",
+  "version": "2.5.0",
+  "distribution": {"npx": {"package": "@agentclientprotocol/codex-acp@2.5.0"}},
+  "preview": {
+    "version": "2.5.1-preview.23",
+    "distribution": {"npx": {"package": "@agentclientprotocol/codex-acp@2.5.1-preview.23"}}
+  }
+}

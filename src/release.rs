@@ -16,6 +16,11 @@ pub const BASE_IMAGE_TAG: &str = "docker.io/library/ubuntu:rolling";
 
 pub const CONTAINERFILE_TEMPLATE: &str = include_str!("../assets/Containerfile");
 
+/// npm package of the Claude adapter.
+const CLAUDE_NPM_NAME: &str = "@agentclientprotocol/claude-agent-acp";
+/// npm package of the Codex adapter.
+const CODEX_NPM_NAME: &str = "@agentclientprotocol/codex-acp";
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SmokeTest {
@@ -61,6 +66,14 @@ pub type ActiveReleases = BTreeMap<String, ActiveEntry>;
 /// What the registry says for Claude.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClaudeComponent {
+    pub version: String,
+    /// Exact `name@version` from `distribution.npx.package`.
+    pub npm_package: String,
+}
+
+/// What the registry says for Codex.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodexComponent {
     pub version: String,
     /// Exact `name@version` from `distribution.npx.package`.
     pub npm_package: String,
@@ -128,6 +141,56 @@ pub fn parse_claude_manifest(text: &str) -> Result<ClaudeComponent, ReleaseError
     }
 
     Ok(ClaudeComponent {
+        version: version.to_string(),
+        npm_package: npm_package.to_string(),
+    })
+}
+
+/// Requires `id == "codex-acp"`, a stable `version` (no `-preview...` suffix) and
+/// `distribution.npx.package == "@agentclientprotocol/codex-acp@<version>"`.
+/// Ignores `preview`.
+pub fn parse_codex_manifest(text: &str) -> Result<CodexComponent, ReleaseError> {
+    let root: Value = serde_json::from_str(text)
+        .map_err(|e| ReleaseError::RegistrySchema(format!("invalid JSON: {e}")))?;
+
+    let id = root
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| ReleaseError::RegistrySchema("missing id field".to_string()))?;
+    if id != "codex-acp" {
+        return Err(ReleaseError::RegistrySchema(format!(
+            "expected id 'codex-acp', got '{id}'"
+        )));
+    }
+
+    let version = root
+        .get("version")
+        .and_then(Value::as_str)
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| ReleaseError::RegistrySchema("missing or empty version".to_string()))?;
+    if version.contains('-') {
+        return Err(ReleaseError::RegistrySchema(format!(
+            "version '{version}' is not a stable release"
+        )));
+    }
+
+    let npm_package = root
+        .get("distribution")
+        .and_then(|d| d.get("npx"))
+        .and_then(|n| n.get("package"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            ReleaseError::RegistrySchema("missing distribution.npx.package".to_string())
+        })?;
+
+    let expected = format!("{CODEX_NPM_NAME}@{version}");
+    if npm_package != expected {
+        return Err(ReleaseError::RegistrySchema(format!(
+            "npx package '{npm_package}' is not '{expected}'"
+        )));
+    }
+
+    Ok(CodexComponent {
         version: version.to_string(),
         npm_package: npm_package.to_string(),
     })
@@ -470,21 +533,9 @@ pub fn prepare_context(context_dir: &Path, lock: &ReleaseLock) -> Result<(), Rel
 
     let target = crate::agents::build_target(&lock.agent);
     if target == "claude" {
-        // The exact version: npm resolves the dependencies inside the build, with
-        // the image's own Node (DECISIONS 2026-10-30, Ubuntu base).
-        lock.npm_package
-            .as_deref()
-            .ok_or_else(|| ReleaseError::Store("missing npmPackage in lock".to_string()))?;
-        let package_json = serde_json::json!({
-            "private": true,
-            "dependencies": {
-                "@agentclientprotocol/claude-agent-acp": lock.agent_version
-            }
-        });
-        let pkg_bytes = serde_json::to_vec_pretty(&package_json)
-            .map_err(|e| ReleaseError::Store(format!("failed to serialize package.json: {e}")))?;
-        write_atomic(&context_dir.join("package.json"), &pkg_bytes)
-            .map_err(|e| ReleaseError::Store(format!("failed to write package.json: {e}")))?;
+        write_package_json(context_dir, lock, CLAUDE_NPM_NAME)?;
+    } else if target == "codex" {
+        write_package_json(context_dir, lock, CODEX_NPM_NAME)?;
     } else if target == "antigravity" {
         let archive_url = lock
             .archive_url
@@ -515,6 +566,26 @@ pub fn prepare_context(context_dir: &Path, lock: &ReleaseLock) -> Result<(), Rel
     }
 
     Ok(())
+}
+
+/// `package.json` naming the exact adapter version: npm resolves the dependencies
+/// inside the build, with the image's own Node (DECISIONS 2026-10-30, Ubuntu base).
+fn write_package_json(
+    context_dir: &Path,
+    lock: &ReleaseLock,
+    package: &str,
+) -> Result<(), ReleaseError> {
+    lock.npm_package
+        .as_deref()
+        .ok_or_else(|| ReleaseError::Store("missing npmPackage in lock".to_string()))?;
+    let package_json = serde_json::json!({
+        "private": true,
+        "dependencies": { package: lock.agent_version }
+    });
+    let pkg_bytes = serde_json::to_vec_pretty(&package_json)
+        .map_err(|e| ReleaseError::Store(format!("failed to serialize package.json: {e}")))?;
+    write_atomic(&context_dir.join("package.json"), &pkg_bytes)
+        .map_err(|e| ReleaseError::Store(format!("failed to write package.json: {e}")))
 }
 
 /// Builds the container image via `container build` (§8.7 step 4).

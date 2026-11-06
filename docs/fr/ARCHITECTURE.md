@@ -232,6 +232,8 @@ flowchart TD
 
 ## 6. Gestion des Versions : Releases, Build et Rollback
 
+L'image comporte aussi une étape `codex`, préparée pour l'agent Codex. Rien ne l'expose encore aux utilisateurs.
+
 `zevbox` utilise un pipeline de release immuable : chaque version d'un agent génère un identifiant horodaté unique (`<agent>-AAAAMMJJ-HHMMSS`) et un fichier de verrouillage (`lock.json`).
 
 ```mermaid

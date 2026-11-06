@@ -38,7 +38,7 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 | Étape | Titre | Statut | Preuve / notes |
 |---|---|---|---|
 | C0 | Vérifier que les versions n'ont pas bougé | ✅ | 2026-11-06 : registre stable `2.5.0 @agentclientprotocol/codex-acp@2.5.0`, Zed `1.25.3`, `container` `1.5.0`, identiques à la qualification. `make check` hors restriction vert : 324 tests réussis, 8 ignorés, `invariants: OK` ; empreintes protégées conformes. |
-| C1 | Image et composants de release sans activation publique | ⬜ | Correctif `C1_image_release.patch` éprouvé : `make check` 329 tests, `verify_image` ALL OK. |
+| C1 | Image et composants de release sans activation publique | ✅ | 2026-11-06 : correctif appliqué à l’identique ; `make check` vert, 329 tests réussis, 8 ignorés. Image jetable : `build rc=0`, `verify_image: ALL OK` (18 PASS), adaptateur 2.5.0, moteur 0.165.0, Node 24.19.0, ACP v1 ; image, builder et dossier nettoyés. |
 | C2a | Le relais refuse les versions ACP qu'il ne filtre pas | ⬜ | Correctif `C2a_relay_version.patch` éprouvé : 332 tests. Change le comportement commun du relais. |
 | C2 | Activation standard, auth native et diagnostics | ⬜ | Correctif `C2_activation_auth.patch` éprouvé : deux échecs protégés attendus, puis 343 tests avec le diff protégé. Accord 👤 et rescellement requis. |
 | C3 | Console et commandes de gestion | ⬜ | Correctif `C3_console.patch` éprouvé : 343 tests, 24 actions. |

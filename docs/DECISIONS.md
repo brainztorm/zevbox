@@ -39,6 +39,8 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **C1 appliqué** : composants de release et étape image Codex repris du correctif éprouvé, sans activation publique. Suppression du `bwrap` système confirmée nécessaire par la qualification prévue ; image réelle : 18 PASS, sandbox natif opérationnel, adaptateur 2.5.0 et moteur 0.165.0. Aucun compte ni modèle sollicité.
+
 - 2026-11-06 — **Nom du projet (demande 👤)** : écrire **Zevbox** dans la prose,
   les titres et les libellés explicatifs des schémas, en anglais comme en
   français. Le binaire/crate `zevbox`, les chemins, URL, noms d'images, labels,

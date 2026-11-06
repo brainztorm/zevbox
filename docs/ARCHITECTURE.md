@@ -256,6 +256,8 @@ flowchart TD
 
 ## 6. Versioning: releases, build and rollback
 
+The image also has a `codex` stage, prepared for the Codex agent. Nothing exposes it to users yet.
+
 Zevbox uses an immutable release pipeline: each agent version gets a unique timestamped id
 (`<agent>-YYYYMMDD-HHMMSS`) and a lock file (`lock.json`).
 

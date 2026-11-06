@@ -584,6 +584,9 @@ Pipeline `update` (aussi utilisé par `tools add/remove`, qui résolvent donc le
 ### 8.8 `assets/Containerfile` (contenu réel, base Ubuntu depuis le 2026-10-30)
 
 ```dockerfile
+# zevbox images (§8.8). Embedded in the binary with include_str!.
+# Build: container build --target <claude|antigravity|codex> --build-arg BASE_IMAGE=... (see §8.7).
+# Everything here is validated at step 11; adjust and record changes in docs/DECISIONS.md.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS base
 ARG ZEVBOX_UID
@@ -615,6 +618,19 @@ COPY package.json /opt/zevbox/claude/
 # optional dependency (F6).
 RUN cd /opt/zevbox/claude && npm install --no-audit --no-fund \
  && test -x node_modules/.bin/claude-agent-acp
+
+FROM base AS codex
+# The browser login cannot reach the VM: `zevbox auth codex` uses the device code.
+ENV NO_BROWSER=1
+COPY package.json /opt/zevbox/codex/
+# package.json names the exact adapter version. No --omit=optional: the Linux arm64
+# Codex engine is an optional dependency of @openai/codex.
+# Ubuntu's bwrap goes away: Apple Container masks parts of /proc, and Codex only falls
+# back to a sandbox without a new /proc with its own bundled bwrap (DECISIONS 2026-11-06).
+RUN cd /opt/zevbox/codex && npm install --no-audit --no-fund \
+ && test -x node_modules/.bin/codex-acp \
+ && test -x node_modules/.bin/codex \
+ && rm -f /usr/bin/bwrap
 
 FROM base AS antigravity
 ARG AGY_SHA256
