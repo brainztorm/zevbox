@@ -143,6 +143,8 @@ On an existing installation, `setup` adds Codex through the global update: it al
 
 Codex keeps its history and databases in `state/codex/.codex`: prompts persist there, never in Zevbox’s journals. Its own sandbox runs inside the VM, without network by default; `ps` does not work inside it. Real sign-in and Zed usage remain to be accepted in C4.
 
+Account-free qualification on 2026-11-06 verified the image, relay, shutdown, cancelled login with a synthetic cache and EN/FR console navigation; evidence and limits are in [PROGRESS.md](docs/PROGRESS.md). Global `setup` remains unvalidated because the existing Antigravity download timed out at 120 seconds.
+
 - **In Zed**: open a project, open the agent panel, pick **zevbox · Claude**,
   **zevbox · Antigravity**, **zevbox · Codex** or **zevbox · oMLX** with **+**. The project is the one open in Zed (its first root folder).
   The agent runs in a dedicated, temporary Linux VM with your source mounted under your own

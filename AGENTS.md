@@ -31,7 +31,14 @@ to read, write or execute anything on the Mac. Single Rust binary, macOS arm64.
    the « Reste à faire » common rules there (one topic per commit, `make check`
    before each commit, docs updated in the same commit).
    **Codex extension (C0–C3 validated 2026-11-06; resume at C4)**:
-   for Codex work, also read `docs/SPEC_codex.md` and `docs/PLAN_codex.md`.
+   C4 resumes on `feat/codex-acp`: integration gates run sequentially with no
+   concurrent build/update/image cleanup (isolated states share the global runtime).
+   Use Codex-only disposable states for independent builds; inventory resources
+   before cleanup (`cleanup_isolated.sh` deletes only Codex images). Global setup
+   remains unvalidated after the pre-existing Antigravity 120-second timeout.
+   Local deployment is authorized with `make install`, `update --agent codex` and
+   `zed install`, without setup. Account consent and paid quota remain personal.
+   For Codex work, also read `docs/SPEC_codex.md` and `docs/PLAN_codex.md`.
    Reuse Claude/Antigravity, including `opt_in: false`; oMLX alone is optional.
    Native login must be reliable, without a ChatGPT-only restriction or a blanket
    ACP authentication ban. Qualify the current stable adapter against the actual

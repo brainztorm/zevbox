@@ -39,6 +39,14 @@ Format : date — fait ou décision — comment c'est vérifié.
 
 ## Décisions
 
+- 2026-11-06 — **C4 partielle, déploiement ciblé réalisé** : gates séquentielles,
+  image/relais, arrêts sans modèle et annulation sur cache synthétique réussis.
+  Installation locale Codex seule, sauvegarde Zed et comptes existants préservés.
+  Console EN/FR en pseudo-terminal et initialize des autres images vérifiés,
+  sans les confondre avec une acceptation visuelle ou un dialogue modèle.
+  Connexion personnelle demandée dans Terminal, aucun quota autorisé ni consommé.
+  C4/backlog 15 ouverts ; preuves détaillées et limites dans PROGRESS.
+
 - 2026-11-06 — **Reprise C4 autorisée** : branche `feat/codex-acp`, sans réapplication,
   fusion, push ni sous-agent. Tests réels puis gate 17 séquentiels, sans opération
   de builder concurrente ; état Codex seul pour les builds indépendants. Setup

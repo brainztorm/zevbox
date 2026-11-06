@@ -392,6 +392,8 @@ The npm adapter `@agentclientprotocol/codex-acp` and its bundled engine run in t
 
 The relay hides `api-key` for Codex only: Zed sends no key. Other methods still use the common filter; there is no blanket `authenticate` refusal. A valid native API-key cache remains accepted. Private `.codex/sessions` and databases contain prompts; Zevbox journals do not. Two instances share this state (concurrent refresh risk). Real account-free proof is in C2; sign-in, model and Zed UI acceptance remain in C4.
 
+Account-free qualification on 2026-11-06 verified the image, relay, shutdown, cancelled login with a synthetic cache and EN/FR console navigation; evidence and limits are in [PROGRESS.md](PROGRESS.md). Global `setup` remains unvalidated because the existing Antigravity download timed out at 120 seconds.
+
 ## 8. The 13 security invariants
 
 Checked automatically on every build (`scripts/check-invariants.sh` and the test suite) and

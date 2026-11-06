@@ -182,6 +182,8 @@ Codex est standard : `setup` et `update` sans sélection l’incluent dès l’�
 
 Le sandbox natif fonctionne dans la VM, sans réseau par défaut ; `ps` n’y fonctionne pas. Modèle, effort et modes dépendent de l’adaptateur et du compte. L’historique et les bases persistent dans `state/codex/.codex`, avec les prompts, distincts des journaux Zevbox. Connexion réelle, dialogue, permissions et reprise dans Zed restent à accepter en C4.
 
+Qualification sans modèle du 2026-11-06 : image, relais, arrêt, annulation de connexion sur cache synthétique et navigation console EN/FR vérifiés ; détails et réserves dans [PROGRESS.md](../PROGRESS.md). L’installation globale par `setup` reste non validée (expiration préexistante du téléchargement Antigravity à 120 s).
+
 **Vérification immédiate :**
 ```bash
 zevbox auth claude --status

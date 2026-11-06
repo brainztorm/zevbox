@@ -38,7 +38,7 @@
   `WORKED EXAMPLE`. Le terminal est **toujours restauré** (mode brut, écran alterné, curseur),
   y compris en cas d'erreur.
 
-Depuis C2, les listes et le statut générique suivent les quatre agents : Claude, Antigravity, oMLX et Codex (trois standards, oMLX seul optionnel). Depuis C3, la connexion Codex dédiée est disponible en mode interactif, avant oMLX dans le menu, avec confirmation de reconnexion. Le menu compte 24 actions.
+Depuis C2, les listes et le statut générique suivent les quatre agents : Claude, Antigravity, oMLX et Codex (trois standards, oMLX seul optionnel). Depuis C3, la connexion Codex dédiée est disponible en mode interactif, avant oMLX dans le menu, avec confirmation de reconnexion. Le menu compte 24 actions. Qualification C4 du 2026-11-06 : rendu/navigation EN/FR en pseudo-terminal 130×30, feuille Codex et confirmation avec cache synthétique puis refus vérifiés ; connexion et retour après login réel encore en attente (PROGRESS).
 
 ## 3. Écran
 

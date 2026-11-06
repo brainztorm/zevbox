@@ -86,9 +86,7 @@ flowchart TD
 - Dans un environnement Docker classique, les fichiers écrits par un conteneur appartiennent souvent à `root`, bloquant l'utilisateur sur son Mac pour modifier ou commiter ses propres fichiers.
 - `zevbox` mappe exactement votre UID/GID macOS (`id -u` / `id -g`, p. ex. 501:20) dans la VM. Les fichiers créés ou modifiés par Claude ou tout autre agent appartiennent immédiatement à votre utilisateur macOS sans root-squash ni conflit de permissions.
 
-##Pour Codex seulement, `api-key` est masqué dans la réponse initialize : Zed ne transmet pas de clé ; une demande de cette méthode reçoit -32602 et le renvoi vers `zevbox auth codex`.
-
-## 5. Éphémérité totale (`--rm`) et délestage des capacités (`--cap-drop ALL`)
+#### 5. Éphémérité totale (`--rm`) et délestage des capacités (`--cap-drop ALL`)
 - La micro-VM est créée avec une couche overlay temporaire. Dès que Zed ferme la session, la VM est anéantie : tous les fichiers temporaires, scripts de compilation ou artefacts générés hors du projet s'évaporent sans polluer votre Mac.
 - De surcroît, le conteneur démarre avec l'option `--cap-drop ALL` : même le compte `root` interne à la VM ne dispose d'aucun privilège système Linux spécial (`CAP_SYS_ADMIN`, `CAP_NET_ADMIN`, etc.).
 
@@ -371,6 +369,8 @@ L’adaptateur npm `@agentclientprotocol/codex-acp` et son moteur embarqué tour
 `auth codex` réutilise la VM d’auth sur dossier vide avec état dédié `state/codex`. Le login CLI par code d’appareil utilise `CODEX_HOME=/home/agent/.codex-login`, puis Zevbox déplace le cache complet sur `.codex/auth.json` seulement après réussite : échec ou annulation conserve le compte actuel. Droits `0700` sur l’état et `.codex`, `0600` sur le cache. `auth --status`, `doctor` et `launch` valident localement `auth_mode=chatgpt` avec trois jetons non vides ou `apikey` avec clé non vide ; aucune garantie distante ni quota. Le `~/.codex` du Mac n’est jamais lu ni monté.
 
 Le relais masque `api-key` pour Codex seulement : Zed n’envoie aucune clé. Les autres méthodes restent soumises au filtre commun ; aucun refus global d’`authenticate`. Une clé API native valide reste acceptée. L’état privé `.codex/sessions` et les bases contiennent les prompts ; les journaux Zevbox ne les contiennent pas. Deux instances partagent cet état (risque de rafraîchissement concurrent). Preuve réelle sans compte en C2 ; connexion, modèle et interface Zed restent à accepter en C4.
+
+Qualification sans modèle du 2026-11-06 : image, relais, arrêt, annulation de connexion sur cache synthétique et navigation console EN/FR vérifiés ; détails et réserves dans [PROGRESS.md](../PROGRESS.md). L’installation globale par `setup` reste non validée (expiration préexistante du téléchargement Antigravity à 120 s).
 
 ## 8. Les 13 Invariants de Sécurité
 

@@ -69,12 +69,9 @@ shasum -a 256 -c tests/PROTECTED.sha256 --quiet
 Résultats attendus : `git status --short` n'affiche rien ; `make check` se termine
 par `invariants: OK` ; `shasum` n'affiche rien.
 
-Si `git status --short` affiche quelque chose, **ne pas commencer** et demander à
-l'humain : « Le dépôt contient des modifications non commitées : <liste>. Les
-commitez-vous, ou puis-je en faire un commit dédié ? ». Le travail de chaque étape
-doit rester séparé de ce qui existait déjà. Si `make check` échoue, appliquer le
-§1.4 (échec de délai) puis, si l'échec persiste, le §1.5 : c'est une panne de base,
-pas une régression Codex.
+Si `git status --short` affiche des modifications étrangères, les préserver sans
+les commiter. Diagnostiquer les échecs et poursuivre les contrôles indépendants
+selon le périmètre autorisé ; ne pas demander une permission générale de reprise.
 
 Base vérifiée le 2026-11-06 : `make check` vert (324 tests réussis, 8 ignorés).
 Un bac à sable d'agent peut empêcher un test de socket locale et un test de
@@ -103,7 +100,7 @@ exécuté dans une vraie VM (SPEC §8.1).
 | `isolated_env.sh` | Crée une installation jetable sous `/tmp`. |
 | `verify_image.sh` | Contrôle une image Codex avec les options de `launch` : `PASS` ou `FAIL`. |
 | `verify_launch.py` | Contrôle `zevbox launch codex` à travers le vrai relais : `PASS` ou `FAIL`. |
-| `cleanup_isolated.sh` | Supprime les images et le dossier d'une installation jetable. |
+| `cleanup_isolated.sh` | Supprime uniquement les images Codex puis le dossier ; inventaire préalable obligatoire, attention aux états mixtes. |
 
 Appliquer un correctif toujours ainsi :
 
@@ -159,23 +156,22 @@ version stable dans le registre à chaque `update`.
   (`W`, `IMAGE`, `T`) sont perdues entre deux appels. Si un bloc doit être coupé,
   noter la valeur de `W` affichée par `isolated_env.sh` et la redéfinir ensuite.
 
-### 1.5 Quand s'arrêter et demander à l'humain
+### 1.5 Intervention personnelle et limites
 
-S'arrêter sans contourner dans chacun de ces cas :
+Ne solliciter l’humain que pour un geste personnel indispensable (compte,
+consentement fournisseur, secret, validation visuelle inaccessible aux outils),
+ou pour une nouvelle modification protégée précisément montrée. Aucun quota
+payant sans autorisation. Préparer et exécuter tout le reste, puis reprendre
+après le geste. Ne pas exposer ou conserver de code d’appareil ni de secret.
 
-1. Le dépôt n'est pas propre au départ (§1.2).
-2. `make check` échoue autrement que ce que ce plan annonce.
-3. `verify_image.sh` ou `verify_launch.py` affiche `FAIL` après une relance.
-   Ne jamais passer en Full access, ajouter une capacité, ni ouvrir
-   `elicitation/*` pour faire passer un contrôle.
-4. Zed ne demande plus la version 1 d'ACP (§3).
-5. Il faudrait modifier un fichier protégé autre que celui du §5.6, ou affaiblir
-   un invariant I1–I13.
-6. L'étape demande un compte, du quota ou l'interface de Zed (§7.2 et §7.3).
-
-Rapporter : l'étape, la commande exacte, sa sortie, ce qui a été essayé. Une étape
-en attente de l'humain reste `👤` dans PROGRESS. Les vérifications indépendantes
-peuvent continuer, sauf celles qui en dépendent.
+En cas de contrôle en échec, conserver les preuves, diagnostiquer et corriger
+dans le périmètre Codex, vérifier puis poursuivre. Ne jamais affaiblir I1–I13,
+modifier les tests protégés ni contourner un FAIL avec Full access, une capacité
+hôte ou `elicitation/*`. Une panne extérieure ne valide pas le contrôle et
+n’élargit pas le périmètre. Consigner les points impossibles ou dépendants et
+terminer les contrôles indépendants. Une version ACP non filtrée reste refusée ;
+aucune extension de filtre sans audit. C4 ne devient ✅ que si tous les critères
+obligatoires ont une preuve.
 
 ## 2. Ordre des étapes
 
@@ -477,17 +473,23 @@ Commit : `docs: remove applied Codex patches`.
 
 ## 7. C4 Qualification réelle et acceptation humaine
 
-Les constructions et diagnostics sans modèle se font par l'exécutant, en installation
-jetable. La connexion au compte, l'interface Zed et les requêtes consommant du quota
-nécessitent l'humain (V2 §0.8). Préparer scénarios et commandes avant de le solliciter.
+Les constructions et diagnostics sans modèle se font par l’exécutant, en installation
+jetable. Le déploiement local ciblé est autorisé (§1). Seuls les gestes personnels
+inaccessibles aux outils et le quota non autorisé nécessitent l’humain ; préparer
+les scénarios et poursuivre tout contrôle indépendant.
 
 ### 7.1 État isolé et preuves sans quota
+
+Reprise autorisée : les deux scénarios `setup` ci-dessous restent **non validés**
+après l’expiration Antigravity ; ne pas les relancer pour terminer Codex. Le
+premier état est partiellement installé ; une reprise serait une récupération,
+pas une preuve neuve. Les essais indépendants se font en état Codex seul.
 
 Créer l'installation avec `isolated_env.sh` (§5.4). Elle fixe `HOME`, le projet
 `$W/home/code/proj` dans une zone autorisée (I2), et un `settings.json` de Zed : sans ce
 fichier, `update` ne synchronise pas Zed. Ne jamais y désigner le dépôt Zevbox.
 
-- [ ] `verify_image.sh` et `verify_launch.py` : `ALL OK`. Versions de Zed, adaptateur,
+- [x] `verify_image.sh` et `verify_launch.py` : `ALL OK`. Versions de Zed, adaptateur,
   moteur et protocole consignées.
 - [ ] Installation neuve : `( . "$W/env.sh"; "$W/zevbox-bin" setup )` construit Claude,
   Antigravity et Codex, avec code 0 et les trois releases présentes ; le résumé seul ne suffit pas. Sans terminal, il affiche
@@ -495,15 +497,15 @@ fichier, `update` ne synchronise pas Zed. Ne jamais y désigner le dépôt Zevbo
 - [ ] Installation existante : dans une autre installation jetable, construire Claude et
   Antigravity avec `update --agent`, puis lancer `setup`. Constater la mise à jour globale
   des trois agents. Relancer `setup` : `releases: up to date`, aucune construction.
-- [ ] Échec de construction : `( . "$W/env.sh"; "$W/zevbox-bin" tools add zevbox-no-such-package )`
+- [x] Échec de construction : `( . "$W/env.sh"; "$W/zevbox-bin" tools add zevbox-no-such-package )`
   échoue pendant `apt-get`. Attendu : code 1, `releases/active.json` inchangé,
   `build.log` utile et sans secret. Puis `( . "$W/env.sh"; "$W/zevbox-bin" tools remove zevbox-no-such-package )` : il reconstruit l'image (code 0) et vide la liste `apt` de `tools.json`.
-- [ ] Deux releases : relancer `update --agent codex`, puis `rollback --agent codex`
+- [x] Deux releases : relancer `update --agent codex`, puis `rollback --agent codex`
   deux fois. L'entrée `current` de `active.json` alterne entre les deux releases.
-- [ ] Ajout d'un outil : `tools add sl`, puis vérifier avec
+- [x] Ajout d'un outil : `tools add sl`, puis vérifier avec
   `container run --rm <image> dpkg -s sl`.
-- [ ] Ciblage : `update --agent codex` ne change pas les releases actives des autres agents.
-- [ ] `make check`, `make test-integration` et `make verify STEP=17` réussis ; empreintes
+- [x] Ciblage : `update --agent codex` ne change pas les releases actives des autres agents.
+- [x] `make check`, `make test-integration` et `make verify STEP=17` réussis ; empreintes
   conformes. Les tests réels historiques ne prouvent pas à eux seuls Codex.
 
 ### 7.2 Connexion et modèle réel avec l'humain
@@ -543,6 +545,11 @@ Déploiement autorisé : `make install`, puis `zevbox update --agent codex` et
   apparaît, le noter dans les limites.
 
 ### 7.3 Essai Zed et cycle de vie
+
+Preuves partielles du 2026-11-06 : installation/sauvegarde/idempotence Zed
+réussies en CLI ; EOF, SIGTERM, SIGKILL/nettoyage et sortie imposée de l’agent
+vérifiés sans modèle ; navigation et rendu console EN/FR en pseudo-terminal.
+Ces preuves ne cochent pas les cases combinées d’usage Zed et de compte réel.
 
 - [ ] Installer les entrées avec l'humain ; sauvegarde Zed vérifiée, entrée `zevbox · Codex`
   unique, entrées non gérées inchangées, réinstallation idempotente. Ne jamais pointer Zed
@@ -643,21 +650,21 @@ observée en C4.
 
 ### 8.5 Revue finale et remise
 
-- [ ] Inventaire des documents examinés, liste des fichiers modifiés et justification des
+- [x] Inventaire des documents examinés, liste des fichiers modifiés et justification des
   documents de la table laissés inchangés, s'il y en a.
-- [ ] Comportement, aide CLI, sorties et guides cohérents ; exemples utilisables, liens locaux
+- [x] Comportement, aide CLI, sorties et guides cohérents ; exemples utilisables, liens locaux
   valides, paires EN/FR alignées, schémas et compteurs vérifiés.
-- [ ] Recherche finale des anciennes règles : Codex optionnel, exclusivité ChatGPT, rejet
+- [x] Recherche finale des anciennes règles : Codex optionnel, exclusivité ChatGPT, rejet
   systématique des caches API, v1 figée, activation avant auth, promesse d'un `setup` limité à
   Codex, sauvegarde et restauration de cache. Ne les conserver que pour expliquer une décision.
-- [ ] `git diff --check`, gates requises et empreintes protégées conformes ; aucune donnée de
+- [x] `git diff --check`, gates requises et empreintes protégées conformes ; aucune donnée de
   compte ou de projet utilisateur dans les docs ; statuts cohérents partout.
 
 La remise finale comporte les commits, résultats de gates, preuves Codex, revue documentaire,
 état du diff protégé et limites restantes. Ne pas annoncer « parité complète » si un essai Zed
 ou une opération courante manque.
 
-## 9. Message de transmission à l'agent exécutant
+## 9. Ancien message de transmission (historique C0–C3, ne plus appliquer)
 
 > Implémente Codex en ACP dans Zevbox en suivant `docs/PLAN_codex.md` à la lettre, dans
 > l'ordre : C0, C1, C2a, C2, C3, C4. Lis d'abord entièrement `AGENTS.md`,

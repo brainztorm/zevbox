@@ -1,6 +1,6 @@
 # Spécification de Codex en ACP dans Zevbox
 
-Exécution C4 suspendue le 2026-11-06 : témoin builder modifié pendant un essai concurrent et téléchargement Antigravity expiré ; voir [PROGRESS.md](PROGRESS.md). C0–C3 sont validées, C4 non acceptée.
+Qualification C4 reprise le 2026-11-06 : gates séquentielles, image et relais réels réussis ; connexion personnelle et usage Zed encore à accepter. Setup global non validé (expiration Antigravity préexistante) ; voir [PROGRESS.md](PROGRESS.md). C0–C3 conservées, C4 non acceptée.
 
 Statut : conception retenue et précisée par l'humain le 2026-11-06 ; faits
 techniques mesurés en VM le même jour (§8.1) ; C0 à C3 validées ; acceptation C4 encore à faire. La

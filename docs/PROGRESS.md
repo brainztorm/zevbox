@@ -42,9 +42,92 @@ Les étapes ci-dessous sont distinctes des gates historiques 0–17.
 | C2a | Le relais refuse les versions ACP qu'il ne filtre pas | ✅ | 2026-11-06 : correctif appliqué à l’identique ; `make check` vert, 332 tests réussis, 8 ignorés, invariants OK ; empreintes protégées conformes. Refus des versions non filtrées en requête et réponse, vérifié par tests simulés ; aucun nouvel essai Zed. |
 | C2 | Activation standard, auth native et diagnostics | ✅ | 2026-11-06 : correctif appliqué à l’identique, documents EN/FR préparés. Fmt/clippy OK ; exactement les deux échecs protégés attendus. Preuve réelle : promotion, `verify_image` 18 PASS, `verify_launch` 13 PASS et ALL OK, EOF 2,3 s sans VM restante, doctor/permissions et entrée Codex OK ; état isolé nettoyé. Diff §5.6 approuvé explicitement par 👤 et appliqué ; rescellement humain confirmé et vérifié, `make check` vert (343 tests réussis, 8 ignorés), invariants OK. Auth réelle à faire en C4. |
 | C3 | Console et commandes de gestion | ✅ | 2026-11-06 : correctif appliqué à l’identique ; `make check` vert, 343 tests réussis, 8 ignorés, invariants OK. 24 actions, Codex avant oMLX, textes EN/FR et guides alignés. Rendu en terminal simulé ; essai interactif humain réservé à C4. |
-| C4 | Qualification réelle, acceptation humaine et revue documentaire | 🟨 | 2026-11-06 : qualification interrompue sur deux écarts documentés ci-dessous : témoin `buildkit` changé pendant les tests réels lancés concurremment avec setup ; téléchargement Antigravity expiré. C0–C3 restent validées. Reprise séquentielle autorisée ; compte, quota et Zed encore non testés. |
+| C4 | Qualification réelle, acceptation humaine et revue documentaire | 👤 | 2026-11-06 : gates séquentielles réussies, image/relais et cycle de vie Codex vérifiés sans modèle ; déploiement local ciblé effectué. C0–C3 conservées. Setup global non validé (expiration Antigravity préexistante). Connexion personnelle, quota et usage réel Zed encore en attente. |
 
 ## Journal
+
+- 2026-11-06 — **C4, nettoyage et revue finale accessible** : inventaire avant
+  suppression et preuves de releases/builds archivés hors des états dans
+  `/tmp/zevbox-c4-evidence/` (`resource-inventory.json`, sous-dossiers portant le
+  nom des états, snapshots globaux après nettoyage). Suppression ciblée des
+  images Claude/Codex du précédent setup incomplet et des deux images Codex
+  finales du nouvel état ; états `P1bCDf` et `1Nv4S1` supprimés. Les images
+  antérieures du nouvel essai avaient été rangées par update ; le candidat apt
+  échoué est archivé avec son build.log. Aucune image réelle ni base partagée
+  supprimée manuellement. Contrôle après nettoyage : tous les current/previous
+  réels et leurs images conservés, empreintes des comptes/réglages inchangées,
+  aucun conteneur préexistant hors builder modifié. Aucun nettoyage réel.
+  Documents examinés : AGENTS, contrat V2, README/guides/architectures EN/FR,
+  SPEC console, SPEC/PLAN Codex, PROGRESS/DECISIONS, annexe README, CLAUDE et
+  exploration Gemini. Modifiés dans cette reprise : tous les documents actifs
+  précités sauf CLAUDE (importe AGENTS) et exploration (historique OAuth) ; annexe
+  README corrigée au commit de procédure. Liens locaux vérifiés ; recherches
+  anciennes règles relues, seuls contexte historique ou faits spécifiques
+  restent. 4 agents, 3 standards, 24 actions, 15 commandes, 13 invariants.
+  Ancien paragraphe api-key mal placé et titre cassé de l’architecture FR
+  corrigés sans changement de politique. Paires utilisateur EN/FR alignées.
+  La revue des documents est faite ; l’acceptation complète C4 reste 👤.
+  Contrôle final `/tmp/zevbox-c4-handoff-check.log` : code 0, 343 tests,
+  invariants OK ; diff et empreintes conformes, aucun fichier protégé modifié.
+
+- 2026-11-06 — **C4, gestion Codex réelle réussie** : état neuf limité à Codex
+  `/private/tmp/zevbox-iso.1Nv4S1` ; update initial code 0, promotion
+  `codex-20261106-151727`, update suivant code 0 `codex-20261106-152101`,
+  current/previous et rollback aller-retour contrôlés par assertions.
+  `tools add zevbox-no-such-package` code 1, active.json inchangé, build.log
+  contient l’erreur apt attendue (candidat `codex-20261106-152227`) ; retrait
+  code 0, liste apt vide. `tools add sl` code 0, `dpkg -s sl` confirme installé ;
+  retrait code 0 et reconstruction réussie. `/tmp/zevbox-c4-management.log` :
+  `management ALL OK`, commandes détaillées dans les logs `-update2`,
+  `-rollback1`, `-rollback2`, `-tools-fail`, `-tools-recover`, `-tools-sl`,
+  `-tools-sl-remove`. Aucun build concurrent ; autres releases conservées
+  prouvées séparément lors du déploiement réel ciblé. Il s’agit d’une installation
+  neuve Codex seule, pas d’un setup neuf global réussi.
+  Confirmation console EN/FR également vérifiée avec cache synthétique puis
+  refusée (aucune reconnexion déclenchée) ; contrôle avec compte réel en attente.
+
+- 2026-11-06 — **C4, qualifications réelles sans modèle et déploiement ciblé** :
+  `verify_image.sh` : 18 PASS, ALL OK ; `verify_launch.py` : 13 PASS, ALL OK
+  (`/tmp/zevbox-c4-verify-image.log`, `-verify-launch.log`). Adaptateur 2.5.0,
+  moteur 0.165.0, Node 24.19.0, Zed 1.25.3, container 1.5.0, ACP v1.
+  EOF 2,3 s ; essais supplémentaires SIGTERM 2,3 s, SIGKILL puis clean 2,3 s,
+  sortie agent imposée par arrêt de sa VM 0,2 s, sans VM/enregistrement restant
+  (`/tmp/zevbox-c4-lifecycle.log`). Cette sortie imposée ne prouve pas chaque
+  type de crash interne du moteur. Login natif atteint puis Ctrl-C : code 1,
+  diagnostic attendu, cache synthétique précédent inchangé (`-cancel.log`).
+  Aucun code d’appareil ni secret conservé. Auth persistante d’un vrai compte
+  non encore prouvée ; cache synthétique relu entre VM dans verify_launch.
+- 2026-11-06 — **C4, installation locale** : `make install` code 0
+  (`/tmp/zevbox-c4-install.log`), puis `zevbox update --agent codex` code 0,
+  promotion `codex-20261106-151920` (`-real-update.log`). Aucun setup global.
+  Autres entrées current/previous inchangées ; empreintes des caches Claude,
+  Antigravity et réglages oMLX inchangées. Sauvegarde Zed antérieure exacte
+  retrouvée ; aucune ligne préexistante supprimée, une seule entrée Codex,
+  binaire `~/.local/bin/zevbox`, deux `zed install` successifs idempotents.
+  `doctor --json` code 0 : releases existantes authentifiées, permissions et
+  entrées Zed OK ; Codex attend sa connexion ; WARN instances anciennes laissé
+  intact (aucun nettoyage de l’installation réelle). Le login est lancé via
+  `/tmp/zevbox-c4-login.command` dans Terminal, sans capture de son affichage ;
+  seul le geste navigateur est demandé à l’humain. Résultat dans
+  `/tmp/zevbox-c4-login-result` (code de sortie uniquement).
+- 2026-11-06 — **C4, mécanismes partagés et console** : images réelles Claude,
+  Antigravity et oMLX répondent initialize ACP v1 avec états vides jetables,
+  sans compte ni prompt (`/tmp/zevbox-c4-regression.log`). Doctor confirme les
+  comptes existants, serveur oMLX joignable de sa VM (HTTP 401 sans clé).
+  Cela ne valide pas un dialogue modèle des autres agents. Console réelle
+  EN/FR en pseudo-terminal 130×30 : navigation vers connexion, feuille Codex,
+  rendu et sortie code 0 (`-console-en.txt`, `-console-fr.txt`). Pas de login
+  réel depuis la console ni de confirmation d’un compte connecté encore prouvés.
+- 2026-11-06 — **C4, réserves obligatoires** : aucun quota payant consommé.
+  Restent connexion personnelle, persistance et annulation après vrai login,
+  usage réel Zed (permissions acceptée/refusée, annulation puis nouveau prompt,
+  modèles/modes/effort, pièces jointes, questions, réseau, reprise et threads),
+  cycle de vie déclenché par Zed, console avec compte réel, non-régression de
+  dialogue des autres agents. Ces essais nécessitent le compte et/ou du quota
+  autorisé ; le présent environnement n’offre pas d’outil de pilotage visuel Zed.
+  Setup neuf/global/existant et idempotence globale restent non validés, cause
+  extérieure Antigravity à 120 s documentée ; aucune reconstruction globale
+  répétée. C4 et backlog 15 restent ouverts, sans promesse de parité complète.
 
 - 2026-11-06 — **Reprise C4, contrôles séquentiels** : branche propre `feat/codex-acp`
   à `d5b7c44`, empreintes conformes. Aucun build/update/setup concurrent détecté

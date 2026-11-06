@@ -201,6 +201,8 @@ Codex is standard: `setup` and unselected `update` include it once initialised. 
 
 The native sandbox runs inside the VM, without network by default; `ps` does not work inside it. Model, effort and modes depend on the adapter and account. History and databases persist in `state/codex/.codex`, including prompts, separately from Zevbox’s journals. Real sign-in, dialogue, permissions and session resumption in Zed remain to be accepted in C4.
 
+Account-free qualification on 2026-11-06 verified the image, relay, shutdown, cancelled login with a synthetic cache and EN/FR console navigation; evidence and limits are in [PROGRESS.md](PROGRESS.md). Global `setup` remains unvalidated because the existing Antigravity download timed out at 120 seconds.
+
 **Check:**
 ```bash
 zevbox auth claude --status
