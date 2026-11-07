@@ -163,12 +163,51 @@ Qualification sans modèle du 2026-11-06 : image, relais, arrêt, annulation de 
   immédiat ; le premier prompt attend ensuite que le serveur charge le modèle. Le mode par défaut
   est **Bypass permissions** : l'agent ne demande jamais rien (il n'agit que dans sa VM et votre
   projet).
-- **Ne plus retenir les commandes** : `zevbox console` ouvre un menu plein écran au clavier (en français ou en anglais, selon votre locale ou `--lang fr|en`) au-dessus des commandes ci-dessous : flèches pour choisir, Entrée pour lancer, Échap pour revenir, `q` pour quitter ; il demande « Êtes-vous sûr ? » avant tout ce qui a un impact.
+- **Ne plus retenir les commandes** : `zevbox console` ouvre un menu plein écran au clavier (en français ou en anglais, selon votre locale ou `--lang fr|en`) au-dessus des commandes ci-dessous : flèches pour choisir, Entrée pour lancer, Échap pour revenir, `q` pour quitter ; il demande « Êtes-vous sûr ? » avant tout ce qui a un impact. Voir [TUI](#tui-interface-utilisateur-en-terminal).
 - **Shell interactif dans la VM de l'agent** : `zevbox shell claude`
 - **Ce que les VM ont déjà** : Ubuntu courante avec Node/npm, Python 3 (`pip`, `venv`), `build-essential`, `git`, `ripgrep`, `curl`, `jq`.
 - **Outils Linux supplémentaires (paquets apt) dans les VM** : `zevbox tools add tree clang`
 - **Vérifier et diagnostiquer** : `zevbox status` · `zevbox doctor`
 - **Arrêter toutes les instances** : `zevbox stop`
+
+---
+
+## TUI (interface utilisateur en terminal)
+
+![La console Zevbox : les menus à gauche, l'explication de l'entrée sélectionnée à droite](../img/TUI.png)
+
+Zevbox a beaucoup de commandes et d'options. La console les remplace par un menu plein écran dans votre terminal : rien à retenir, vous lisez et vous choisissez. La capture montre la version anglaise ; la console existe aussi en français.
+
+```bash
+zevbox console
+```
+
+**À quoi elle sert**
+
+- **Utiliser Zevbox sans apprendre ses commandes.** Connectez un agent, mettez à jour, ajoutez un outil Linux ou arrêtez un agent depuis le menu.
+- **Voir où vous en êtes d'un coup d'œil.** Le bandeau du haut affiche la version active de chaque agent et le nombre d'agents en cours.
+- **Comprendre avant d'agir.** Le panneau de droite explique l'entrée sélectionnée : ce qu'elle fait, quand s'en servir, ce qu'elle change et ce qu'elle ne touche pas, sa durée et si elle a besoin du réseau.
+- **Éviter les erreurs.** Avant tout ce qui a un impact, la console demande « Êtes-vous sûr ? », indique la conséquence et sélectionne **Non** par défaut.
+- **Apprendre les vraies commandes au passage.** Chaque action affiche la commande qu'elle lance, par exemple `zevbox update --check`.
+
+**Comment elle fonctionne**
+
+Choisissez une entrée à gauche et lisez son explication à droite. Les flèches déplacent, Entrée ouvre un menu ou lance l'action, Échap revient en arrière, `q` quitte, et PgUp/PgDn font défiler un texte long. La ligne du bas affiche toujours les touches valables à cet instant, et le panneau au cadre bleu est celui qui les reçoit.
+
+La sortie d'une action s'affiche en direct à droite et se termine par `✓ terminé` ou `✗ échec`. Les connexions des agents, le shell de VM et la première installation utilisent tout le terminal, puis Entrée vous ramène au menu.
+
+| Menu | Ce que vous y faites |
+|---|---|
+| **Agents en cours** | Voir ce qui tourne, arrêter un agent ou tous, lire le journal d'une session |
+| **Mises à jour** | Vérifier les nouvelles versions, tout mettre à jour ou un seul agent, revenir à la version précédente |
+| **Connexion des agents** | Voir qui est connecté, se connecter à Claude, Antigravity ou Codex, connecter oMLX |
+| **Outils Linux** | Afficher, ajouter ou retirer les paquets supplémentaires disponibles pour les agents |
+| **Diagnostic et ménage** | Lancer `doctor`, faire le ménage, libérer l'espace disque pris par les anciennes images |
+| **Zed** | Prévisualiser, installer ou retirer les entrées Zevbox dans Zed |
+| **Shell dans une VM** | Ouvrir un shell dans la VM d'un agent |
+| **Première installation** | Préparer Zevbox sur ce Mac |
+
+La console suit la langue de votre système, en français ou en anglais ; utilisez `zevbox console --lang fr` ou `--lang en` pour choisir. Elle fonctionne avant `zevbox setup`, demande un terminal interactif et n'ajoute aucune fonction propre : chaque action lance la commande `zevbox` correspondante. Les agents, eux, se lancent toujours depuis Zed. Tous les détails sont dans le [guide utilisateur](GUIDE_UTILISATEUR.md#la-console--un-menu-à-la-place-des-commandes).
 
 ---
 

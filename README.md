@@ -158,12 +158,51 @@ Account-free qualification on 2026-11-06 verified the image, relay, shutdown, ca
   model, which Claude Code keeps using for small background requests. The switch is immediate;
   the first prompt then waits while the server loads the model. The default mode is **Bypass
   permissions**: the agent never asks (it only acts inside its VM and your project).
-- **Don't remember commands**: `zevbox console` opens a full-screen keyboard menu (English or French, from your locale or `--lang en|fr`) over the commands below: arrows to choose, Enter to run, Esc to go back, `q` to quit; it asks "Are you sure?" before anything with an impact.
+- **Don't remember commands**: `zevbox console` opens a full-screen keyboard menu (English or French, from your locale or `--lang en|fr`) over the commands below: arrows to choose, Enter to run, Esc to go back, `q` to quit; it asks "Are you sure?" before anything with an impact. See [TUI](#tui-terminal-user-interface).
 - **Interactive shell in the agent's VM**: `zevbox shell claude`
 - **What the VMs already have**: current Ubuntu with Node/npm, Python 3 (`pip`, `venv`), `build-essential`, `git`, `ripgrep`, `curl`, `jq`.
 - **Extra Linux tools (apt packages) in the VMs**: `zevbox tools add tree clang`
 - **Check and diagnose**: `zevbox status` · `zevbox doctor`
 - **Stop every running instance**: `zevbox stop`
+
+---
+
+## TUI (terminal user interface)
+
+![The Zevbox console: menus on the left, an explanation of the selected entry on the right](docs/img/TUI.png)
+
+Zevbox has many commands and options. The console replaces them with a full-screen menu in your terminal: nothing to memorise, you read and you choose.
+
+```bash
+zevbox console
+```
+
+**What it is for**
+
+- **Use Zevbox without learning its commands.** Sign in to an agent, update, add a Linux tool or stop an agent from the menu.
+- **See where you stand at a glance.** The top banner shows the active version of each agent and how many are running.
+- **Understand before you act.** The right-hand panel explains the selected entry: what it does, when to use it, what it changes and what it leaves alone, how long it takes and whether it needs the network.
+- **Avoid mistakes.** Before anything with an impact, the console asks "Are you sure?", states the consequence, and selects **No** by default.
+- **Learn the real commands as you go.** Each action shows the command it runs, for example `zevbox update --check`.
+
+**How it works**
+
+Pick an entry on the left and read its explanation on the right. Arrows move, Enter opens a menu or runs the action, Esc goes back, `q` quits, and PgUp/PgDn scroll a long text. The bottom line always shows the keys that work at that moment, and the panel with the blue border is the one receiving them.
+
+The output of an action appears live on the right, ending with `✓ done` or `✗ failed`. Agent sign-ins, the VM shell and first-time setup use the whole terminal, then Enter brings you back to the menu.
+
+| Menu | What you do there |
+|---|---|
+| **Running agents** | See what is running, stop one agent or all of them, read a session log |
+| **Updates** | Check for new versions, update everything or one agent, go back to the previous version |
+| **Agent sign-in** | See who is connected, sign in to Claude, Antigravity or Codex, connect oMLX |
+| **Linux tools** | Show, add or remove the extra packages available to the agents |
+| **Diagnosis and cleanup** | Run `doctor`, clean up, free disk space taken by old images |
+| **Zed** | Preview, install or remove the Zevbox entries in Zed |
+| **Shell in a VM** | Open a shell in an agent's VM |
+| **First-time setup** | Prepare Zevbox on this Mac |
+
+The console follows your system language, in English or French; use `zevbox console --lang en` or `--lang fr` to choose. It works before `zevbox setup`, needs an interactive terminal, and adds no feature of its own: every action runs the matching `zevbox` command. Agents themselves still start from Zed. Full details are in the [user guide](docs/USER_GUIDE.md#the-console-a-menu-instead-of-commands).
 
 ---
 
